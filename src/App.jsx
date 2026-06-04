@@ -199,7 +199,10 @@ function HomePage({ navigate }) {
     <div style={{ minHeight:"100vh", background:"#fff" }}>
       <header style={{ position:"sticky", top:0, zIndex:50, background:"rgba(255,255,255,0.96)", backdropFilter:"blur(10px)", borderBottom:"1px solid #F0EDE8" }}>
         <div style={{ maxWidth:680, margin:"0 auto", padding:"0 20px", height:54, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-          <Logo size={38}/>
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <Logo size={38}/>
+            <span style={{ fontFamily:"'Playfair Display', serif", fontSize:18, fontWeight:900, color:"#111", letterSpacing:"-0.01em" }}>Letters<span style={{ color:"#C8A96E" }}>.</span></span>
+          </div>
           <button onClick={() => setShowModal(true)} style={{ background:"#111", border:"none", borderRadius:20, padding:"6px 16px", fontSize:12.5, color:"#F0EAD8", fontFamily:"'DM Sans', sans-serif", fontWeight:500, cursor:"pointer" }}>Request invite</button>
         </div>
       </header>
