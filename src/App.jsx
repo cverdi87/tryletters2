@@ -3251,7 +3251,10 @@ function MarketingHomePage({ navigate }) {
             <Logo size={38}/>
             <span style={{ fontFamily:"'Playfair Display', serif", fontSize:18, fontWeight:900, color:"#111", letterSpacing:"-0.01em" }}>Letters<span style={{ color:"#C8A96E" }}>.</span></span>
           </div>
-          <button onClick={() => setShowModal(true)} style={{ background:"#111", border:"none", borderRadius:20, padding:"6px 16px", fontSize:12.5, color:"#F0EAD8", fontFamily:"'DM Sans', sans-serif", fontWeight:500, cursor:"pointer" }}>Request invite</button>
+          <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+            <button onClick={() => navigate("signin")} style={{ background:"none", border:"none", fontSize:12.5, color:"#888", fontFamily:"'DM Sans', sans-serif", fontWeight:500, cursor:"pointer" }}>Sign in</button>
+            <button onClick={() => setShowModal(true)} style={{ background:"#111", border:"none", borderRadius:20, padding:"6px 16px", fontSize:12.5, color:"#F0EAD8", fontFamily:"'DM Sans', sans-serif", fontWeight:500, cursor:"pointer" }}>Request invite</button>
+          </div>
         </div>
       </header>
       <main style={{ maxWidth:680, margin:"0 auto", padding:"0 20px", filter:showModal?"blur(2px)":"none", transition:"filter 0.3s ease", pointerEvents:showModal?"none":"auto" }}>
@@ -3404,8 +3407,15 @@ export default function App() {
           <Auth onAuthSuccess={() => setSession(true)}/>
         </div>
       )}
-      {!["home","invite","how-it-works","investor"].includes(marketingPage) && (
-        <Auth onAuthSuccess={() => setSession(true)}/>
+      {marketingPage === "signin" && (
+        <div style={{ minHeight:"100vh", background:"#F9F6F0", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:20 }}>
+          <button onClick={() => setMarketingPage("home")}
+            style={{ position:"fixed", top:20, left:20, background:"none", border:"none", cursor:"pointer", color:"#888", display:"flex", alignItems:"center", gap:6, fontFamily:"'DM Sans', sans-serif", fontSize:13 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+            Back
+          </button>
+          <Auth onAuthSuccess={() => setSession(true)}/>
+        </div>
       )}
     </div>
   );
