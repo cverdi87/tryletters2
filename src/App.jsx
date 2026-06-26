@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation, useParams } from "react-router-dom";
 import { supabase } from "./supabase";
 import Auth from "./Auth";
 
@@ -389,9 +390,9 @@ function LetterCard({ item, onOpen, selected, onToggleLike, isLiked, onToggleRep
       </div>
 
       {/* Author + body */}
-      <div style={{ display:"flex", gap:12 }}>
+      <div style={{ display:"flex", gap:12, minWidth:0 }}>
         <Avatar initial={item.initial} color={item.color}/>
-        <div style={{ flex:1 }}>
+        <div style={{ flex:1, minWidth:0 }}>
           <div style={{ marginBottom:8 }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
               <span style={{ fontSize:13, fontWeight:600, color:"#1a1a1a", fontFamily:"'DM Sans', sans-serif" }}>{item.author}</span>
@@ -470,7 +471,7 @@ function NewsCard({ item }) {
       </div>
 
       <div style={{ display:"flex", justifyContent:"space-between", gap:16, alignItems:"flex-start" }}>
-        <div style={{ flex:1 }}>
+        <div style={{ flex:1, minWidth:0 }}>
           {/* Publication */}
           <div style={{ marginBottom:6, display:"flex", alignItems:"center", gap:6 }}>
             <div style={{ width:3, height:3, borderRadius:"50%", background:pubColor }}/>
@@ -697,7 +698,8 @@ function SideNav({ activeTab, onNavigate, onSignOut, session }) {
 
 function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
   const [activeFeedTab, setActiveFeedTab] = useState("for-you");
-  const [openLetter, setOpenLetter] = useState(null);
+  const navigate = useNavigate();
+  const { letterId } = useParams();
   const [menuOpen, setMenuOpen] = useState(false);
   const [realLetters, setRealLetters] = useState([]);
   const [loadingFeed, setLoadingFeed] = useState(true);
@@ -869,9 +871,16 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
     fetchRealLetters();
   }, []);
 
+  // Minimal derivation needed early — full combinedFeed-based lookup happens
+  // later once republishEntries/mockFeed are in scope; this covers the most
+  // common case (a real letter) for the likes/replies effect below.
+  const openLetterEarly = letterId
+    ? realLetters.find(item => item.dbId === letterId) || null
+    : null;
+
   // Fetch likes + replies whenever a real letter is opened
   useEffect(() => {
-    if (!openLetter || !openLetter.isReal) {
+    if (!openLetterEarly || !openLetterEarly.isReal) {
       setLetterLikes([]);
       setLetterReplies([]);
       return;
@@ -879,8 +888,8 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
     const fetchDetail = async () => {
       setLoadingDetail(true);
       const [{ data: likesData }, { data: repliesData }] = await Promise.all([
-        supabase.from("likes").select("user_id").eq("letter_id", openLetter.dbId),
-        supabase.from("replies").select("*, profiles:user_id (username, full_name, status)").eq("letter_id", openLetter.dbId).order("created_at", { ascending: true }),
+        supabase.from("likes").select("user_id").eq("letter_id", openLetterEarly.dbId),
+        supabase.from("replies").select("*, profiles:user_id (username, full_name, status)").eq("letter_id", openLetterEarly.dbId).order("created_at", { ascending: true }),
       ]);
       setLetterLikes((likesData || []).map(l => l.user_id));
       setLetterReplies((repliesData || []).map(r => ({
@@ -894,7 +903,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
       setLoadingDetail(false);
     };
     fetchDetail();
-  }, [openLetter?.dbId]);
+  }, [openLetterEarly?.dbId]);
 
   const isLikedByMe = letterLikes.includes(session?.user?.id);
 
@@ -1001,6 +1010,23 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
     combinedFeedBase; // "for-you" and "following" both use the same base feed for now —
                        // Following has no real follow graph yet, see empty state below.
 
+  // Derive the open letter from the URL param (e.g. /feed/letter/abc123) instead
+  // of separate local state, so individual letters are real, shareable URLs.
+  // Real letters use their dbId (a UUID); mock letters use a "mock-N" slug
+  // since they don't have a database id of their own.
+  const openLetter = letterId
+    ? combinedFeed.find(item => item.dbId === letterId) ||
+      realLetters.find(item => item.dbId === letterId) ||
+      combinedFeed.find(item => `mock-${item.id}` === letterId && !item.isReal) ||
+      null
+    : null;
+
+  const setOpenLetter = (item) => {
+    if (!item) { navigate("/feed"); return; }
+    const slug = item.dbId ? item.dbId : `mock-${item.id}`;
+    navigate(`/feed/letter/${slug}`);
+  };
+
   return (
     <div style={{ minHeight:"100vh", background:"#fff" }}>
 
@@ -1036,7 +1062,14 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
           @media (min-width: 768px) {
             .letters-split { display: flex !important; height: 100vh; overflow: hidden; }
             .letters-feed-pane { overflow-y: auto; border-right: 1px solid #F0EDE8; flex-shrink: 0; }
-            .letters-detail-pane { display: flex !important; overflow-y: auto; flex: 1; }
+            .letters-detail-pane {
+              display: flex !important;
+              overflow-y: auto;
+              flex: 1;
+              position: static !important;
+              top: auto !important; left: auto !important; right: auto !important; bottom: auto !important;
+              z-index: auto !important;
+            }
           }
         `}</style>
 
@@ -1146,8 +1179,19 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
           </div>
         </div>
 
-        {/* Detail pane — desktop only */}
-        <div className="letters-detail-pane" style={{ display:"none", background:"#fff", minHeight:"100vh" }}>
+        {/* Detail pane — full-screen overlay on mobile when a letter is open, side pane on desktop */}
+        <div
+          className="letters-detail-pane"
+          style={{
+            display: openLetter ? "flex" : "none",
+            background: "#fff",
+            minHeight: "100vh",
+            position: openLetter ? "fixed" : "static",
+            top: 0, left: 0, right: 0, bottom: 0,
+            zIndex: openLetter ? 100 : "auto",
+            overflowY: "auto",
+          }}
+        >
           {openLetter ? (
             <div style={{ width:"100%", paddingBottom:60 }}>
               {/* Close bar */}
@@ -1392,9 +1436,17 @@ function ArticleReaderView({ article, onBack, onWriteAbout }) {
           </button>
           <div style={{ display:"flex", alignItems:"center", gap:14 }}>
             {/* Font size controls */}
-            <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-              <button onClick={() => setFontSize(f => Math.max(14, f-1))} style={{ background:"none", border:"none", cursor:"pointer", color:subtext, fontFamily:"'DM Sans', sans-serif", fontSize:12, fontWeight:600, padding:4 }}>A−</button>
-              <button onClick={() => setFontSize(f => Math.min(22, f+1))} style={{ background:"none", border:"none", cursor:"pointer", color:subtext, fontFamily:"'DM Sans', sans-serif", fontSize:15, fontWeight:600, padding:4 }}>A+</button>
+            <div style={{ display:"flex", alignItems:"center", gap:2 }}>
+              <button
+                onClick={() => setFontSize(f => Math.max(14, f-1))}
+                style={{ background:"none", border:"none", cursor:"pointer", color:subtext, fontFamily:"'DM Sans', sans-serif", fontSize:13, fontWeight:600, padding:"10px 8px", minWidth:36, minHeight:36, touchAction:"manipulation" }}>
+                A−
+              </button>
+              <button
+                onClick={() => setFontSize(f => Math.min(22, f+1))}
+                style={{ background:"none", border:"none", cursor:"pointer", color:subtext, fontFamily:"'DM Sans', sans-serif", fontSize:16, fontWeight:600, padding:"10px 8px", minWidth:36, minHeight:36, touchAction:"manipulation" }}>
+                A+
+              </button>
             </div>
             {/* Dark mode toggle */}
             <button onClick={() => setDarkMode(d => !d)} style={{ background:"none", border:"none", cursor:"pointer", color:subtext, padding:4 }}>
@@ -1539,8 +1591,8 @@ function PublicationPage({ publication, articles, onBack, onOpenArticle }) {
 
 function ReadPage({ onNavigate }) {
   const [activeCategory, setActiveCategory] = useState("All");
-  const [openArticle, setOpenArticle] = useState(null);
-  const [openPublication, setOpenPublication] = useState(null);
+  const navigate = useNavigate();
+  const { articleId, publicationName } = useParams();
   const [realArticles, setRealArticles] = useState([]);
   const [loadingArticles, setLoadingArticles] = useState(true);
   const categories = ["All", "World", "Local", "Politics", "Technology", "Culture", "Sports"];
@@ -1582,8 +1634,34 @@ function ReadPage({ onNavigate }) {
   const filteredSources = activeCategory === "All" ? newsSources : newsSources.filter(s => s.category === activeCategory);
   const filteredArticles = activeCategory === "All" ? allArticles : allArticles.filter(a => a.category === activeCategory);
 
+  // Derive open article/publication from the URL instead of local state, so
+  // individual articles and publication pages are real, shareable URLs.
+  // Real articles match by dbId (UUID); mock articles fall back to a
+  // "mock-N" slug since they don't have a database id of their own.
+  const openArticle = articleId
+    ? allArticles.find(a => a.dbId === articleId) ||
+      allArticles.find(a => `mock-${a.id}` === articleId && !a.isReal) ||
+      null
+    : null;
+
+  const openPublication = publicationName
+    ? newsSources.find(s => s.name === decodeURIComponent(publicationName)) || null
+    : null;
+
+  const setOpenArticle = (article) => {
+    if (!article) { navigate("/read"); return; }
+    const slug = article.dbId ? article.dbId : `mock-${article.id}`;
+    navigate(`/read/article/${slug}`);
+  };
+
+  const setOpenPublication = (publication) => {
+    if (!publication) { navigate("/read"); return; }
+    navigate(`/read/publication/${encodeURIComponent(publication.name)}`);
+  };
+
   if (openArticle) return (
     <ArticleReaderView
+      key={openArticle.dbId || openArticle.id}
       article={openArticle}
       onBack={() => setOpenArticle(null)}
       onWriteAbout={(article) => onNavigate && onNavigate("write", article)}
@@ -1965,7 +2043,41 @@ function WritePage({ session, onNavigate }) {
   const [savedAt, setSavedAt] = useState(null);
   const [bodyFontSize, setBodyFontSize] = useState(17);
   const [bodyFont, setBodyFont] = useState("EB Garamond");
+  const [realRecentArticles, setRealRecentArticles] = useState([]);
+  const [loadingRecentArticles, setLoadingRecentArticles] = useState(true);
   const editorRef = useRef(null);
+
+  // Pull the 4 most recently published real articles for the source-linking panel
+  useEffect(() => {
+    const fetchRecent = async () => {
+      setLoadingRecentArticles(true);
+      const { data, error } = await supabase
+        .from("news_articles")
+        .select("*")
+        .order("published_at", { ascending: false })
+        .limit(4);
+      if (!error && data) {
+        const mapped = data.map(a => ({
+          id: `real-${a.id}`,
+          dbId: a.id,
+          isReal: true,
+          title: a.title,
+          publication: a.source,
+          url: a.link,
+          color: colorForSource(a.source),
+          image_url: a.image_url,
+          readAt: timeAgoRead(a.published_at),
+        }));
+        setRealRecentArticles(mapped);
+      }
+      setLoadingRecentArticles(false);
+    };
+    fetchRecent();
+  }, []);
+
+  // Real articles first, falling back to mock content to fill out to 4 if
+  // the live feed doesn't have enough yet — keeps the panel from looking sparse.
+  const recentArticlesCombined = [...realRecentArticles, ...recentArticles].slice(0, 4);
 
   const fontOptions = [
     { name:"EB Garamond",    label:"Garamond",    sample:"Serif · Classic",   stack:"'EB Garamond', Georgia, serif" },
@@ -2307,8 +2419,10 @@ function WritePage({ session, onNavigate }) {
           </div>
         </div>
 
-        {/* ── Source-linking column — desktop only, where preview used to be ── */}
-        <div className="letters-write-preview" style={{ flex:"1 1 340px", minWidth:0 }}>
+        {/* ── Source-linking column — visible on all screen sizes; sits beside the
+             writing area on desktop, stacks below it on mobile (flex-direction
+             switches to column under 768px via .letters-write-main) ── */}
+        <div style={{ flex:"1 1 340px", minWidth:0 }}>
           <div style={{ position:"sticky", top:24 }}>
 
             {/* ── Source section ── */}
@@ -2343,7 +2457,9 @@ function WritePage({ session, onNavigate }) {
               <div style={{ padding:"14px 20px 6px" }}>
                 <div style={{ fontSize:9.5, letterSpacing:"0.12em", textTransform:"uppercase", color:"#BBB", fontFamily:"'DM Mono', monospace", marginBottom:10 }}>Recent articles</div>
                 <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                  {recentArticles.slice(0, 4).map(article => {
+                  {loadingRecentArticles && realRecentArticles.length === 0 ? (
+                    <div style={{ textAlign:"center", padding:"16px 0", fontSize:10.5, color:"#CCC", fontFamily:"'DM Mono', monospace" }}>Loading...</div>
+                  ) : recentArticlesCombined.map(article => {
                     const isSelected = form.sourceTitle === article.title;
                     return (
                       <button key={article.id} onClick={() => selectArticle(article)}
@@ -2357,7 +2473,11 @@ function WritePage({ session, onNavigate }) {
                         onMouseEnter={e => { if(!isSelected) e.currentTarget.style.borderColor="#C8A96E"; }}
                         onMouseLeave={e => { if(!isSelected) e.currentTarget.style.borderColor="#E8E0D0"; }}>
                         <div style={{ width:36, height:36, borderRadius:6, overflow:"hidden", flexShrink:0, background:article.color, position:"relative" }}>
-                          <img src={`https://picsum.photos/seed/${article.imgId}/72/72`} alt={article.title} style={{ width:"100%", height:"100%", objectFit:"cover" }}/>
+                          {article.image_url ? (
+                            <img src={article.image_url} alt={article.title} style={{ width:"100%", height:"100%", objectFit:"cover" }} onError={e => { e.target.style.display = "none"; }}/>
+                          ) : article.imgId ? (
+                            <img src={`https://picsum.photos/seed/${article.imgId}/72/72`} alt={article.title} style={{ width:"100%", height:"100%", objectFit:"cover" }}/>
+                          ) : null}
                           {isSelected && (
                             <div style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.4)", display:"flex", alignItems:"center", justifyContent:"center" }}>
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C8A96E" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
@@ -2591,7 +2711,7 @@ function ForumFeedCard({ item }) {
       </div>
       <div style={{ display:"flex", gap:12 }}>
         <div style={{ width:34, height:34, borderRadius:"50%", background:item.color, display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontSize:13, fontFamily:"'Playfair Display', serif", fontWeight:500, flexShrink:0 }}>{item.initial}</div>
-        <div style={{ flex:1 }}>
+        <div style={{ flex:1, minWidth:0 }}>
           <div style={{ display:"flex", justifyContent:"space-between", marginBottom:5 }}>
             <span style={{ fontSize:13, fontWeight:600, color:"#1a1a1a", fontFamily:"'DM Sans', sans-serif" }}>{item.author}</span>
             <span style={{ fontSize:10, color:"#bbb", fontFamily:"'DM Mono', monospace" }}>{item.timeAgo}</span>
@@ -3357,70 +3477,22 @@ function InvitePage({ navigate }) {
 }
 
 // ── App Router ────────────────────────────────────────────────────────────────
-export default function App() {
-  const [tab, setTab] = useState("feed");
-  const [marketingPage, setMarketingPage] = useState("home");
-  const [session, setSession] = useState(null);
-  const [loadingSession, setLoadingSession] = useState(true);
+// Wraps the real authenticated app in a Router context and translates the
+// old setTab("write")-style calls into real navigation, so every existing
+// page component (FeedPage, ReadPage, WritePage, ForumsPage, YouPage) keeps
+// working with minimal internal changes.
+function AuthenticatedApp({ session, handleSignOut }) {
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setLoadingSession(false);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
+  // Derive the active top-level tab from the URL for the nav components,
+  // e.g. "/feed/letter/abc123" -> "feed"
+  const activeTab = location.pathname.split("/")[1] || "feed";
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    setSession(null);
-    setTab("feed");
-    setMarketingPage("home");
-  };
+  // Old code calls onNavigate("write") etc. — translate that single-segment
+  // tab name into a real route change.
+  const goToTab = (tabName) => navigate(`/${tabName}`);
 
-  if (loadingSession) return (
-    <div style={{ minHeight:"100vh", background:"#F9F6F0", display:"flex", alignItems:"center", justifyContent:"center" }}>
-      <span style={{ fontSize:10, letterSpacing:"0.2em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace" }}>Loading...</span>
-    </div>
-  );
-
-  // Not logged in — show marketing site
-  if (!session) return (
-    <div>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        ::placeholder { color: #B0A898; font-style: italic; font-family: 'EB Garamond', Georgia, serif; font-size: 14px; }
-      `}</style>
-      {marketingPage === "home"     && <MarketingHomePage navigate={setMarketingPage}/>}
-      {marketingPage === "invite"   && <InvitePage navigate={setMarketingPage}/>}
-      {marketingPage === "how-it-works" && (
-        <div style={{ minHeight:"100vh", background:"#F9F6F0", display:"flex", alignItems:"center", justifyContent:"center" }}>
-          <Auth onAuthSuccess={() => setSession(true)}/>
-        </div>
-      )}
-      {marketingPage === "investor" && (
-        <div style={{ minHeight:"100vh", background:"#F9F6F0", display:"flex", alignItems:"center", justifyContent:"center" }}>
-          <Auth onAuthSuccess={() => setSession(true)}/>
-        </div>
-      )}
-      {marketingPage === "signin" && (
-        <div style={{ minHeight:"100vh", background:"#F9F6F0", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:20 }}>
-          <button onClick={() => setMarketingPage("home")}
-            style={{ position:"fixed", top:20, left:20, background:"none", border:"none", cursor:"pointer", color:"#888", display:"flex", alignItems:"center", gap:6, fontFamily:"'DM Sans', sans-serif", fontSize:13 }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-            Back
-          </button>
-          <Auth onAuthSuccess={() => setSession(true)}/>
-        </div>
-      )}
-    </div>
-  );
-
-  // Logged in — show the app with bottom nav
   return (
     <div>
       <style>{`
@@ -3460,23 +3532,108 @@ export default function App() {
 
       {/* Global desktop sidebar — visible on all tabs */}
       <div className="letters-sidebar" style={{ position:"fixed", top:0, left:0, bottom:0, width:220, background:"#fff", borderRight:"1px solid #F0EDE8", zIndex:60, flexDirection:"column" }}>
-        <SideNav activeTab={tab} onNavigate={setTab} onSignOut={handleSignOut} session={session}/>
+        <SideNav activeTab={activeTab} onNavigate={goToTab} onSignOut={handleSignOut} session={session}/>
       </div>
 
       {/* Global desktop right nav */}
-      <RightNav active={tab} onNavigate={setTab}/>
+      <RightNav active={activeTab} onNavigate={goToTab}/>
 
-      {/* Page content */}
-      {tab === "feed"   && <FeedPage session={session} onSignOut={handleSignOut} onNavigate={setTab} activeTab={tab}/>}
-      {tab === "read"   && <ReadPage onNavigate={setTab}/>}
-      {tab === "write"  && <WritePage session={session} onNavigate={setTab}/>}
-      {tab === "forums" && <ForumsPage/>}
-      {tab === "you"    && <YouPage session={session} onSignOut={handleSignOut}/>}
+      {/* Page content — real routes now, not state */}
+      <Routes>
+        <Route path="/" element={<Navigate to="/feed" replace/>}/>
+        <Route path="/feed" element={<FeedPage session={session} onSignOut={handleSignOut} onNavigate={goToTab} activeTab={activeTab}/>}/>
+        <Route path="/feed/letter/:letterId" element={<FeedPage session={session} onSignOut={handleSignOut} onNavigate={goToTab} activeTab={activeTab}/>}/>
+        <Route path="/read" element={<ReadPage onNavigate={goToTab}/>}/>
+        <Route path="/read/article/:articleId" element={<ReadPage onNavigate={goToTab}/>}/>
+        <Route path="/read/publication/:publicationName" element={<ReadPage onNavigate={goToTab}/>}/>
+        <Route path="/write" element={<WritePage session={session} onNavigate={goToTab}/>}/>
+        <Route path="/forums" element={<ForumsPage/>}/>
+        <Route path="/you" element={<YouPage session={session} onSignOut={handleSignOut}/>}/>
+        <Route path="*" element={<Navigate to="/feed" replace/>}/>
+      </Routes>
 
       {/* Global mobile bottom nav */}
       <div className="letters-bottom-nav">
-        <BottomNav active={tab} onNavigate={setTab}/>
+        <BottomNav active={activeTab} onNavigate={goToTab}/>
       </div>
     </div>
+  );
+}
+
+// Marketing/auth site shown when logged out — also routed, so /signin and
+// /invite are real, shareable, refreshable URLs instead of button-only state.
+function MarketingSite({ onAuthSuccess }) {
+  const navigate = useNavigate();
+  const goTo = (page) => navigate(page === "home" ? "/" : `/${page}`);
+
+  return (
+    <div>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        ::placeholder { color: #B0A898; font-style: italic; font-family: 'EB Garamond', Georgia, serif; font-size: 14px; }
+      `}</style>
+      <Routes>
+        <Route path="/" element={<MarketingHomePage navigate={goTo}/>}/>
+        <Route path="/invite" element={<InvitePage navigate={goTo}/>}/>
+        <Route path="/how-it-works" element={
+          <div style={{ minHeight:"100vh", background:"#F9F6F0", display:"flex", alignItems:"center", justifyContent:"center" }}>
+            <Auth onAuthSuccess={onAuthSuccess}/>
+          </div>
+        }/>
+        <Route path="/investor" element={
+          <div style={{ minHeight:"100vh", background:"#F9F6F0", display:"flex", alignItems:"center", justifyContent:"center" }}>
+            <Auth onAuthSuccess={onAuthSuccess}/>
+          </div>
+        }/>
+        <Route path="/signin" element={
+          <div style={{ minHeight:"100vh", background:"#F9F6F0", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:20 }}>
+            <button onClick={() => goTo("home")}
+              style={{ position:"fixed", top:20, left:20, background:"none", border:"none", cursor:"pointer", color:"#888", display:"flex", alignItems:"center", gap:6, fontFamily:"'DM Sans', sans-serif", fontSize:13 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+              Back
+            </button>
+            <Auth onAuthSuccess={onAuthSuccess}/>
+          </div>
+        }/>
+        <Route path="*" element={<Navigate to="/" replace/>}/>
+      </Routes>
+    </div>
+  );
+}
+
+export default function App() {
+  const [session, setSession] = useState(null);
+  const [loadingSession, setLoadingSession] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoadingSession(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setSession(null);
+  };
+
+  if (loadingSession) return (
+    <div style={{ minHeight:"100vh", background:"#F9F6F0", display:"flex", alignItems:"center", justifyContent:"center" }}>
+      <span style={{ fontSize:10, letterSpacing:"0.2em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace" }}>Loading...</span>
+    </div>
+  );
+
+  return (
+    <BrowserRouter>
+      {!session
+        ? <MarketingSite onAuthSuccess={() => setSession(true)}/>
+        : <AuthenticatedApp session={session} handleSignOut={handleSignOut}/>
+      }
+    </BrowserRouter>
   );
 }
