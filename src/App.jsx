@@ -778,10 +778,17 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
   };
 
   const stripHtml = (html) => {
-    if (typeof document === "undefined") return html || "";
+    if (!html) return "";
+    if (typeof document === "undefined") return html;
+    // Insert a space wherever a block-level boundary was, so paragraphs and
+    // line breaks don't collapse directly into the next word with no gap
+    // (e.g. "...mobile" + "News feed..." becoming "...mobileNews feed...").
+    const withSpacing = html
+      .replace(/<\/(p|div|li|blockquote|h[1-6])>/gi, " ")
+      .replace(/<br\s*\/?>/gi, " ");
     const div = document.createElement("div");
-    div.innerHTML = html || "";
-    return div.textContent || div.innerText || "";
+    div.innerHTML = withSpacing;
+    return (div.textContent || div.innerText || "").replace(/\s+/g, " ").trim();
   };
 
   const fetchRealLetters = async () => {
@@ -2982,10 +2989,17 @@ function YouPage({ session, onSignOut }) {
   const userStatus = profile?.status || "founding";
 
   const stripHtml = (html) => {
-    if (typeof document === "undefined") return html || "";
+    if (!html) return "";
+    if (typeof document === "undefined") return html;
+    // Insert a space wherever a block-level boundary was, so paragraphs and
+    // line breaks don't collapse directly into the next word with no gap
+    // (e.g. "...mobile" + "News feed..." becoming "...mobileNews feed...").
+    const withSpacing = html
+      .replace(/<\/(p|div|li|blockquote|h[1-6])>/gi, " ")
+      .replace(/<br\s*\/?>/gi, " ");
     const div = document.createElement("div");
-    div.innerHTML = html || "";
-    return div.textContent || div.innerText || "";
+    div.innerHTML = withSpacing;
+    return (div.textContent || div.innerText || "").replace(/\s+/g, " ").trim();
   };
 
   const timeAgoYou = (dateStr) => {
@@ -3354,15 +3368,536 @@ function HomepageModal({ onDismiss, navigate }) {
   );
 }
 
+// ── Reusable phone frame for the landing-page demo slides ──────────────────────
+function PhoneFrame({ children }) {
+  return (
+    <div style={{ width:260, margin:"0 auto", background:"linear-gradient(165deg, #1c1c1c, #0a0a0a)", borderRadius:34, padding:"14px 10px", boxShadow:"0 20px 46px rgba(0,0,0,0.22), inset 0 1px 1px rgba(255,255,255,0.06)", position:"relative" }}>
+      <div style={{ position:"absolute", left:-2, top:90, width:3, height:34, background:"#2a2a2a", borderRadius:2 }}/>
+      <div style={{ position:"absolute", right:-2, top:130, width:3, height:50, background:"#2a2a2a", borderRadius:2 }}/>
+      <div style={{ background:"#fff", borderRadius:22, overflow:"hidden", height:430, position:"relative" }}>
+        <div style={{ position:"absolute", top:0, left:"50%", transform:"translateX(-50%)", width:72, height:17, background:"#111", borderRadius:"0 0 11px 11px", zIndex:20 }}/>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// Five-act landing-page demo, one per product tab:
+//   Slide 0 — Feed (phone):    scroll the feed, open a letter, like it, post a reply.
+//   Slide 1 — Desktop (laptop): browse Read, click Write in the nav, the desktop Write screen opens.
+//   Slide 2 — Write (phone):   a headline appears, the body types itself out, Publish presses.
+//   Slide 3 — Forums (phone):  browse forum cards, a Join button flips to Joined.
+//   Slide 4 — You (phone):     the profile builds — badge fades in, stat numbers count up.
+// Then the whole thing loops back to Slide 0.
+function AnimatedDemoFeed() {
+  const [phase, setPhase] = useState("mobile-scroll");
+  const [typedComment, setTypedComment] = useState(0);
+  const [liked, setLiked] = useState(false);
+  const [commentPosted, setCommentPosted] = useState(false);
+  const [touchPos, setTouchPos] = useState(null);
+  const [desktopCursor, setDesktopCursor] = useState({ x: 43, y: 50 }); // laptop-slide pointer position, in %
+  const [writeTyped, setWriteTyped] = useState(0);     // chars of the Write-slide body typed so far
+  const [forumJoined, setForumJoined] = useState(false); // Forums-slide Join → Joined
+  const [statsProgress, setStatsProgress] = useState(0); // You-slide count-up, 0 → 1
+  const scrollRef = useRef(null);
+
+  const demoArticle = { publication:"The Atlantic", section:"Economy", headline:"The Quiet Death of the American Middle Class" };
+  const demoLetterAuthor = mockFeed.find(i => i.type === "letter") || { author:"Margaret T.", username:"margaret_t", status:"founding", initial:"M", color:"#2D6A4F", preview:"The framing of this piece misses what's actually happening in rust-belt communities. Having lived in Youngstown for 30 years, I can tell you the numbers don't capture the social fabric that's unraveled..." };
+  const commentText = "I was thinking the same thing! Great minds!";
+
+  // Write-slide content
+  const writeHeadline = "When the local paper dies";
+  const writeBody = "Local newsrooms are vanishing, and with them the daily record of civic life — the quiet work of showing up to the meeting and taking the minutes.";
+
+  // Forums-slide content
+  const demoForums = [
+    { name:"Politics & Policy", members:"6.2k", color:"#C0392B" },
+    { name:"Technology",        members:"5.1k", color:"#1A1A1A" },
+    { name:"Climate & Earth",   members:"3.8k", color:"#27AE60" },
+  ];
+
+  // You-slide stats (count up to these)
+  const youStats = [
+    { label:"Letters", value:12 },
+    { label:"Replies", value:47 },
+    { label:"Likes",   value:203 },
+  ];
+
+  const goTo = (next, delay) => { const t = setTimeout(() => setPhase(next), delay); return () => clearTimeout(t); };
+
+  // ── Slide 0: Feed (phone) ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (phase !== "mobile-scroll") return;
+    let raf, start = null;
+    const duration = 2200;
+    const animate = (ts) => {
+      if (!start) start = ts;
+      const progress = Math.min((ts - start) / duration, 1);
+      if (scrollRef.current) scrollRef.current.scrollTop = progress * (scrollRef.current.scrollHeight - scrollRef.current.clientHeight);
+      if (progress < 1) raf = requestAnimationFrame(animate);
+      else setTimeout(() => setPhase("mobile-tap"), 350);
+    };
+    raf = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(raf);
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase !== "mobile-tap") return;
+    setTouchPos({ x: 50, y: 32 });
+    const t = setTimeout(() => setPhase("mobile-open"), 550);
+    return () => clearTimeout(t);
+  }, [phase]);
+
+  useEffect(() => { if (phase === "mobile-open") { setTouchPos(null); return goTo("mobile-like-tap", 900); } }, [phase]);
+
+  useEffect(() => {
+    if (phase !== "mobile-like-tap") return;
+    setTouchPos({ x: 12, y: 71 });
+    const t = setTimeout(() => { setTouchPos(null); setPhase("mobile-like"); }, 450);
+    return () => clearTimeout(t);
+  }, [phase]);
+
+  useEffect(() => { if (phase === "mobile-like") { setLiked(true); return goTo("mobile-comment-type", 800); } }, [phase]);
+
+  useEffect(() => {
+    if (phase !== "mobile-comment-type") return;
+    setTypedComment(0);
+    let i = 0;
+    const interval = setInterval(() => {
+      i++;
+      setTypedComment(i);
+      if (i >= commentText.length) { clearInterval(interval); setTimeout(() => setPhase("mobile-comment-sent"), 600); }
+    }, 28);
+    return () => clearInterval(interval);
+  }, [phase]);
+
+  useEffect(() => { if (phase === "mobile-comment-sent") { setCommentPosted(true); return goTo("desktop-read", 1200); } }, [phase]);
+
+  // ── Slide 1: Desktop (laptop) — Read → click Write → Write screen ───────────
+  useEffect(() => {
+    if (phase !== "desktop-read") return;
+    setDesktopCursor({ x: 43, y: 50 }); // idle over the Read content
+    return goTo("desktop-cursor", 1500);
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase !== "desktop-cursor") return;
+    setDesktopCursor({ x: 50, y: 12 }); // glide up to the "Write" nav item
+    return goTo("desktop-write", 950);
+  }, [phase]);
+
+  useEffect(() => { if (phase === "desktop-write") return goTo("write-in", 2000); }, [phase]);
+
+  // ── Slide 2: Write (phone) ─────────────────────────────────────────────────
+  useEffect(() => { if (phase === "write-in") return goTo("write-type", 500); }, [phase]);
+
+  useEffect(() => {
+    if (phase !== "write-type") return;
+    setWriteTyped(0);
+    let i = 0;
+    const interval = setInterval(() => {
+      i++;
+      setWriteTyped(i);
+      if (i >= writeBody.length) { clearInterval(interval); setTimeout(() => setPhase("write-publish"), 600); }
+    }, 22);
+    return () => clearInterval(interval);
+  }, [phase]);
+
+  useEffect(() => { if (phase === "write-publish") return goTo("write-success", 700); }, [phase]);
+  useEffect(() => { if (phase === "write-success") return goTo("forums-in", 1500); }, [phase]);
+
+  // ── Slide 3: Forums (phone) ────────────────────────────────────────────────
+  useEffect(() => { if (phase === "forums-in") return goTo("forums-scroll", 500); }, [phase]);
+  useEffect(() => { if (phase === "forums-scroll") return goTo("forums-join", 1000); }, [phase]);
+  useEffect(() => { if (phase === "forums-join") { setForumJoined(true); return goTo("you-in", 1400); } }, [phase]);
+
+  // ── Slide 4: You (phone) ───────────────────────────────────────────────────
+  useEffect(() => { if (phase === "you-in") return goTo("you-count", 400); }, [phase]);
+
+  useEffect(() => {
+    if (phase !== "you-count") return;
+    let raf, start = null, resetTimer = null;
+    const duration = 1100;
+    const animate = (ts) => {
+      if (!start) start = ts;
+      const progress = Math.min((ts - start) / duration, 1);
+      setStatsProgress(progress);
+      if (progress < 1) {
+        raf = requestAnimationFrame(animate);
+      } else {
+        // Hold the finished profile for a beat, then reset everything and loop.
+        resetTimer = setTimeout(() => {
+          setLiked(false); setCommentPosted(false); setTypedComment(0); setTouchPos(null);
+          setWriteTyped(0); setForumJoined(false); setStatsProgress(0);
+          setDesktopCursor({ x: 43, y: 50 });
+          if (scrollRef.current) scrollRef.current.scrollTop = 0;
+          setPhase("mobile-scroll");
+        }, 1300);
+      }
+    };
+    raf = requestAnimationFrame(animate);
+    return () => { cancelAnimationFrame(raf); if (resetTimer) clearTimeout(resetTimer); };
+  }, [phase]);
+
+  const mobileOpen = phase !== "mobile-scroll" && phase !== "mobile-tap";
+  const desktopWriteScreen = phase === "desktop-write";
+
+  // ── Carousel mechanics ──────────────────────────────────────────────────────
+  const phaseToSlide = {
+    "mobile-scroll":0, "mobile-tap":0, "mobile-open":0, "mobile-like-tap":0, "mobile-like":0,
+    "mobile-comment-type":0, "mobile-comment-sent":0,
+    "desktop-read":1, "desktop-cursor":1, "desktop-write":1,
+    "write-in":2, "write-type":2, "write-publish":2, "write-success":2,
+    "forums-in":3, "forums-scroll":3, "forums-join":3,
+    "you-in":4, "you-count":4,
+  };
+  const slideIndex = phaseToSlide[phase] ?? 0;
+  const SLOT = 420; // width reserved per slide (slide 320 + 100 gap), keeps the wide laptop clear of its neighbors
+
+  const slideStyle = (i) => {
+    const distance = slideIndex - i; // 0 = active, 1 = one slide back, etc.; <0 = not yet reached
+    return {
+      width:320, flexShrink:0, marginRight:100,
+      opacity: distance < 0 ? 0 : distance === 0 ? 1 : Math.max(0.18, 1 - distance * 0.4),
+      transform: distance < 0 ? "scale(0.96)" : "scale(1)",
+      transition:"opacity 0.5s ease, transform 0.5s ease",
+    };
+  };
+
+  // Small shared header bar for the phone-based slides (Write / Forums / You)
+  const ScreenHeader = ({ label }) => (
+    <div style={{ display:"flex", alignItems:"center", gap:6, padding:"24px 12px 8px", borderBottom:"1px solid #F0EDE8", flexShrink:0 }}>
+      <Logo size={14}/>
+      <span style={{ fontSize:9.5, color:"#444", fontFamily:"'Playfair Display', serif", fontWeight:900 }}>{label}<span style={{ color:"#C8A96E" }}>.</span></span>
+    </div>
+  );
+
+  return (
+    <div style={{ position:"relative", width:"100%", maxWidth:760, margin:"0 auto", overflow:"hidden" }}>
+      <div style={{
+        display:"flex", alignItems:"center",
+        transform:`translateX(calc(50% - 160px - ${slideIndex * SLOT}px))`,
+        transition:"transform 0.6s cubic-bezier(0.22,1,0.36,1)",
+      }}>
+
+        {/* ── Slide 0: Phone — Feed ── */}
+        <div style={slideStyle(0)}>
+          <div style={{ width:260, margin:"0 auto", background:"linear-gradient(165deg, #1c1c1c, #0a0a0a)", borderRadius:34, padding:"14px 10px", boxShadow:"0 20px 46px rgba(0,0,0,0.22), inset 0 1px 1px rgba(255,255,255,0.06)", position:"relative" }}>
+            <div style={{ position:"absolute", left:-2, top:90, width:3, height:34, background:"#2a2a2a", borderRadius:2 }}/>
+            <div style={{ position:"absolute", right:-2, top:130, width:3, height:50, background:"#2a2a2a", borderRadius:2 }}/>
+
+            <div style={{ background:"#fff", borderRadius:22, overflow:"hidden", height:430, position:"relative" }}>
+              <div style={{ position:"absolute", top:0, left:"50%", transform:"translateX(-50%)", width:72, height:17, background:"#111", borderRadius:"0 0 11px 11px", zIndex:20 }}/>
+
+              {touchPos && (
+                <div style={{
+                  position:"absolute", left:`${touchPos.x}%`, top:`${touchPos.y}%`,
+                  transform:"translate(-50%, -50%)", zIndex:30, pointerEvents:"none",
+                  width:30, height:30, borderRadius:"50%",
+                  background:"rgba(200,169,110,0.35)", border:"2px solid rgba(200,169,110,0.7)",
+                  animation:"touch-pulse 0.45s ease-out",
+                }}/>
+              )}
+
+              {!mobileOpen ? (
+                <div ref={scrollRef} style={{ height:"100%", overflow:"hidden", padding:"26px 12px 0" }}>
+                  {mockFeed.slice(0, 4).map(item => (
+                    <div key={item.id} style={{ transform:"scale(0.74)", transformOrigin:"top center" }}>
+                      {item.type==="letter" ? <LetterCard item={item}/> : <NewsCard item={item}/>}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ height:"100%", display:"flex", flexDirection:"column", paddingTop:24 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 12px", borderBottom:"1px solid #F0EDE8" }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+                    <span style={{ fontSize:9.5, color:"#888", fontFamily:"'DM Sans', sans-serif" }}>Feed</span>
+                  </div>
+                  <div style={{ flex:1, overflow:"hidden", padding:"12px 14px" }}>
+                    <div style={{ display:"flex", alignItems:"flex-start", gap:6, marginBottom:10, padding:"7px 9px", background:"#F9F6F0", borderRadius:7, border:"1px solid #E8E0D0" }}>
+                      <div style={{ width:2, background:"#C8A96E", borderRadius:2, alignSelf:"stretch" }}/>
+                      <div>
+                        <span style={{ fontSize:7, letterSpacing:"0.08em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontWeight:600 }}>{demoArticle.publication}</span>
+                        <div style={{ fontSize:8.5, color:"#777", fontFamily:"'EB Garamond', serif", fontStyle:"italic", marginTop:1 }}>{demoArticle.headline}</div>
+                      </div>
+                    </div>
+                    <div style={{ display:"flex", alignItems:"center", gap:7, marginBottom:10 }}>
+                      <div style={{ width:26, height:26, borderRadius:"50%", background:demoLetterAuthor.color, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:11, fontFamily:"'Playfair Display', serif", fontWeight:700 }}>{demoLetterAuthor.initial}</div>
+                      <div>
+                        <div style={{ fontSize:10.5, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}>{demoLetterAuthor.author}</div>
+                        <div style={{ fontSize:7.5, color:"#BBB", fontFamily:"'DM Mono', monospace" }}>by {demoLetterAuthor.username} <span style={{ color:"#C8A96E" }}>✦ Founding Member</span></div>
+                      </div>
+                    </div>
+                    <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:10.5, lineHeight:1.55, color:"#333", margin:"0 0 12px" }}>{demoLetterAuthor.preview}</p>
+
+                    <div style={{ display:"flex", alignItems:"center", gap:14, paddingBottom:10, borderBottom:"1px solid #F0EDE8", marginBottom:10 }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:4, color: liked ? "#C0392B" : "#bbb", transition:"color 0.2s" }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill={liked ? "#C0392B" : "none"} stroke="currentColor" strokeWidth="2" style={{ transform: liked ? "scale(1.15)" : "scale(1)", transition:"transform 0.25s cubic-bezier(0.34,1.56,0.64,1)" }}><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                        <span style={{ fontSize:9 }}>{liked ? (demoLetterAuthor.likes || 38) + 1 : (demoLetterAuthor.likes || 38)}</span>
+                      </div>
+                      <div style={{ display:"flex", alignItems:"center", gap:4, color:"#bbb" }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        <span style={{ fontSize:9 }}>{commentPosted ? (demoLetterAuthor.replies || 14) + 1 : (demoLetterAuthor.replies || 14)}</span>
+                      </div>
+                    </div>
+
+                    {commentPosted && (
+                      <div style={{ display:"flex", gap:6, animation:"fade-in-up 0.3s ease" }}>
+                        <div style={{ width:20, height:20, borderRadius:"50%", background:"#C8A96E", flexShrink:0 }}/>
+                        <div>
+                          <div style={{ fontSize:8.5, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}>You</div>
+                          <p style={{ fontSize:9, color:"#555", fontFamily:"'EB Garamond', serif", margin:0, lineHeight:1.4 }}>{commentText}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ padding:"8px 12px", borderTop:"1px solid #F0EDE8" }}>
+                    <div style={{ background:"#F0EDE8", borderRadius:14, padding:"6px 10px", fontSize:9, color: typedComment > 0 ? "#333" : "#BBB", fontFamily:"'EB Garamond', serif", fontStyle: typedComment > 0 ? "normal" : "italic", minHeight:14 }}>
+                      {typedComment > 0 && phase === "mobile-comment-type" ? (
+                        <>{commentText.slice(0, typedComment)}<span style={{ display:"inline-block", width:1.5, height:10, background:"#C8A96E", marginLeft:1, verticalAlign:"middle", animation:"blink-cursor 0.9s step-end infinite" }}/></>
+                      ) : !commentPosted ? "Write a reply..." : ""}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Slide 1: Laptop — desktop experience: browse Read → click Write → Write screen ── */}
+        {/* The laptop is intentionally larger than the phone. It lives in a normal 320px slot for
+            the carousel's centering math, but its inner frame is 460px wide and centered via a
+            negative margin so it overflows the slot symmetrically. */}
+        <div style={slideStyle(1)}>
+          <div style={{ width:460, marginLeft:-70 }}>
+            <div>
+              {/* Lid + screen (landscape, ~16:10) */}
+              <div style={{ background:"linear-gradient(165deg, #1c1c1c, #0a0a0a)", borderRadius:"14px 14px 4px 4px", padding:"12px 12px 0", boxShadow:"0 24px 54px rgba(0,0,0,0.24), inset 0 1px 1px rgba(255,255,255,0.06)" }}>
+                <div style={{ background:"#fff", borderRadius:5, overflow:"hidden", height:282, position:"relative", display:"flex", flexDirection:"column" }}>
+
+                  {/* Browser chrome */}
+                  <div style={{ background:"#F5EFE4", padding:"7px 12px", display:"flex", alignItems:"center", gap:6, borderBottom:"1px solid #E8E0D0", flexShrink:0 }}>
+                    <div style={{ width:7, height:7, borderRadius:"50%", background:"#E0D5C0" }}/>
+                    <div style={{ width:7, height:7, borderRadius:"50%", background:"#E0D5C0" }}/>
+                    <div style={{ width:7, height:7, borderRadius:"50%", background:"#E0D5C0" }}/>
+                    <div style={{ flex:1, textAlign:"center", fontSize:9.5, color:"#AAA", fontFamily:"'DM Mono', monospace" }}>
+                      tryletters.tech/{desktopWriteScreen ? "write" : "read"}
+                    </div>
+                  </div>
+
+                  {/* Top nav */}
+                  <div style={{ display:"flex", justifyContent:"center", gap:22, padding:"8px 0", borderBottom:"1px solid #F0EDE8", background:"#fff", flexShrink:0 }}>
+                    {["Feed","Read","Write","Forums","You"].map(n => {
+                      const active = (n === "Read" && phase === "desktop-read") || (n === "Write" && (phase === "desktop-cursor" || phase === "desktop-write"));
+                      return (
+                        <span key={n} style={{ fontSize:11, fontFamily:"'DM Sans', sans-serif", fontWeight: active ? 700 : 400, color: active ? "#111" : "#BBB", borderBottom: active ? "2px solid #C8A96E" : "2px solid transparent", paddingBottom:2, transition:"color 0.2s ease" }}>{n}</span>
+                      );
+                    })}
+                  </div>
+
+                  {/* Content area */}
+                  <div style={{ flex:1, position:"relative", overflow:"hidden" }}>
+
+                    {/* READ screen */}
+                    <div style={{ position:"absolute", inset:0, padding:"14px 18px", background:"#F9F6F0", opacity: desktopWriteScreen ? 0 : 1, transition:"opacity 0.4s ease", zIndex:1 }}>
+                      <div style={{ fontSize:9, letterSpacing:"0.14em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:11 }}>Trending · Based on your interests</div>
+                      {/* Lead story — horizontal */}
+                      <div style={{ background:"#fff", border:"1px solid #E8E0D0", borderRadius:9, display:"flex", gap:12, padding:11, marginBottom:11 }}>
+                        <div style={{ width:90, height:66, borderRadius:6, background:"#2C3E50", flexShrink:0 }}/>
+                        <div style={{ minWidth:0 }}>
+                          <div style={{ fontSize:8.5, letterSpacing:"0.1em", textTransform:"uppercase", color:"#2C3E50", fontFamily:"'DM Mono', monospace", fontWeight:600, marginBottom:4 }}>The Atlantic · Economy</div>
+                          <div style={{ fontFamily:"'Playfair Display', serif", fontSize:15, fontWeight:800, color:"#111", lineHeight:1.2 }}>The Quiet Death of the American Middle Class</div>
+                        </div>
+                      </div>
+                      {/* Two secondary cards */}
+                      <div style={{ display:"flex", gap:11 }}>
+                        {[{c:"#E67E22",p:"Reuters",t:"EU Reaches Historic Agreement on AI Liability"},{c:"#27AE60",p:"The Guardian",t:"Climate Scientists Warn of Tipping Points by 2030"}].map(a => (
+                          <div key={a.p} style={{ flex:1, background:"#fff", border:"1px solid #E8E0D0", borderRadius:9, overflow:"hidden", minWidth:0 }}>
+                            <div style={{ height:48, background:a.c }}/>
+                            <div style={{ padding:"8px 10px" }}>
+                              <div style={{ fontSize:8, letterSpacing:"0.1em", textTransform:"uppercase", color:a.c, fontFamily:"'DM Mono', monospace", fontWeight:600, marginBottom:3 }}>{a.p}</div>
+                              <div style={{ fontFamily:"'Playfair Display', serif", fontSize:11.5, fontWeight:700, color:"#111", lineHeight:1.25, display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden" }}>{a.t}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* WRITE screen — the two-column desktop composer */}
+                    <div style={{ position:"absolute", inset:0, background:"#F9F6F0", opacity: desktopWriteScreen ? 1 : 0, transform: desktopWriteScreen ? "translateY(0)" : "translateY(8px)", transition:"opacity 0.45s ease, transform 0.45s ease", pointerEvents:"none", zIndex:2 }}>
+                      {/* Dark hero */}
+                      <div style={{ background:"#111", padding:"11px 16px", display:"flex", justifyContent:"space-between", alignItems:"center", borderTop:"2px solid #C8A96E" }}>
+                        <div>
+                          <div style={{ fontSize:7, letterSpacing:"0.22em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:2 }}>Letters · Est. 2025</div>
+                          <div style={{ fontFamily:"'Playfair Display', serif", fontSize:18, fontWeight:900, color:"#F0EAD8", lineHeight:1 }}>Write a Letter<span style={{ color:"#C8A96E" }}>.</span></div>
+                        </div>
+                        <div style={{ background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.18)", borderRadius:14, padding:"5px 12px", fontSize:8.5, color:"#F0EAD8", fontFamily:"'DM Sans', sans-serif", fontWeight:600 }}>◉ Preview</div>
+                      </div>
+                      {/* Two columns */}
+                      <div style={{ display:"flex", gap:9, padding:12 }}>
+                        {/* Editor column */}
+                        <div style={{ flex:"1.5", display:"flex", gap:6, minWidth:0 }}>
+                          <div style={{ display:"flex", flexDirection:"column", gap:5, background:"#fff", border:"1px solid #E8E0D0", borderRadius:5, padding:"7px 4px", height:"fit-content" }}>
+                            {[{l:"B",b:1,i:0},{l:"I",b:0,i:1},{l:"U",b:0,i:0}].map(x => (
+                              <div key={x.l} style={{ fontSize:10, fontWeight:x.b?700:400, fontStyle:x.i?"italic":"normal", textDecoration:x.l==="U"?"underline":"none", color:"#888", textAlign:"center", width:15, fontFamily:x.i?"'EB Garamond', serif":"'DM Sans', sans-serif" }}>{x.l}</div>
+                            ))}
+                          </div>
+                          <div style={{ flex:1, background:"#fff", border:"1px solid #E8E0D0", borderRadius:5, padding:"10px 12px", minWidth:0 }}>
+                            <div style={{ fontFamily:"'Playfair Display', serif", fontSize:13, fontWeight:800, color:"#CCC", borderBottom:"1px solid #F0EDE8", paddingBottom:6, marginBottom:7 }}>Give your letter a headline…</div>
+                            <div style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:11.5, color:"#CCC" }}>Dear reader…</div>
+                          </div>
+                        </div>
+                        {/* Source column */}
+                        <div style={{ flex:"1", background:"#fff", border:"1px solid #E8E0D0", borderRadius:5, padding:"9px 11px", minWidth:0 }}>
+                          <div style={{ fontSize:8, letterSpacing:"0.12em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:8 }}>Link a source</div>
+                          {[{c:"#F39C12",p:"BBC Sport"},{c:"#27AE60",p:"The Guardian"}].map(a => (
+                            <div key={a.p} style={{ display:"flex", gap:7, alignItems:"center", marginBottom:8 }}>
+                              <div style={{ width:22, height:22, borderRadius:4, background:a.c, flexShrink:0 }}/>
+                              <div style={{ fontSize:8, letterSpacing:"0.08em", textTransform:"uppercase", color:a.c, fontFamily:"'DM Mono', monospace", fontWeight:600 }}>{a.p}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* Cursor — spans the whole screen (chrome + nav + content) so it can reach the Write tab */}
+                  {(phase === "desktop-read" || phase === "desktop-cursor") && (
+                    <div style={{ position:"absolute", left:`${desktopCursor.x}%`, top:`${desktopCursor.y}%`, transition:"left 0.8s cubic-bezier(0.4,0,0.2,1), top 0.8s cubic-bezier(0.4,0,0.2,1)", zIndex:15, pointerEvents:"none", filter:"drop-shadow(0 1px 2px rgba(0,0,0,0.35))" }}>
+                      <svg width="17" height="17" viewBox="0 0 24 24" fill="#111" stroke="#fff" strokeWidth="1.4" strokeLinejoin="round"><path d="M5 2l5.5 17 2.2-7.2 7.3-2.2L5 2z"/></svg>
+                    </div>
+                  )}
+                </div>
+              </div>
+              {/* Laptop base + hinge */}
+              <div style={{ width:496, marginLeft:-18, height:13, background:"linear-gradient(180deg, #1f1f1f, #0c0c0c)", borderRadius:"2px 2px 7px 7px", boxShadow:"0 9px 18px rgba(0,0,0,0.22)", position:"relative" }}>
+                <div style={{ width:84, height:4, background:"#2a2a2a", borderRadius:"0 0 5px 5px", margin:"0 auto" }}/>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Slide 2: Phone — Write ── */}
+        <div style={slideStyle(2)}>
+          <PhoneFrame>
+            <div style={{ height:"100%", display:"flex", flexDirection:"column" }}>
+              <ScreenHeader label="Write"/>
+              {phase === "write-success" ? (
+                <div style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"0 22px", textAlign:"center", animation:"fade-in-up 0.4s ease" }}>
+                  <div style={{ width:46, height:46, borderRadius:"50%", background:"#C8A96E", display:"flex", alignItems:"center", justifyContent:"center", marginBottom:14, boxShadow:"0 2px 10px rgba(200,169,110,0.4)" }}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  </div>
+                  <div style={{ fontSize:8, letterSpacing:"0.2em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:7 }}>Published</div>
+                  <div style={{ fontFamily:"'Playfair Display', serif", fontSize:18, fontWeight:900, color:"#111", lineHeight:1.15 }}>Your letter<br/>is live<span style={{ color:"#C8A96E" }}>.</span></div>
+                </div>
+              ) : (
+                <>
+                  <div style={{ flex:1, padding:"14px 16px", overflow:"hidden" }}>
+                    {/* Linked source chip */}
+                    <div style={{ display:"flex", alignItems:"flex-start", gap:6, marginBottom:13, padding:"7px 9px", background:"#F9F6F0", borderRadius:7, border:"1px solid #E8E0D0", opacity: phase === "write-in" ? 0 : 1, transition:"opacity 0.4s ease" }}>
+                      <div style={{ width:2, background:"#C8A96E", borderRadius:2, alignSelf:"stretch" }}/>
+                      <div>
+                        <div style={{ fontSize:6.5, letterSpacing:"0.1em", textTransform:"uppercase", color:"#BBB", fontFamily:"'DM Mono', monospace", marginBottom:1 }}>In response to</div>
+                        <span style={{ fontSize:7, letterSpacing:"0.08em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontWeight:600 }}>{demoArticle.publication}</span>
+                        <div style={{ fontSize:8.5, color:"#777", fontFamily:"'EB Garamond', serif", fontStyle:"italic", marginTop:1 }}>{demoArticle.headline}</div>
+                      </div>
+                    </div>
+                    {/* Headline */}
+                    <div style={{ fontFamily:"'Playfair Display', serif", fontSize:16, fontWeight:800, color:"#111", marginBottom:9, lineHeight:1.2, minHeight:19, opacity: phase === "write-in" ? 0 : 1, transition:"opacity 0.4s ease" }}>{writeHeadline}</div>
+                    {/* Body — types itself out */}
+                    <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:11, lineHeight:1.65, color:"#333", margin:0 }}>
+                      {writeBody.slice(0, writeTyped)}
+                      {phase === "write-type" && writeTyped < writeBody.length && (
+                        <span style={{ display:"inline-block", width:1.5, height:11, background:"#C8A96E", marginLeft:1, verticalAlign:"middle", animation:"blink-cursor 0.9s step-end infinite" }}/>
+                      )}
+                    </p>
+                  </div>
+                  <div style={{ padding:"10px 14px", borderTop:"1px solid #F0EDE8" }}>
+                    <div style={{ width:"100%", background:"#111", color:"#F0EAD8", borderRadius:6, padding:"10px 0", textAlign:"center", fontSize:10.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, transform: phase === "write-publish" ? "scale(0.95)" : "scale(1)", opacity: phase === "write-publish" ? 0.85 : 1, transition:"transform 0.15s ease, opacity 0.15s ease" }}>
+                      Publish Letter →
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </PhoneFrame>
+        </div>
+
+        {/* ── Slide 3: Phone — Forums ── */}
+        <div style={slideStyle(3)}>
+          <PhoneFrame>
+            <div style={{ height:"100%", display:"flex", flexDirection:"column" }}>
+              <ScreenHeader label="Forums"/>
+              <div style={{ flex:1, overflow:"hidden", padding:"12px 14px", background:"#F9F6F0" }}>
+                <div style={{ fontSize:7.5, letterSpacing:"0.14em", textTransform:"uppercase", color:"#AAA", fontFamily:"'DM Mono', monospace", marginBottom:10 }}>Discover forums</div>
+                {demoForums.map((f, i) => {
+                  const joined = forumJoined && i === 0;
+                  return (
+                    <div key={f.name} style={{ background:"#fff", border:"1px solid #E8E0D0", borderRadius:9, padding:"9px 10px", marginBottom:8, display:"flex", alignItems:"center", gap:9 }}>
+                      <div style={{ width:30, height:30, borderRadius:7, background:f.color, flexShrink:0 }}/>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontFamily:"'Playfair Display', serif", fontSize:11, fontWeight:700, color:"#111", lineHeight:1.1 }}>{f.name}</div>
+                        <div style={{ fontSize:7.5, color:"#BBB", fontFamily:"'DM Mono', monospace", marginTop:2 }}>{f.members} members</div>
+                      </div>
+                      <div style={{
+                        background: joined ? "#F0EDE8" : "#111", color: joined ? "#888" : "#F0EAD8",
+                        borderRadius:20, padding:"4px 12px", fontSize:8.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600,
+                        transition:"all 0.25s ease", transform: joined ? "scale(1.05)" : "scale(1)",
+                      }}>
+                        {joined ? "Joined" : "Join"}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </PhoneFrame>
+        </div>
+
+        {/* ── Slide 4: Phone — You ── */}
+        <div style={slideStyle(4)}>
+          <PhoneFrame>
+            <div style={{ height:"100%", display:"flex", flexDirection:"column" }}>
+              <ScreenHeader label="You"/>
+              <div style={{ flex:1, padding:"18px 16px", background:"#fff" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:15 }}>
+                  <div style={{ width:52, height:52, borderRadius:"50%", background:"#2D6A4F", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontFamily:"'Playfair Display', serif", fontSize:22, fontWeight:900, flexShrink:0 }}>M</div>
+                  <div>
+                    <div style={{ fontFamily:"'Playfair Display', serif", fontSize:15, fontWeight:900, color:"#111", lineHeight:1.1 }}>Margaret T.</div>
+                    <div style={{ fontSize:8, fontFamily:"'DM Mono', monospace", marginTop:3, color:"#C8A96E", opacity: phase === "you-count" ? 1 : 0, transition:"opacity 0.5s ease" }}>✦ Founding Member</div>
+                  </div>
+                </div>
+                <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:10, lineHeight:1.55, color:"#666", margin:"0 0 16px", fontStyle:"italic" }}>
+                  Pharmacist and health-policy writer in Youngstown. Letters on healthcare, local news, and the long arc of the Rust Belt.
+                </p>
+                <div style={{ display:"flex", borderTop:"1px solid #F0EDE8", borderBottom:"1px solid #F0EDE8" }}>
+                  {youStats.map((s, i) => (
+                    <div key={s.label} style={{ flex:1, textAlign:"center", padding:"11px 2px", borderRight: i < youStats.length-1 ? "1px solid #F0EDE8" : "none" }}>
+                      <div style={{ fontFamily:"'Playfair Display', serif", fontSize:17, fontWeight:700, color:"#111", lineHeight:1 }}>{Math.round(s.value * statsProgress)}</div>
+                      <div style={{ fontSize:6.5, letterSpacing:"0.1em", textTransform:"uppercase", color:"#AAA", fontFamily:"'DM Mono', monospace", marginTop:3 }}>{s.label}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </PhoneFrame>
+        </div>
+
+      </div>
+
+      <style>{`
+        @keyframes blink-cursor { 0%,49% { opacity:1 } 50%,100% { opacity:0 } }
+        @keyframes fade-in-up { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes touch-pulse { 0% { transform:translate(-50%,-50%) scale(0.4); opacity:0.8; } 100% { transform:translate(-50%,-50%) scale(1); opacity:1; } }
+      `}</style>
+    </div>
+  );
+}
+
 function MarketingHomePage({ navigate }) {
   const [showModal, setShowModal] = useState(false);
-  const [dismissed, setDismissed] = useState(false);
-  useEffect(() => {
-    if (dismissed) return;
-    const t = setTimeout(() => setShowModal(true), 3000);
-    return () => clearTimeout(t);
-  }, [dismissed]);
-  const dismiss = () => { setShowModal(false); setDismissed(true); };
   return (
     <div style={{ minHeight:"100vh", background:"#fff" }}>
       <header style={{ position:"sticky", top:0, zIndex:50, background:"rgba(255,255,255,0.96)", backdropFilter:"blur(10px)", borderBottom:"1px solid #F0EDE8" }}>
@@ -3377,15 +3912,166 @@ function MarketingHomePage({ navigate }) {
           </div>
         </div>
       </header>
-      <main style={{ maxWidth:680, margin:"0 auto", padding:"0 20px", filter:showModal?"blur(2px)":"none", transition:"filter 0.3s ease", pointerEvents:showModal?"none":"auto" }}>
-        <div style={{ display:"flex", borderBottom:"1px solid #F0EDE8", marginTop:8 }}>
-          {["For You","Following","Latest"].map((t,i) => (
-            <button key={t} style={{ background:"none", border:"none", borderBottom:i===0?"2px solid #C8A96E":"2px solid transparent", padding:"12px 16px", fontSize:13, fontFamily:"'DM Sans', sans-serif", fontWeight:i===0?600:400, color:i===0?"#111":"#bbb", cursor:"pointer" }}>{t}</button>
+      <main style={{ filter:showModal?"blur(2px)":"none", transition:"filter 0.3s ease", pointerEvents:showModal?"none":"auto" }}>
+
+        {/* Hero — logo and tagline as the entire pitch, no supporting copy block */}
+        <div style={{ maxWidth:760, margin:"0 auto", padding:"80px 24px 40px", textAlign:"center" }}>
+          <div style={{ display:"flex", justifyContent:"center", marginBottom:32 }}>
+            <Logo size={168}/>
+          </div>
+          <h1 style={{ fontFamily:"'Playfair Display', serif", fontSize:"clamp(34px, 7vw, 64px)", fontWeight:900, color:"#111", margin:"0 0 22px", letterSpacing:"-0.03em", lineHeight:1.05, whiteSpace:"nowrap" }}>
+            Social media. Elevated<span style={{ color:"#C8A96E" }}>.</span>
+          </h1>
+          <div style={{ fontSize:11, letterSpacing:"0.2em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:36 }}>
+            Now accepting founding members
+          </div>
+          <div style={{ display:"flex", gap:10, justifyContent:"center", flexWrap:"wrap" }}>
+            <button onClick={() => setShowModal(true)} style={{ background:"#111", color:"#F0EAD8", border:"none", borderRadius:6, padding:"14px 30px", fontSize:14, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:"pointer" }}>
+              Request an Invitation →
+            </button>
+            <button onClick={() => navigate("how-it-works")} style={{ background:"none", color:"#555", border:"1px solid #C8BFA8", borderRadius:6, padding:"14px 30px", fontSize:14, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:"pointer" }}>
+              How It Works
+            </button>
+          </div>
+        </div>
+
+        {/* Self-playing demo — phone scrolls/opens/likes/replies, then a desktop panel
+            slides in alongside it to show quoting an article into a letter */}
+        <div style={{ maxWidth:1020, margin:"0 auto 100px", padding:"0 24px", overflowX:"auto" }}>
+          <AnimatedDemoFeed/>
+        </div>
+      </main>
+      {showModal && <HomepageModal onDismiss={() => setShowModal(false)} navigate={(page) => { setShowModal(false); navigate(page); }}/>}
+    </div>
+  );
+}
+
+function HowItWorksPage({ navigate }) {
+  const steps = [
+    {
+      label: "Read",
+      title: "Curated news, no algorithm games.",
+      body: "A real-time feed pulling from national outlets and local civic newsrooms — BBC, The Guardian, NPR, and a growing list of nonprofit local papers. No engagement-bait, no outrage sorting.",
+      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C8A96E" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>,
+    },
+    {
+      label: "Write",
+      title: "A letter, not a tweet.",
+      body: "Respond to a story with a real letter — quote the source verbatim, format your thinking, and put your name behind it. No character limit forcing you into a soundbite.",
+      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C8A96E" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>,
+    },
+    {
+      label: "Build standing",
+      title: "Quality earns you a name, not a viral hit.",
+      body: "Contributor status — from Letters Contributor up through Senior Correspondent and Verified Journalist — is built on the substance of what you write, not how many people retweeted it.",
+      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C8A96E" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 15a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/><path d="M8.21 13.89L7 23l5-3 5 3-1.21-9.12"/></svg>,
+    },
+    {
+      label: "Gather",
+      title: "Forums for people who want to go deeper.",
+      body: "Topic communities, verified institutional spaces (think a publication's own moderated forum), and communities anyone can request to start — each pairing a letters-style feed with live discussion.",
+      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C8A96E" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+    },
+  ];
+
+  return (
+    <div style={{ minHeight:"100vh", background:"#fff" }}>
+      <header style={{ position:"sticky", top:0, zIndex:50, background:"rgba(255,255,255,0.96)", backdropFilter:"blur(10px)", borderBottom:"1px solid #F0EDE8" }}>
+        <div style={{ maxWidth:680, margin:"0 auto", padding:"0 20px", height:54, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+          <button onClick={() => navigate("home")} style={{ background:"none", border:"none", cursor:"pointer", display:"flex", alignItems:"center", gap:10, padding:0 }}>
+            <Logo size={34}/><span style={{ fontFamily:"'Playfair Display', serif", fontSize:18, fontWeight:900, color:"#111" }}>Letters<span style={{ color:"#C8A96E" }}>.</span></span>
+          </button>
+          <button onClick={() => navigate("home")} style={{ fontSize:12, color:"#AAA", fontFamily:"'EB Garamond', serif", fontStyle:"italic", background:"none", border:"none", cursor:"pointer" }}>← Back</button>
+        </div>
+      </header>
+
+      <main style={{ maxWidth:640, margin:"0 auto", padding:"56px 24px 80px" }}>
+        <BroadsheetRule left="Vol. I — No. 1" center="Dear Reader" right="Free to Join"/>
+        <div style={{ fontSize:10, letterSpacing:"0.2em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:12 }}>How It Works</div>
+        <h1 style={{ fontFamily:"'Playfair Display', serif", fontSize:36, fontWeight:900, color:"#111", margin:"0 0 16px", letterSpacing:"-0.02em", lineHeight:1.1 }}>
+          Social media. Elevated<span style={{ color:"#C8A96E" }}>.</span>
+        </h1>
+        <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:17, color:"#777", lineHeight:1.75, margin:"0 0 40px", fontStyle:"italic" }}>
+          Most platforms reward the loudest take. Letters rewards the best one. Here's the loop.
+        </p>
+
+        <div style={{ display:"flex", flexDirection:"column", gap:32 }}>
+          {steps.map((step, i) => (
+            <div key={step.label} style={{ display:"flex", gap:18 }}>
+              <div style={{ flexShrink:0, display:"flex", flexDirection:"column", alignItems:"center" }}>
+                <div style={{ width:44, height:44, borderRadius:"50%", background:"#F9F6F0", border:"1px solid #E8E0D0", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                  {step.icon}
+                </div>
+                {i < steps.length - 1 && <div style={{ width:1, flex:1, background:"#E8E0D0", marginTop:8 }}/>}
+              </div>
+              <div style={{ paddingBottom:8 }}>
+                <div style={{ fontSize:9.5, letterSpacing:"0.16em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:6 }}>
+                  Step {i+1} · {step.label}
+                </div>
+                <h3 style={{ fontFamily:"'Playfair Display', serif", fontSize:20, fontWeight:800, color:"#111", margin:"0 0 8px", lineHeight:1.25 }}>{step.title}</h3>
+                <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:15, color:"#666", lineHeight:1.65, margin:0 }}>{step.body}</p>
+              </div>
+            </div>
           ))}
         </div>
-        {mockFeed.map(item => item.type==="letter" ? <LetterCard key={item.id} item={item}/> : <NewsCard key={item.id} item={item}/>)}
+
+        <div style={{ marginTop:48, padding:"24px 26px", background:"#F9F6F0", borderRadius:12, border:"1px solid #E8E0D0", textAlign:"center" }}>
+          <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:15, color:"#777", margin:"0 0 18px", lineHeight:1.6 }}>
+            Letters is launching to a small group of founding members first.
+          </p>
+          <button onClick={() => navigate("invite")} style={{ background:"#111", color:"#F0EAD8", border:"none", borderRadius:6, padding:"13px 28px", fontSize:13.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:"pointer" }}>
+            Request an Invitation →
+          </button>
+        </div>
       </main>
-      {showModal && <HomepageModal onDismiss={dismiss} navigate={(page) => { dismiss(); navigate(page); }}/>}
+    </div>
+  );
+}
+
+function InvestorPage({ navigate }) {
+  return (
+    <div style={{ minHeight:"100vh", background:"#fff" }}>
+      <header style={{ position:"sticky", top:0, zIndex:50, background:"rgba(255,255,255,0.96)", backdropFilter:"blur(10px)", borderBottom:"1px solid #F0EDE8" }}>
+        <div style={{ maxWidth:680, margin:"0 auto", padding:"0 20px", height:54, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+          <button onClick={() => navigate("home")} style={{ background:"none", border:"none", cursor:"pointer", display:"flex", alignItems:"center", gap:10, padding:0 }}>
+            <Logo size={34}/><span style={{ fontFamily:"'Playfair Display', serif", fontSize:18, fontWeight:900, color:"#111" }}>Letters<span style={{ color:"#C8A96E" }}>.</span></span>
+          </button>
+          <button onClick={() => navigate("home")} style={{ fontSize:12, color:"#AAA", fontFamily:"'EB Garamond', serif", fontStyle:"italic", background:"none", border:"none", cursor:"pointer" }}>← Back</button>
+        </div>
+      </header>
+
+      <main style={{ maxWidth:640, margin:"0 auto", padding:"56px 24px 80px" }}>
+        <BroadsheetRule left="Vol. I — No. 1" center="For Investors" right="Pre-Seed"/>
+        <div style={{ fontSize:10, letterSpacing:"0.2em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:12 }}>The Thesis</div>
+        <h1 style={{ fontFamily:"'Playfair Display', serif", fontSize:34, fontWeight:900, color:"#111", margin:"0 0 16px", letterSpacing:"-0.02em", lineHeight:1.15 }}>
+          Quality, not virality<span style={{ color:"#C8A96E" }}>.</span>
+        </h1>
+        <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:16.5, color:"#666", lineHeight:1.75, margin:"0 0 32px" }}>
+          Every major social platform monetizes attention through engagement-optimized algorithms, which rewards outrage over insight. Letters is built on the opposite premise: a platform where the quality of what you write determines your standing, not how viral it goes.
+        </p>
+
+        <div style={{ borderTop:"1px solid #111", borderBottom:"3px solid #111", padding:"5px 0", marginBottom:28 }}/>
+
+        {[
+          { label:"The Comparables", body:"Substack proved readers and writers will pay for quality. The Atlantic and NYT proved premium editorial content commands premium pricing. Reddit proved community-organized discourse at scale is valuable — Letters positions as the anti-Reddit on quality bar." },
+          { label:"The Model", body:"A platform-wide reader subscription (the \"Letters Press Pass\") pools revenue and distributes it to contributors based on actual engagement their letters receive — ad-free, and aligned with quality rather than volume." },
+          { label:"The Stage", body:"Pre-seed. A working product is live with a real, automated news pipeline, real user-generated content infrastructure, and an engaged early cohort. Raising to bring on a technical co-founder and reach the first 1,000 active users." },
+        ].map(section => (
+          <div key={section.label} style={{ marginBottom:26 }}>
+            <div style={{ fontSize:9.5, letterSpacing:"0.16em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:8 }}>{section.label}</div>
+            <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:15.5, color:"#555", lineHeight:1.7, margin:0 }}>{section.body}</p>
+          </div>
+        ))}
+
+        <div style={{ marginTop:40, padding:"24px 26px", background:"#111", borderRadius:12, textAlign:"center" }}>
+          <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:15, color:"#999", margin:"0 0 18px", lineHeight:1.6 }}>
+            Interested in the full deck or a conversation?
+          </p>
+          <a href="mailto:chris@tryletters.tech" style={{ display:"inline-block", background:"#F0EAD8", color:"#111", border:"none", borderRadius:6, padding:"13px 28px", fontSize:13.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, textDecoration:"none" }}>
+            Get in touch →
+          </a>
+        </div>
+      </main>
     </div>
   );
 }
@@ -3394,8 +4080,49 @@ function InvitePage({ navigate }) {
   const [form, setForm] = useState({ firstName:"", lastName:"", email:"", occupation:"", referral:"", referralOther:"" });
   const [focused, setFocused] = useState(null);
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
   const [errors, setErrors] = useState({});
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
+
+  const handleSubmit = async () => {
+    const e = validate();
+    if (Object.keys(e).length) { setErrors(e); return; }
+    setSubmitting(true);
+    setSubmitError(null);
+    const { error } = await supabase.from("waitlist").insert({
+      first_name: form.firstName.trim(),
+      last_name: form.lastName.trim(),
+      email: form.email.trim(),
+      occupation: form.occupation.trim(),
+      referral: form.referral,
+      referral_other: form.referralOther.trim() || null,
+    });
+    if (error) {
+      console.error("Waitlist submission failed:", error);
+      setSubmitError("Something went wrong submitting your request. Please try again.");
+      setSubmitting(false);
+      return;
+    }
+
+    // Notify chris@tryletters.tech that a new invite request came in.
+    // Fire-and-forget: the waitlist row is already saved, so the user's signup
+    // succeeds and they see the success screen even if this email ever fails.
+    supabase.functions.invoke("notify-waitlist", {
+      body: {
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        email: form.email.trim(),
+        occupation: form.occupation.trim(),
+        referral: form.referral,
+        referralOther: form.referralOther.trim() || null,
+      },
+    }).catch((err) => console.error("Notification email failed (signup still recorded):", err));
+
+    setSubmitting(false);
+    setSubmitted(true);
+  };
+
   const validate = () => {
     const e={};
     if(!form.firstName.trim()) e.firstName="Required";
@@ -3454,9 +4181,14 @@ function InvitePage({ navigate }) {
               </div>
               {form.referral==="Other" && <div><label style={labelStyle}>Please tell us more</label><input type="text" placeholder="Where did you find us?" value={form.referralOther} onChange={e=>set("referralOther",e.target.value)} onFocus={()=>setFocused("referralOther")} onBlur={()=>setFocused(null)} style={inputStyle("referralOther")}/></div>}
               <div style={{ borderTop:"1px solid #E8E0D0", margin:"4px 0" }}/>
-              <button onClick={() => { const e=validate(); if(Object.keys(e).length){setErrors(e);return;} setSubmitted(true); }} style={{ width:"100%", background:"#111", color:"#F0EAD8", border:"none", borderRadius:6, padding:"15px 0", fontSize:14, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:"pointer", lineHeight:1.4 }}>
+              {submitError && (
+                <div style={{ background:"#FDF0F0", border:"1px solid #C8A8A8", borderRadius:5, padding:"10px 14px", fontSize:13, color:"#C0392B", fontFamily:"'EB Garamond', serif", fontStyle:"italic" }}>
+                  {submitError}
+                </div>
+              )}
+              <button onClick={handleSubmit} disabled={submitting} style={{ width:"100%", background:submitting?"#555":"#111", color:"#F0EAD8", border:"none", borderRadius:6, padding:"15px 0", fontSize:14, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:submitting?"not-allowed":"pointer", lineHeight:1.4 }}>
                 <span style={{ display:"block", fontSize:9.5, letterSpacing:"0.2em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontWeight:500, marginBottom:2 }}>First Print</span>
-                Submit My Request →
+                {submitting ? "Submitting..." : "Submit My Request →"}
               </button>
             </div>
           </>
@@ -3576,16 +4308,8 @@ function MarketingSite({ onAuthSuccess }) {
       <Routes>
         <Route path="/" element={<MarketingHomePage navigate={goTo}/>}/>
         <Route path="/invite" element={<InvitePage navigate={goTo}/>}/>
-        <Route path="/how-it-works" element={
-          <div style={{ minHeight:"100vh", background:"#F9F6F0", display:"flex", alignItems:"center", justifyContent:"center" }}>
-            <Auth onAuthSuccess={onAuthSuccess}/>
-          </div>
-        }/>
-        <Route path="/investor" element={
-          <div style={{ minHeight:"100vh", background:"#F9F6F0", display:"flex", alignItems:"center", justifyContent:"center" }}>
-            <Auth onAuthSuccess={onAuthSuccess}/>
-          </div>
-        }/>
+        <Route path="/how-it-works" element={<HowItWorksPage navigate={goTo}/>}/>
+        <Route path="/investor" element={<InvestorPage navigate={goTo}/>}/>
         <Route path="/signin" element={
           <div style={{ minHeight:"100vh", background:"#F9F6F0", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:20 }}>
             <button onClick={() => goTo("home")}

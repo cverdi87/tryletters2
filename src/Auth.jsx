@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "./supabase";
 
 function Logo({ size = 40 }) {
@@ -14,14 +14,26 @@ function Logo({ size = 40 }) {
 }
 
 export default function Auth({ onAuthSuccess }) {
-  const [mode, setMode] = useState("signin"); // "signin" | "signup"
-  const [form, setForm] = useState({ email: "", password: "", fullName: "", username: "" });
+  const [mode, setMode] = useState("signin"); // "signin" | "signup" | "reset" | "newPassword" | "verifyOtp"
+  const [form, setForm] = useState({ email: "", password: "", fullName: "", username: "", newPassword: "", confirmPassword: "", otpCode: "" });
   const [focused, setFocused] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  // Supabase redirects here with a recovery session active after the user
+  // clicks the reset link in their email — detect that and show the
+  // "set a new password" screen instead of the normal sign-in form.
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setMode("newPassword");
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   const inputStyle = (field) => ({
     width: "100%",
@@ -65,6 +77,57 @@ export default function Auth({ onAuthSuccess }) {
     setLoading(false);
   };
 
+  const handleRequestReset = async () => {
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+
+    if (!form.email.trim()) {
+      setError("Please enter your email address.");
+      setLoading(false);
+      return;
+    }
+
+    const { error } = await supabase.auth.resetPasswordForEmail(form.email, {
+      redirectTo: window.location.origin,
+    });
+
+    if (error) {
+      setError(error.message);
+    } else {
+      setMessage("Check your email for a link to reset your password.");
+    }
+    setLoading(false);
+  };
+
+  const handleSetNewPassword = async () => {
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+
+    if (form.newPassword.length < 6) {
+      setError("Password must be at least 6 characters.");
+      setLoading(false);
+      return;
+    }
+    if (form.newPassword !== form.confirmPassword) {
+      setError("Passwords don't match.");
+      setLoading(false);
+      return;
+    }
+
+    const { error } = await supabase.auth.updateUser({ password: form.newPassword });
+
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+    } else {
+      setMessage("Password updated! Signing you in...");
+      setLoading(false);
+      setTimeout(() => onAuthSuccess(), 1000);
+    }
+  };
+
   const handleSignUp = async () => {
     setLoading(true);
     setError(null);
@@ -73,7 +136,9 @@ export default function Auth({ onAuthSuccess }) {
     if (!form.username.trim()) { setError("Please choose a username."); setLoading(false); return; }
     if (form.password.length < 6) { setError("Password must be at least 6 characters."); setLoading(false); return; }
 
-    // Create auth user
+    // Create auth user — Supabase sends a 6-digit verification code to their
+    // email automatically as part of signUp. The account exists but is
+    // unconfirmed until they enter that code on the next screen.
     const { data, error: signUpError } = await supabase.auth.signUp({
       email: form.email,
       password: form.password,
@@ -85,7 +150,38 @@ export default function Auth({ onAuthSuccess }) {
       return;
     }
 
-    // Create profile row
+    // Profile creation is deferred until after the code is verified (see
+    // handleVerifyOtp below) — we don't want a profiles row for an email
+    // nobody has actually proven they own yet.
+    setMessage(null);
+    setMode("verifyOtp");
+    setLoading(false);
+  };
+
+  const handleVerifyOtp = async () => {
+    setLoading(true);
+    setError(null);
+
+    if (form.otpCode.trim().length !== 6) {
+      setError("Enter the 6-digit code from your email.");
+      setLoading(false);
+      return;
+    }
+
+    const { data, error: verifyError } = await supabase.auth.verifyOtp({
+      email: form.email,
+      token: form.otpCode.trim(),
+      type: "signup",
+    });
+
+    if (verifyError) {
+      setError(verifyError.message);
+      setLoading(false);
+      return;
+    }
+
+    // Verification succeeded and the user now has an active session —
+    // create their profile row now that the email is confirmed real.
     if (data.user) {
       const { error: profileError } = await supabase
         .from("profiles")
@@ -97,14 +193,29 @@ export default function Auth({ onAuthSuccess }) {
         });
 
       if (profileError) {
-        setError(profileError.message);
-        setLoading(false);
-        return;
+        // Profile creation failing shouldn't block sign-in — surface it,
+        // but the account itself is valid and verified at this point.
+        console.error("Profile creation failed after verification:", profileError);
       }
     }
 
-    setMessage("Account created! You can now sign in.");
-    setMode("signin");
+    setLoading(false);
+    onAuthSuccess();
+  };
+
+  const handleResendOtp = async () => {
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+    const { error: resendError } = await supabase.auth.resend({
+      type: "signup",
+      email: form.email,
+    });
+    if (resendError) {
+      setError(resendError.message);
+    } else {
+      setMessage("A new code is on its way.");
+    }
     setLoading(false);
   };
 
@@ -141,15 +252,26 @@ export default function Auth({ onAuthSuccess }) {
             </div>
           </div>
 
-          {/* Tabs */}
-          <div style={{ display: "flex", borderBottom: "1px solid #C8BFA8", margin: "0 28px" }}>
-            {["signin", "signup"].map(m => (
-              <button key={m} onClick={() => { setMode(m); setError(null); setMessage(null); }}
-                style={{ background: "none", border: "none", borderBottom: mode === m ? "2px solid #111" : "2px solid transparent", marginBottom: -1, padding: "8px 20px 10px", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "'DM Mono', monospace", fontWeight: mode === m ? 500 : 400, color: mode === m ? "#111" : "#AAA", cursor: "pointer", transition: "all 0.15s" }}>
-                {m === "signin" ? "Sign In" : "Create Account"}
-              </button>
-            ))}
-          </div>
+          {/* Tabs — hidden during reset/newPassword flows since those are single-purpose screens */}
+          {(mode === "signin" || mode === "signup") && (
+            <div style={{ display: "flex", borderBottom: "1px solid #C8BFA8", margin: "0 28px" }}>
+              {["signin", "signup"].map(m => (
+                <button key={m} onClick={() => { setMode(m); setError(null); setMessage(null); }}
+                  style={{ background: "none", border: "none", borderBottom: mode === m ? "2px solid #111" : "2px solid transparent", marginBottom: -1, padding: "8px 20px 10px", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "'DM Mono', monospace", fontWeight: mode === m ? 500 : 400, color: mode === m ? "#111" : "#AAA", cursor: "pointer", transition: "all 0.15s" }}>
+                  {m === "signin" ? "Sign In" : "Create Account"}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Reset / newPassword / verifyOtp header — since there are no tabs here, give context instead */}
+          {(mode === "reset" || mode === "newPassword" || mode === "verifyOtp") && (
+            <div style={{ padding: "0 28px", marginBottom: 4 }}>
+              <div style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "#C8A96E", fontFamily: "'DM Mono', monospace" }}>
+                {mode === "reset" ? "Reset Password" : mode === "newPassword" ? "Choose a New Password" : "Verify Your Email"}
+              </div>
+            </div>
+          )}
 
           {/* Form */}
           <div style={{ padding: "24px 28px 28px", display: "flex", flexDirection: "column", gap: 16 }}>
@@ -188,54 +310,137 @@ export default function Auth({ onAuthSuccess }) {
               </>
             )}
 
-            {/* Email */}
-            <div>
-              <label style={labelStyle}>Email Address</label>
-              <input type="email" placeholder="you@example.com" value={form.email}
-                onChange={e => set("email", e.target.value)}
-                onFocus={() => setFocused("email")} onBlur={() => setFocused(null)}
-                style={inputStyle("email")}/>
-            </div>
+            {/* Email — shown for signin, signup, and reset (not needed for newPassword, since the user already has a recovery session) */}
+            {mode !== "newPassword" && mode !== "verifyOtp" && (
+              <div>
+                <label style={labelStyle}>Email Address</label>
+                <input type="email" placeholder="you@example.com" value={form.email}
+                  onChange={e => set("email", e.target.value)}
+                  onFocus={() => setFocused("email")} onBlur={() => setFocused(null)}
+                  style={inputStyle("email")}/>
+              </div>
+            )}
 
-            {/* Password */}
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
-                <label style={{ ...labelStyle, marginBottom: 0 }}>Password</label>
-                {mode === "signin" && (
-                  <button style={{ background: "none", border: "none", fontSize: 11, color: "#C8A96E", fontFamily: "'EB Garamond', serif", fontStyle: "italic", cursor: "pointer", padding: 0 }}>
-                    Forgot password?
-                  </button>
+            {/* verifyOtp mode — show the code input plus the email it was sent to as context */}
+            {mode === "verifyOtp" && (
+              <>
+                <p style={{ fontSize: 13, color: "#888", fontFamily: "'EB Garamond', serif", fontStyle: "italic", margin: 0, lineHeight: 1.5 }}>
+                  We sent a 6-digit code to <strong style={{ fontStyle: "normal", color: "#555" }}>{form.email}</strong>. Enter it below to verify your account.
+                </p>
+                <div>
+                  <label style={labelStyle}>Verification Code</label>
+                  <input type="text" inputMode="numeric" maxLength={6} placeholder="000000" value={form.otpCode}
+                    onChange={e => set("otpCode", e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    onFocus={() => setFocused("otpCode")} onBlur={() => setFocused(null)}
+                    style={{ ...inputStyle("otpCode"), fontSize: 22, letterSpacing: "0.3em", textAlign: "center", fontFamily: "'DM Mono', monospace" }}/>
+                </div>
+              </>
+            )}
+
+            {/* Password — normal sign in/up field */}
+            {(mode === "signin" || mode === "signup") && (
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+                  <label style={{ ...labelStyle, marginBottom: 0 }}>Password</label>
+                  {mode === "signin" && (
+                    <button onClick={() => { setMode("reset"); setError(null); setMessage(null); }}
+                      style={{ background: "none", border: "none", fontSize: 11, color: "#C8A96E", fontFamily: "'EB Garamond', serif", fontStyle: "italic", cursor: "pointer", padding: 0 }}>
+                      Forgot password?
+                    </button>
+                  )}
+                </div>
+                <input type="password" placeholder="••••••••" value={form.password}
+                  onChange={e => set("password", e.target.value)}
+                  onFocus={() => setFocused("password")} onBlur={() => setFocused(null)}
+                  style={inputStyle("password")}/>
+                {mode === "signup" && (
+                  <span style={{ fontSize: 11, color: "#BBB", fontFamily: "'EB Garamond', serif", fontStyle: "italic", marginTop: 4, display: "block" }}>
+                    At least 6 characters
+                  </span>
                 )}
               </div>
-              <input type="password" placeholder="••••••••" value={form.password}
-                onChange={e => set("password", e.target.value)}
-                onFocus={() => setFocused("password")} onBlur={() => setFocused(null)}
-                style={inputStyle("password")}/>
-              {mode === "signup" && (
-                <span style={{ fontSize: 11, color: "#BBB", fontFamily: "'EB Garamond', serif", fontStyle: "italic", marginTop: 4, display: "block" }}>
-                  At least 6 characters
-                </span>
-              )}
-            </div>
+            )}
+
+            {/* New password fields — shown only after clicking the reset link in email */}
+            {mode === "newPassword" && (
+              <>
+                <div>
+                  <label style={labelStyle}>New Password</label>
+                  <input type="password" placeholder="••••••••" value={form.newPassword}
+                    onChange={e => set("newPassword", e.target.value)}
+                    onFocus={() => setFocused("newPassword")} onBlur={() => setFocused(null)}
+                    style={inputStyle("newPassword")}/>
+                  <span style={{ fontSize: 11, color: "#BBB", fontFamily: "'EB Garamond', serif", fontStyle: "italic", marginTop: 4, display: "block" }}>
+                    At least 6 characters
+                  </span>
+                </div>
+                <div>
+                  <label style={labelStyle}>Confirm New Password</label>
+                  <input type="password" placeholder="••••••••" value={form.confirmPassword}
+                    onChange={e => set("confirmPassword", e.target.value)}
+                    onFocus={() => setFocused("confirmPassword")} onBlur={() => setFocused(null)}
+                    style={inputStyle("confirmPassword")}/>
+                </div>
+              </>
+            )}
+
+            {/* Reset mode helper copy */}
+            {mode === "reset" && (
+              <p style={{ fontSize: 13, color: "#888", fontFamily: "'EB Garamond', serif", fontStyle: "italic", margin: 0, lineHeight: 1.5 }}>
+                Enter the email address on your account and we'll send you a link to reset your password.
+              </p>
+            )}
 
             {/* Submit */}
             <button
-              onClick={mode === "signin" ? handleSignIn : handleSignUp}
+              onClick={
+                mode === "signin" ? handleSignIn :
+                mode === "signup" ? handleSignUp :
+                mode === "reset" ? handleRequestReset :
+                mode === "verifyOtp" ? handleVerifyOtp :
+                handleSetNewPassword
+              }
               disabled={loading}
               style={{ width: "100%", background: loading ? "#555" : "#111", color: "#F0EAD8", border: "none", borderRadius: 6, padding: "13px 0", fontSize: 14, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, cursor: loading ? "not-allowed" : "pointer", letterSpacing: "0.02em", marginTop: 4, transition: "background 0.15s" }}>
-              {loading ? "Please wait..." : mode === "signin" ? "Sign In →" : "Create Account →"}
+              {loading ? "Please wait..." :
+                mode === "signin" ? "Sign In →" :
+                mode === "signup" ? "Create Account →" :
+                mode === "reset" ? "Send Reset Link →" :
+                mode === "verifyOtp" ? "Verify & Continue →" :
+                "Update Password →"}
             </button>
 
+            {/* Resend code link — verifyOtp only */}
+            {mode === "verifyOtp" && (
+              <div style={{ textAlign: "center" }}>
+                <button onClick={handleResendOtp} disabled={loading}
+                  style={{ background: "none", border: "none", fontSize: 12, color: "#C8A96E", fontFamily: "'EB Garamond', serif", fontStyle: "italic", cursor: "pointer", padding: 0, textDecoration: "underline" }}>
+                  Didn't get a code? Resend it
+                </button>
+              </div>
+            )}
+
             {/* Bottom link */}
-            <div style={{ textAlign: "center" }}>
-              <span style={{ fontSize: 12, color: "#AAA", fontFamily: "'EB Garamond', serif", fontStyle: "italic" }}>
-                {mode === "signin" ? "New to Letters? " : "Already have an account? "}
-              </span>
-              <button onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setError(null); setMessage(null); }}
-                style={{ background: "none", border: "none", fontSize: 12, color: "#C8A96E", fontFamily: "'EB Garamond', serif", fontStyle: "italic", cursor: "pointer", padding: 0, textDecoration: "underline" }}>
-                {mode === "signin" ? "Create an account" : "Sign in"}
-              </button>
-            </div>
+            {mode !== "newPassword" && mode !== "verifyOtp" && (
+              <div style={{ textAlign: "center" }}>
+                {mode === "reset" ? (
+                  <button onClick={() => { setMode("signin"); setError(null); setMessage(null); }}
+                    style={{ background: "none", border: "none", fontSize: 12, color: "#C8A96E", fontFamily: "'EB Garamond', serif", fontStyle: "italic", cursor: "pointer", padding: 0, textDecoration: "underline" }}>
+                    ← Back to sign in
+                  </button>
+                ) : (
+                  <>
+                    <span style={{ fontSize: 12, color: "#AAA", fontFamily: "'EB Garamond', serif", fontStyle: "italic" }}>
+                      {mode === "signin" ? "New to Letters? " : "Already have an account? "}
+                    </span>
+                    <button onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setError(null); setMessage(null); }}
+                      style={{ background: "none", border: "none", fontSize: 12, color: "#C8A96E", fontFamily: "'EB Garamond', serif", fontStyle: "italic", cursor: "pointer", padding: 0, textDecoration: "underline" }}>
+                      {mode === "signin" ? "Create an account" : "Sign in"}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
