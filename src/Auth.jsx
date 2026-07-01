@@ -182,15 +182,18 @@ export default function Auth({ onAuthSuccess }) {
 
     // Verification succeeded and the user now has an active session —
     // create their profile row now that the email is confirmed real.
+    // Use upsert (not insert) so a returning/re-verified user whose profile
+    // row already exists is updated in place instead of throwing a 409
+    // conflict (which previously crashed this screen).
     if (data.user) {
       const { error: profileError } = await supabase
         .from("profiles")
-        .insert({
+        .upsert({
           id: data.user.id,
           full_name: form.fullName,
           username: form.username.toLowerCase().replace(/\s/g, ""),
           status: "founding",
-        });
+        }, { onConflict: "id" });
 
       if (profileError) {
         // Profile creation failing shouldn't block sign-in — surface it,
