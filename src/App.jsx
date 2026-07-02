@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation, useParams } from "react-router-dom";
 import { supabase } from "./supabase";
 import Auth from "./Auth";
+import { MASTHEAD_LABEL } from "./version";
 
 // ── Shared: Logo ──────────────────────────────────────────────────────────────
 function Logo({ size = 40 }) {
@@ -451,6 +452,74 @@ function LetterCard({ item, onOpen, selected, onToggleLike, isLiked, onToggleRep
   );
 }
 
+// Lighter-weight card for short posts (kind === "post"): no "Letter" masthead,
+// no title, no source, no 3-line clamp — the whole (short) body is shown.
+// Shares the same like / reply / republish actions as LetterCard.
+function PostCard({ item, onOpen, selected, onToggleLike, isLiked, onToggleRepublish, isRepublished }) {
+  return (
+    <article onClick={() => onOpen && onOpen(item)}
+      style={{ borderBottom:"1px solid #F0EDE8", padding:"18px 0", cursor:"pointer", background: selected ? "#FDFAF4" : "#fff", borderLeft: selected ? "3px solid #C8A96E" : "3px solid transparent", paddingLeft: selected ? 12 : 0, transition:"all 0.15s" }}>
+
+      {/* Republished banner — same treatment as LetterCard */}
+      {item.republishedBy && (
+        <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:10, color:"#999" }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+          <span style={{ fontSize:10.5, fontFamily:"'DM Mono', monospace", letterSpacing:"0.03em" }}>Republished from <strong style={{ color:"#777" }}>{item.republishedBy}</strong></span>
+        </div>
+      )}
+
+      {/* Post label — muted ink rather than the gold "Letter" masthead */}
+      <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:10 }}>
+        <div style={{ width:2, height:14, background:"#8A7B5C", borderRadius:2 }}/>
+        <span style={{ fontSize:9, letterSpacing:"0.18em", textTransform:"uppercase", color:"#8A7B5C", fontFamily:"'DM Mono', monospace", fontWeight:600 }}>Post</span>
+      </div>
+
+      <div style={{ display:"flex", gap:12, minWidth:0 }}>
+        <Avatar initial={item.initial} color={item.color}/>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ marginBottom:8 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+              <span style={{ fontSize:13, fontWeight:600, color:"#1a1a1a", fontFamily:"'DM Sans', sans-serif" }}>{item.author}</span>
+              <span style={{ fontSize:10, color:"#bbb", fontFamily:"'DM Mono', monospace", flexShrink:0 }}>{item.timeAgo}</span>
+            </div>
+            <div style={{ fontSize:10, fontFamily:"'DM Mono', monospace", marginTop:2, letterSpacing:"0.04em" }}>
+              <span style={{ color:"#BBB" }}>by </span>
+              <span style={{ color:"#888" }}>{item.username}</span>
+              <span style={{ color:statusColors[item.status] || "#AAA", marginLeft:6 }}>
+                {contributorStatuses[item.status] || contributorStatuses["contributor"]}
+              </span>
+            </div>
+          </div>
+
+          {/* Full post text — short, so no clamp; preserve the writer's line breaks */}
+          <p style={{ margin:0, fontSize:15.5, lineHeight:1.6, color:"#222", fontFamily:"'EB Garamond', Georgia, serif", whiteSpace:"pre-wrap" }}>
+            {item.fullBody || item.preview}
+          </p>
+
+          <div style={{ display:"flex", gap:18, marginTop:12, alignItems:"center" }}>
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggleLike && onToggleLike(item); }}
+              disabled={!item.isReal}
+              style={{ display:"flex", alignItems:"center", gap:5, background:"none", border:"none", padding:0, cursor: item.isReal ? "pointer" : "default", color: isLiked ? "#C0392B" : "#bbb", fontSize:11, fontFamily:"'DM Sans', sans-serif", transition:"color 0.15s" }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill={isLiked ? "#C0392B" : "none"} stroke="currentColor" strokeWidth="1.8"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+              {item.likes}
+            </button>
+            <span style={{ fontSize:11, color:"#bbb", fontFamily:"'DM Sans', sans-serif" }}>↩ {item.replies} replies</span>
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggleRepublish && onToggleRepublish(item); }}
+              disabled={!item.isReal}
+              title={isRepublished ? "Remove from your feed" : "Republish to your feed"}
+              style={{ display:"flex", alignItems:"center", gap:5, background:"none", border:"none", padding:0, marginLeft:"auto", cursor: item.isReal ? "pointer" : "default", color: isRepublished ? "#117A65" : "#bbb", fontSize:11, fontFamily:"'DM Sans', sans-serif", fontWeight: isRepublished ? 600 : 400, transition:"color 0.15s" }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+              {isRepublished ? "Republished" : "Republish"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
 function NewsCard({ item }) {
   // Publication color map
   const pubColors = {
@@ -709,6 +778,12 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
   const [republishEntries, setRepublishEntries] = useState([]); // extra feed cards representing other users' republishes
   const [myProfile, setMyProfile] = useState(null);
 
+  // Quick-post composer at the top of the feed (short posts, kind === "post")
+  const [composeText, setComposeText] = useState("");
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [composingPost, setComposingPost] = useState(false);
+  const COMPOSE_LIMIT = 500;
+
   // Pull-to-refresh state — tracks gesture distance and refresh phase for the wax-seal animation
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -828,6 +903,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
             id: `real-${letter.id}`,
             dbId: letter.id,
             type: "letter",
+            kind: letter.kind || "letter", // "letter" (long) or "post" (short) — drives which feed card renders
             isReal: true,
             author: profile.full_name || profile.username || "Anonymous",
             username: profile.username || "user",
@@ -995,6 +1071,36 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
     setSubmittingReply(false);
   };
 
+  // Publish a short post from the feed compose box, then drop it into the feed
+  // immediately (optimistic) so it appears without a refresh.
+  const submitPost = async () => {
+    if (!composeText.trim() || !session?.user?.id) return;
+    setComposingPost(true);
+    const myName = myProfile?.full_name || myProfile?.username || session.user.email?.split("@")[0] || "You";
+    const { data, error } = await supabase
+      .from("letters")
+      .insert({ user_id: session.user.id, body: composeText.trim(), kind: "post" })
+      .select()
+      .single();
+    if (error) {
+      console.error("Post failed:", error);
+      alert(`Post failed: ${error.message}`);
+    } else if (data) {
+      const plain = composeText.trim();
+      setRealLetters(prev => [{
+        id: `real-${data.id}`, dbId: data.id, type: "letter", kind: "post", isReal: true,
+        author: myName, username: myProfile?.username || "you", status: myProfile?.status || "founding",
+        initial: myName[0].toUpperCase(), color: colorForId(session.user.id),
+        timeAgo: "Just now", createdAt: data.created_at || new Date().toISOString(),
+        section: "", publication: "", headline: "", title: null,
+        preview: plain, fullBody: plain, replies: 0, likes: 0,
+      }, ...prev]);
+      setComposeText("");
+      setComposeOpen(false);
+    }
+    setComposingPost(false);
+  };
+
   // Merge real letters with mock news cards, sorted so real content appears woven in naturally
   const combinedFeedBase = [...realLetters, ...republishEntries, ...mockFeed].sort((a, b) => {
     if (a.isReal && !b.isReal) return -1;
@@ -1150,6 +1256,35 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
               </button>
               <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
             </div>
+
+            {/* Quick-post composer — short posts (kind: "post") straight from the feed */}
+            <div style={{ display:"flex", gap:10, alignItems:"flex-start", padding:"14px 0", borderBottom:"1px solid #F0EDE8" }}>
+              <Avatar initial={(myProfile?.full_name || myProfile?.username || session?.user?.email?.[0] || "Y")[0].toUpperCase()} color="#C8A96E" size={38}/>
+              <div style={{ flex:1, minWidth:0 }}>
+                <textarea
+                  value={composeText}
+                  onChange={e => setComposeText(e.target.value.slice(0, COMPOSE_LIMIT))}
+                  onFocus={() => setComposeOpen(true)}
+                  placeholder="Share a quick post…"
+                  rows={composeOpen ? 3 : 1}
+                  style={{ width:"100%", border:`1px solid ${composeOpen ? "#C8A96E" : "#E8E0D0"}`, borderRadius:12, padding:"10px 14px", fontFamily:"'EB Garamond', Georgia, serif", fontSize:15, lineHeight:1.5, color:"#111", background:"#FDFCF8", outline:"none", resize:"none", boxSizing:"border-box", transition:"border-color 0.15s" }}
+                />
+                {composeOpen && (
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:8 }}>
+                    <span style={{ fontSize:11, color: composeText.length > COMPOSE_LIMIT - 50 ? "#C0392B" : "#CCC", fontFamily:"'DM Mono', monospace" }}>{composeText.length}/{COMPOSE_LIMIT}</span>
+                    <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                      <button onClick={() => { setComposeText(""); setComposeOpen(false); }}
+                        style={{ background:"none", border:"none", fontSize:12, color:"#BBB", fontFamily:"'DM Sans', sans-serif", cursor:"pointer" }}>Cancel</button>
+                      <button onClick={submitPost} disabled={composingPost || !composeText.trim()}
+                        style={{ background: composeText.trim() ? "#111" : "#E8E0D0", color: composeText.trim() ? "#F0EAD8" : "#AAA", border:"none", borderRadius:20, padding:"7px 18px", fontSize:12.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor: composeText.trim() ? "pointer" : "default" }}>
+                        {composingPost ? "Posting…" : "Post"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {activeFeedTab === "following" ? (
               <div style={{ textAlign:"center", padding:"60px 20px" }}>
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#DDD8CC" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom:16 }}>
@@ -1168,8 +1303,10 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
               // from realLetters so a like/reply made anywhere updates every card showing this letter.
               const live = item.isReal ? realLetters.find(l => l.dbId === item.dbId) : null;
               const displayItem = live ? { ...item, likes: live.likes, replies: live.replies } : item;
+              // Short posts render through the lighter PostCard; long letters keep LetterCard.
+              const CardComp = item.kind === "post" ? PostCard : LetterCard;
               return (
-                <LetterCard
+                <CardComp
                   key={item.id}
                   item={displayItem}
                   onOpen={setOpenLetter}
@@ -1604,6 +1741,21 @@ function ReadPage({ onNavigate }) {
   const [loadingArticles, setLoadingArticles] = useState(true);
   const categories = ["All", "World", "Local", "Politics", "Technology", "Culture", "Sports"];
 
+  // Long letters (kind: "letter") to surface in the dedicated Letters section
+  const [readLetters, setReadLetters] = useState([]);
+  const [loadingReadLetters, setLoadingReadLetters] = useState(true);
+
+  const stripHtmlRead = (html) => {
+    if (!html) return "";
+    if (typeof document === "undefined") return html;
+    const withSpacing = html.replace(/<\/(p|div|li|blockquote|h[1-6])>/gi, " ").replace(/<br\s*\/?>/gi, " ");
+    const div = document.createElement("div");
+    div.innerHTML = withSpacing;
+    return (div.textContent || div.innerText || "").replace(/\s+/g, " ").trim();
+  };
+  const readLetterColors = ["#2D6A4F","#1B4F72","#6B2D8B","#7A3B1E","#117A65","#8E5C2E","#3B5998","#A23B3B"];
+  const readLetterColorForId = (id) => readLetterColors[(id || "").split("").reduce((a,c)=>a+c.charCodeAt(0),0) % readLetterColors.length];
+
   useEffect(() => {
     const fetchRealArticles = async () => {
       setLoadingArticles(true);
@@ -1633,6 +1785,40 @@ function ReadPage({ onNavigate }) {
       setLoadingArticles(false);
     };
     fetchRealArticles();
+  }, []);
+
+  // Pull recent long letters (kind: "letter") for the Letters section — most recent first.
+  useEffect(() => {
+    const fetchReadLetters = async () => {
+      setLoadingReadLetters(true);
+      const { data, error } = await supabase
+        .from("letters")
+        .select("id, title, body, source_title, source_publication, created_at, user_id, kind, profiles:user_id (username, full_name, status)")
+        .eq("kind", "letter")
+        .order("created_at", { ascending: false })
+        .limit(8);
+      if (!error && data) {
+        const mapped = data.map(l => {
+          const profile = l.profiles || {};
+          const plain = stripHtmlRead(l.body);
+          return {
+            dbId: l.id,
+            title: l.title,
+            author: profile.full_name || profile.username || "Anonymous",
+            username: profile.username || "user",
+            status: profile.status || "contributor",
+            initial: (profile.full_name || profile.username || "A")[0].toUpperCase(),
+            color: readLetterColorForId(l.user_id),
+            timeAgo: timeAgoRead(l.created_at),
+            sourcePublication: l.source_publication || "",
+            snippet: plain.length > 180 ? plain.slice(0, 180) + "…" : plain,
+          };
+        });
+        setReadLetters(mapped);
+      }
+      setLoadingReadLetters(false);
+    };
+    fetchReadLetters();
   }, []);
 
   // Merge real articles ahead of mock ones — mock content fills in categories/sources
@@ -1698,6 +1884,86 @@ function ReadPage({ onNavigate }) {
             </button>
           ))}
         </div>
+
+        {/* ── Letters — the editorial heart of the page, given top billing ── */}
+        {activeCategory === "All" && readLetters.length > 0 && (
+          <div style={{ marginBottom:32 }}>
+            {/* Masthead */}
+            <div style={{ borderTop:"3px solid #111", borderBottom:"1px solid #111", padding:"8px 0 6px", marginBottom:16, display:"flex", alignItems:"baseline", justifyContent:"space-between" }}>
+              <span style={{ fontFamily:"'Playfair Display', serif", fontSize:22, fontWeight:900, color:"#111", letterSpacing:"-0.01em" }}>
+                Letters<span style={{ color:"#C8A96E" }}>.</span>
+              </span>
+              <span style={{ fontSize:9.5, letterSpacing:"0.16em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace" }}>
+                From our writers
+              </span>
+            </div>
+
+            {/* Lead letter — full width, prominent */}
+            <div onClick={() => navigate(`/feed/letter/${readLetters[0].dbId}`)}
+              style={{ background:"#fff", border:"1px solid #E8E0D0", borderLeft:"3px solid #C8A96E", borderRadius:12, padding:"22px 24px", cursor:"pointer", marginBottom:14, transition:"border-color 0.15s" }}
+              onMouseEnter={e => e.currentTarget.style.borderColor="#C8A96E"}
+              onMouseLeave={e => { e.currentTarget.style.borderColor="#E8E0D0"; e.currentTarget.style.borderLeftColor="#C8A96E"; }}>
+              <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:12 }}>
+                <span style={{ fontSize:9, letterSpacing:"0.18em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontWeight:600 }}>Featured Letter</span>
+              </div>
+              {readLetters[0].title && (
+                <div style={{ fontFamily:"'Playfair Display', serif", fontSize:24, fontWeight:900, color:"#111", lineHeight:1.2, letterSpacing:"-0.01em", marginBottom:10 }}>{readLetters[0].title}</div>
+              )}
+              <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:16, lineHeight:1.65, color:"#555", margin:"0 0 14px", display:"-webkit-box", WebkitLineClamp:3, WebkitBoxOrient:"vertical", overflow:"hidden" }}>
+                {readLetters[0].snippet}
+              </p>
+              {readLetters[0].sourcePublication && (
+                <div style={{ fontSize:9.5, letterSpacing:"0.08em", textTransform:"uppercase", color:"#BBB", fontFamily:"'DM Mono', monospace", marginBottom:14 }}>
+                  In response to · {readLetters[0].sourcePublication}
+                </div>
+              )}
+              <div style={{ display:"flex", alignItems:"center", gap:10, paddingTop:12, borderTop:"1px solid #F0EDE8" }}>
+                <div style={{ width:32, height:32, borderRadius:"50%", background:readLetters[0].color, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:13, fontFamily:"'Playfair Display', serif", fontWeight:700, flexShrink:0 }}>{readLetters[0].initial}</div>
+                <div style={{ minWidth:0 }}>
+                  <div style={{ fontSize:13, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}>{readLetters[0].author}</div>
+                  <div style={{ fontSize:9.5, color: statusColors[readLetters[0].status] || "#AAA", fontFamily:"'DM Mono', monospace" }}>{contributorStatuses[readLetters[0].status] || contributorStatuses["contributor"]}</div>
+                </div>
+                <span style={{ marginLeft:"auto", fontSize:9.5, color:"#BBB", fontFamily:"'DM Mono', monospace", flexShrink:0 }}>{readLetters[0].timeAgo}</span>
+              </div>
+            </div>
+
+            {/* The rest — 2-up grid */}
+            {readLetters.length > 1 && (
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+                {readLetters.slice(1, 5).map(letter => (
+                  <div key={letter.dbId} onClick={() => navigate(`/feed/letter/${letter.dbId}`)}
+                    style={{ background:"#fff", border:"1px solid #E8E0D0", borderRadius:12, padding:"16px 18px", cursor:"pointer", transition:"border-color 0.15s", display:"flex", flexDirection:"column" }}
+                    onMouseEnter={e => e.currentTarget.style.borderColor="#C8A96E"}
+                    onMouseLeave={e => e.currentTarget.style.borderColor="#E8E0D0"}>
+                    <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:10 }}>
+                      <div style={{ width:2, height:12, background:"#C8A96E", borderRadius:2 }}/>
+                      <span style={{ fontSize:8.5, letterSpacing:"0.18em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontWeight:600 }}>Letter</span>
+                    </div>
+                    {letter.title && (
+                      <div style={{ fontFamily:"'Playfair Display', serif", fontSize:17, fontWeight:800, color:"#111", lineHeight:1.25, marginBottom:6 }}>{letter.title}</div>
+                    )}
+                    <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:13.5, lineHeight:1.6, color:"#555", margin:"0 0 12px", display:"-webkit-box", WebkitLineClamp:3, WebkitBoxOrient:"vertical", overflow:"hidden" }}>
+                      {letter.snippet}
+                    </p>
+                    {letter.sourcePublication && (
+                      <div style={{ fontSize:9, letterSpacing:"0.08em", textTransform:"uppercase", color:"#BBB", fontFamily:"'DM Mono', monospace", marginBottom:10 }}>
+                        In response to · {letter.sourcePublication}
+                      </div>
+                    )}
+                    <div style={{ marginTop:"auto", display:"flex", alignItems:"center", gap:8, paddingTop:10, borderTop:"1px solid #F0EDE8" }}>
+                      <div style={{ width:26, height:26, borderRadius:"50%", background:letter.color, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:11, fontFamily:"'Playfair Display', serif", fontWeight:700, flexShrink:0 }}>{letter.initial}</div>
+                      <div style={{ minWidth:0 }}>
+                        <div style={{ fontSize:12, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif", overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis" }}>{letter.author}</div>
+                        <div style={{ fontSize:9, color: statusColors[letter.status] || "#AAA", fontFamily:"'DM Mono', monospace" }}>{contributorStatuses[letter.status] || contributorStatuses["contributor"]}</div>
+                      </div>
+                      <span style={{ marginLeft:"auto", fontSize:9.5, color:"#BBB", fontFamily:"'DM Mono', monospace", flexShrink:0 }}>{letter.timeAgo}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── Trending — newspaper-style tiered layout ── */}
         <div style={{ marginBottom:32 }}>
@@ -2044,6 +2310,9 @@ function WritePage({ session, onNavigate }) {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
+  const [kind, setKind] = useState("letter"); // "letter" (full editor) | "post" (quick short post)
+  const [postBody, setPostBody] = useState(""); // plain-text body used only in post mode
+  const POST_LIMIT = 500;
   const [showBrowse, setShowBrowse] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [showQuoteSource, setShowQuoteSource] = useState(false);
@@ -2228,33 +2497,63 @@ function WritePage({ session, onNavigate }) {
   const labelStyle = { fontSize:9.5, letterSpacing:"0.14em", textTransform:"uppercase", color:"#888", fontFamily:"'DM Mono', monospace", display:"block", marginBottom:6 };
 
   const handlePublish = async () => {
-    const plainCheck = form.body.replace(/<[^>]*>/g, "").trim();
-    if (!plainCheck) { setError("Your letter can't be empty."); return; }
+    const isPost = kind === "post";
+    if (isPost) {
+      if (!postBody.trim()) { setError("Your post can't be empty."); return; }
+    } else {
+      const plainCheck = form.body.replace(/<[^>]*>/g, "").trim();
+      if (!plainCheck) { setError("Your letter can't be empty."); return; }
+    }
     setLoading(true);
     setError(null);
-    const { error } = await supabase.from("letters").insert({
-      user_id: session.user.id,
-      title: form.title || null,
-      body: form.body,
-      source_url: form.sourceUrl || null,
-      source_title: form.sourceTitle || null,
-      source_publication: form.sourcePublication || null,
-    });
+    const { error } = await supabase.from("letters").insert(
+      isPost
+        ? {
+            user_id: session.user.id,
+            body: postBody.trim(),
+            title: null,
+            source_url: null,
+            source_title: null,
+            source_publication: null,
+            kind: "post",
+          }
+        : {
+            user_id: session.user.id,
+            title: form.title || null,
+            body: form.body,
+            source_url: form.sourceUrl || null,
+            source_title: form.sourceTitle || null,
+            source_publication: form.sourcePublication || null,
+            kind: "letter",
+          }
+    );
     if (error) { setError(error.message); setLoading(false); return; }
-    try { localStorage.removeItem(draftKey); } catch {}
+    if (!isPost) { try { localStorage.removeItem(draftKey); } catch {} }
     setSuccess(true);
     setLoading(false);
   };
+
+  // Shared Letter/Post segmented toggle, rendered at the top of both composers.
+  const modeToggle = (
+    <div style={{ display:"flex", gap:4, background:"#F0EDE8", borderRadius:10, padding:4, width:"fit-content" }}>
+      {[{ k:"letter", label:"Letter" }, { k:"post", label:"Post" }].map(m => (
+        <button key={m.k} onClick={() => { setKind(m.k); setError(null); }}
+          style={{ background: kind===m.k ? "#111" : "none", color: kind===m.k ? "#F0EAD8" : "#888", border:"none", borderRadius:7, padding:"6px 20px", fontSize:12.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:"pointer", transition:"all 0.15s" }}>
+          {m.label}
+        </button>
+      ))}
+    </div>
+  );
 
   if (success) return (
     <div className="letters-main" style={{ minHeight:"100vh", background:"#F9F6F0", paddingBottom:80 }}>
       <TopBar title={<span>Write<span style={{ color:"#C8A96E" }}>.</span></span>}/>
       <div style={{ maxWidth:680, margin:"0 auto", padding:"60px 20px", textAlign:"center" }}>
         <div style={{ fontSize:10, letterSpacing:"0.2em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:16 }}>Published</div>
-        <h2 style={{ fontFamily:"'Playfair Display', serif", fontSize:32, fontWeight:900, color:"#111", margin:"0 0 16px" }}>Your letter is live<span style={{ color:"#C8A96E" }}>.</span></h2>
+        <h2 style={{ fontFamily:"'Playfair Display', serif", fontSize:32, fontWeight:900, color:"#111", margin:"0 0 16px" }}>Your {kind === "post" ? "post" : "letter"} is live<span style={{ color:"#C8A96E" }}>.</span></h2>
         <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:16, color:"#888", margin:"0 0 32px" }}>It's now visible in the feed for your followers to read and respond to.</p>
         <div style={{ display:"flex", gap:12, justifyContent:"center" }}>
-          <button onClick={() => { setSuccess(false); setForm({ sourceUrl:"", sourceTitle:"", sourcePublication:"", title:"", body:"" }); if(editorRef.current) editorRef.current.innerHTML=""; }}
+          <button onClick={() => { setSuccess(false); setForm({ sourceUrl:"", sourceTitle:"", sourcePublication:"", title:"", body:"" }); setPostBody(""); if(editorRef.current) editorRef.current.innerHTML=""; }}
             style={{ background:"none", border:"1px solid #C8BFA8", borderRadius:6, padding:"10px 20px", fontSize:13, fontFamily:"'DM Sans', sans-serif", cursor:"pointer", color:"#555" }}>
             Write another
           </button>
@@ -2264,6 +2563,54 @@ function WritePage({ session, onNavigate }) {
           </button>
         </div>
       </div>
+    </div>
+  );
+
+  // ── Post mode — a stripped-down composer for short posts ──
+  if (kind === "post") return (
+    <div className="letters-main" style={{ minHeight:"100vh", background:"#F9F6F0", paddingBottom:80 }}>
+      <TopBar title={<span>Write<span style={{ color:"#C8A96E" }}>.</span></span>}/>
+      <main style={{ maxWidth:640, margin:"0 auto", padding:"24px 20px", display:"flex", flexDirection:"column", gap:20 }}>
+        {modeToggle}
+
+        {/* Hero */}
+        <div style={{ background:"#111", borderRadius:14, overflow:"hidden", position:"relative" }}>
+          <div style={{ position:"absolute", top:0, left:0, right:0, height:3, background:"linear-gradient(90deg, #C8A96E, #E8D5A8, #C8A96E)" }}/>
+          <div style={{ padding:"22px 28px" }}>
+            <div style={{ fontSize:9.5, letterSpacing:"0.22em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:6 }}>Letters · Est. 2025</div>
+            <h1 style={{ fontFamily:"'Playfair Display', serif", fontSize:30, fontWeight:900, color:"#F0EAD8", margin:0, letterSpacing:"-0.01em", lineHeight:1.1 }}>Write a Post<span style={{ color:"#C8A96E" }}>.</span></h1>
+            <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:13.5, color:"#888", margin:"8px 0 0" }}>A quick thought — no headline, no source, just say it.</p>
+          </div>
+        </div>
+
+        {/* Simple textarea */}
+        <div style={{ background:"#fff", border:"1px solid #E8E0D0", borderRadius:10, padding:"16px 18px" }}>
+          <textarea
+            value={postBody}
+            onChange={e => setPostBody(e.target.value.slice(0, POST_LIMIT))}
+            placeholder="What's on your mind?"
+            autoFocus
+            style={{ width:"100%", minHeight:150, border:"none", outline:"none", resize:"none", fontFamily:"'EB Garamond', Georgia, serif", fontSize:17, lineHeight:1.7, color:"#222", background:"none", boxSizing:"border-box" }}
+          />
+          <div style={{ display:"flex", justifyContent:"flex-end", marginTop:8, paddingTop:10, borderTop:"1px solid #F9F6F0" }}>
+            <span style={{ fontSize:11, color: postBody.length > POST_LIMIT - 50 ? "#C0392B" : "#CCC", fontFamily:"'DM Mono', monospace" }}>{postBody.length}/{POST_LIMIT}</span>
+          </div>
+        </div>
+
+        {error && (
+          <div style={{ background:"#FDF0F0", border:"1px solid #C8A8A8", borderRadius:5, padding:"10px 14px", fontSize:13, color:"#C0392B", fontFamily:"'EB Garamond', serif", fontStyle:"italic" }}>
+            {error}
+          </div>
+        )}
+
+        <button onClick={handlePublish} disabled={loading}
+          style={{ width:"100%", background:loading?"#555":"#111", color:"#F0EAD8", border:"none", borderRadius:6, padding:"15px 0", fontSize:14, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:loading?"not-allowed":"pointer", letterSpacing:"0.02em", lineHeight:1.4, transition:"background 0.15s" }}>
+          <span style={{ display:"block", fontSize:9.5, letterSpacing:"0.2em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontWeight:500, marginBottom:2 }}>
+            {loading ? "Posting..." : "Say it plainly"}
+          </span>
+          {loading ? "Please wait..." : "Publish Post →"}
+        </button>
+      </main>
     </div>
   );
 
@@ -2277,6 +2624,8 @@ function WritePage({ session, onNavigate }) {
 
         {/* ── Form column ── */}
         <div style={{ flex:"1.4 1 560px", minWidth:0, display:"flex", flexDirection:"column", gap:20 }}>
+
+          {modeToggle}
 
           {/* ── Prominent writing hero banner ── */}
           <div style={{ background:"#111", borderRadius:14, overflow:"hidden", position:"relative" }}>
@@ -3336,7 +3685,7 @@ function HomepageModal({ onDismiss, navigate }) {
     <div onClick={onDismiss} style={{ position:"fixed", inset:0, zIndex:100, background:"rgba(0,0,0,0.45)", display:"flex", alignItems:"center", justifyContent:"center", padding:24, opacity:visible?1:0, transition:"opacity 0.3s ease" }}>
       <div onClick={e=>e.stopPropagation()} style={{ background:"#F7F4EE", border:"1px solid #C8BFA8", borderRadius:14, width:"100%", maxWidth:460, overflow:"hidden", opacity:visible?1:0, transform:visible?"translateY(0)":"translateY(20px)", transition:"opacity 0.3s ease, transform 0.3s ease" }}>
         <div style={{ padding:"22px 28px 0" }}>
-          <BroadsheetRule left="Vol. I — No. 1" center="Coming Soon" right="Free to Join"/>
+          <BroadsheetRule left={MASTHEAD_LABEL} center="Coming Soon" right="Free to Join"/>
           <div style={{ display:"flex", alignItems:"center", gap:20, marginBottom:16, marginTop:-10 }}>
             <div style={{ flex:1 }}>
               <h2 style={{ fontFamily:"'Playfair Display', serif", fontSize:40, fontWeight:900, color:"#111", margin:"0 0 7px", lineHeight:0.95, letterSpacing:"-0.02em" }}>Letters<span style={{ color:"#C8A96E" }}>.</span></h2>
@@ -3920,7 +4269,7 @@ function MarketingHomePage({ navigate }) {
             <Logo size={168}/>
           </div>
           <h1 style={{ fontFamily:"'Playfair Display', serif", fontSize:"clamp(34px, 7vw, 64px)", fontWeight:900, color:"#111", margin:"0 0 22px", letterSpacing:"-0.03em", lineHeight:1.05, whiteSpace:"nowrap" }}>
-            Social media. Elevated<span style={{ color:"#C8A96E" }}>.</span>
+            Awaiting Your Reply<span style={{ color:"#C8A96E" }}>.</span>
           </h1>
           <div style={{ fontSize:11, letterSpacing:"0.2em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:36 }}>
             Now accepting founding members
@@ -3986,10 +4335,10 @@ function HowItWorksPage({ navigate }) {
       </header>
 
       <main style={{ maxWidth:640, margin:"0 auto", padding:"56px 24px 80px" }}>
-        <BroadsheetRule left="Vol. I — No. 1" center="Dear Reader" right="Free to Join"/>
+        <BroadsheetRule left={MASTHEAD_LABEL} center="Dear Reader" right="Free to Join"/>
         <div style={{ fontSize:10, letterSpacing:"0.2em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:12 }}>How It Works</div>
         <h1 style={{ fontFamily:"'Playfair Display', serif", fontSize:36, fontWeight:900, color:"#111", margin:"0 0 16px", letterSpacing:"-0.02em", lineHeight:1.1 }}>
-          Social media. Elevated<span style={{ color:"#C8A96E" }}>.</span>
+          Awaiting Your Reply<span style={{ color:"#C8A96E" }}>.</span>
         </h1>
         <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:17, color:"#777", lineHeight:1.75, margin:"0 0 40px", fontStyle:"italic" }}>
           Most platforms reward the loudest take. Letters rewards the best one. Here's the loop.
@@ -4041,7 +4390,7 @@ function InvestorPage({ navigate }) {
       </header>
 
       <main style={{ maxWidth:640, margin:"0 auto", padding:"56px 24px 80px" }}>
-        <BroadsheetRule left="Vol. I — No. 1" center="For Investors" right="Pre-Seed"/>
+        <BroadsheetRule left={MASTHEAD_LABEL} center="For Investors" right="Pre-Seed"/>
         <div style={{ fontSize:10, letterSpacing:"0.2em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:12 }}>The Thesis</div>
         <h1 style={{ fontFamily:"'Playfair Display', serif", fontSize:34, fontWeight:900, color:"#111", margin:"0 0 16px", letterSpacing:"-0.02em", lineHeight:1.15 }}>
           Quality, not virality<span style={{ color:"#C8A96E" }}>.</span>
@@ -4148,7 +4497,7 @@ function InvitePage({ navigate }) {
       <main style={{ maxWidth:560, margin:"0 auto", padding:"60px 28px 80px" }}>
         {!submitted ? (
           <>
-            <BroadsheetRule left="Vol. I — No. 1" center="First Print" right="Free to Join"/>
+            <BroadsheetRule left={MASTHEAD_LABEL} center="First Print" right="Free to Join"/>
             <div style={{ fontSize:10, letterSpacing:"0.2em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:12 }}>Request an Invitation</div>
             <h1 style={{ fontFamily:"'Playfair Display', serif", fontSize:38, fontWeight:900, color:"#111", margin:"0 0 14px", letterSpacing:"-0.02em", lineHeight:1.1 }}>Join Letters<span style={{ color:"#C8A96E" }}>.</span></h1>
             <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:16.5, color:"#777", lineHeight:1.7, margin:"0 0 28px", fontStyle:"italic" }}>Letters is launching to a small group of founding members first. Leave your details and we'll be in touch.</p>

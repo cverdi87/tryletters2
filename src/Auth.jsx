@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "./supabase";
+import { MASTHEAD_LABEL } from "./version";
 
 function Logo({ size = 40 }) {
   const r = size / 2;
@@ -239,7 +240,7 @@ export default function Auth({ onAuthSuccess }) {
             Letters<span style={{ color: "#C8A96E" }}>.</span>
           </h1>
           <p style={{ fontFamily: "'EB Garamond', serif", fontStyle: "italic", fontSize: 15, color: "#888", margin: 0 }}>
-            Social Media. Elevated.
+            Awaiting Your Reply.
           </p>
         </div>
 
@@ -249,7 +250,7 @@ export default function Auth({ onAuthSuccess }) {
           {/* Broadsheet rule */}
           <div style={{ padding: "20px 28px 0" }}>
             <div style={{ borderTop: "3px solid #111", borderBottom: "1px solid #111", padding: "4px 0", marginBottom: 20, display: "flex", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "#888", fontFamily: "'DM Mono', monospace" }}>Vol. I — No. 1</span>
+              <span style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "#888", fontFamily: "'DM Mono', monospace" }}>{MASTHEAD_LABEL}</span>
               <span style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "#C8A96E", fontFamily: "'DM Mono', monospace" }}>✦ Members Only ✦</span>
               <span style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "#888", fontFamily: "'DM Mono', monospace" }}>Est. 2025</span>
             </div>
