@@ -29,10 +29,71 @@ function BroadsheetRule({ left, center, right }) {
 }
 
 // ── Shared: Top Bar ───────────────────────────────────────────────────────────
-function TopBar({ title, onSignOut, rightAction }) {
+// ── Brand image placeholders (shown when an image is missing or fails) ──
+function LMark({ size = 24 }) {
+  return (
+    <div aria-hidden="true" style={{ width:size, height:size, background:"#171717", borderRadius:"23%", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+      <span style={{ fontFamily:"'Playfair Display', serif", color:"#F4ECD8", fontSize:Math.round(size*0.56), fontWeight:900, lineHeight:1 }}>L</span>
+    </div>
+  );
+}
+
+// Shows the article image, falling back to a branded placeholder when it is
+// missing OR fails to load. Large slots get a source drop-cap; small slots get a
+// compact ink monogram — both tinted with the source's assigned color.
+function NewsThumb({ src, color, publication, initial, height, radius = 0, lead = false, gradient = false }) {
+  const [failed, setFailed] = useState(false);
+  const bg = color || "#7C7C7C";
+  const init = (initial || (publication || "").replace(/^the\s+/i, "").trim().charAt(0) || "L").toUpperCase();
+  const showImg = src && !failed;
+  const big = lead || (height ? height >= 150 : true);
+  return (
+    <div style={{ position:"relative", width:"100%", height: height || "100%", background:bg, overflow:"hidden", borderRadius:radius }}>
+      {showImg ? (
+        <img src={src} alt={publication || ""} referrerPolicy="no-referrer" loading="lazy"
+          onError={() => setFailed(true)}
+          style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }}/>
+      ) : big ? (
+        <>
+          <div aria-hidden="true" style={{ position:"absolute", right:-8, bottom:-30, fontFamily:"'Playfair Display', serif", fontWeight:900, fontSize:Math.max(150,(height||220)*0.95), lineHeight:1, color:"rgba(249,246,240,0.15)", userSelect:"none" }}>{init}</div>
+          {publication && <div style={{ position:"absolute", left:14, top:13, fontFamily:"'DM Mono', monospace", fontSize:10, letterSpacing:"0.18em", textTransform:"uppercase", color:"rgba(249,246,240,0.92)" }}>{publication}</div>}
+          <div style={{ position:"absolute", left:14, bottom:13, display:"flex", alignItems:"center", gap:7 }}>
+            <LMark size={22}/>
+            <span style={{ fontFamily:"'DM Mono', monospace", fontSize:9, letterSpacing:"0.16em", color:"rgba(249,246,240,0.62)" }}>No image</span>
+          </div>
+        </>
+      ) : (
+        <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:6, padding:8 }}>
+          <LMark size={(height||110) < 80 ? 22 : 28}/>
+          {publication && (height||110) >= 96 && <span style={{ fontFamily:"'DM Mono', monospace", fontSize:8.5, letterSpacing:"0.14em", textTransform:"uppercase", color:"rgba(249,246,240,0.72)", textAlign:"center", padding:"0 6px" }}>{publication}</span>}
+        </div>
+      )}
+      {gradient && showImg && <div style={{ position:"absolute", bottom:0, left:0, right:0, height:"55%", background:"linear-gradient(to top, rgba(0,0,0,0.4), transparent)", pointerEvents:"none" }}/>}
+    </div>
+  );
+}
+
+// A Letters nameplate crest — the picture area for letters until they carry
+// their own cover images.
+function LetterCover({ height = 96, section }) {
+  const nameSize = Math.max(20, Math.round(height * 0.34));
+  const ruleW = Math.min(190, Math.round(height * 1.7));
+  const gap = Math.round(height * 0.09);
+  return (
+    <div style={{ position:"relative", width:"100%", height, background:"#FBF7EF", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", overflow:"hidden" }}>
+      <div style={{ width:ruleW, height:2, background:"#141414", marginBottom:gap }}/>
+      <div style={{ fontFamily:"'Playfair Display', serif", fontSize:nameSize, fontWeight:900, color:"#141414", letterSpacing:"-0.01em", lineHeight:1 }}>Letters<span style={{ color:"#C8A96E" }}>.</span></div>
+      <div style={{ width:ruleW, borderTop:"1px solid #141414", marginTop:gap, paddingTop:Math.round(height*0.06) }}>
+        <div style={{ fontFamily:"'DM Mono', monospace", fontSize:8.5, letterSpacing:"0.24em", color:"#B0873E", textAlign:"center", paddingLeft:"0.24em", textTransform:"uppercase" }}>{section || "From our writers"}</div>
+      </div>
+    </div>
+  );
+}
+
+function TopBar({ title, onSignOut, rightAction, maxWidth = 680 }) {
   return (
     <header style={{ position:"sticky", top:0, zIndex:50, background:"rgba(249,246,240,0.97)", backdropFilter:"blur(10px)", borderBottom:"1px solid #E8E0D0" }}>
-      <div style={{ maxWidth:680, margin:"0 auto", padding:"0 20px", height:54, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+      <div style={{ maxWidth, margin:"0 auto", padding:"0 20px", height:54, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
           <Logo size={32}/>
           <span style={{ fontFamily:"'Playfair Display', serif", fontSize:17, fontWeight:900, color:"#111", letterSpacing:"-0.01em" }}>
@@ -373,7 +434,9 @@ function LetterDetailView({ item, onBack, session }) {
 function LetterCard({ item, onOpen, selected, onToggleLike, isLiked, onToggleRepublish, isRepublished }) {
   return (
     <article onClick={() => onOpen && onOpen(item)}
-      style={{ borderBottom:"1px solid #F0EDE8", padding:"20px 0", cursor:"pointer", background: selected ? "#FDFAF4" : "#fff", borderLeft: selected ? "3px solid #C8A96E" : "3px solid transparent", paddingLeft: selected ? 12 : 0, transition:"all 0.15s" }}>
+      style={{ borderBottom:"1px solid #F0EDE8", padding:"20px 0", cursor:"pointer", background: selected ? "#FDFAF4" : "#fff", borderLeft: selected ? "3px solid #C8A96E" : "3px solid transparent", paddingLeft: selected ? 12 : 0, transition:"all 0.15s" }}
+      onMouseEnter={e => { if (selected) return; const s = e.currentTarget.style; s.margin = "0 -12px"; s.padding = "20px 12px"; s.background = "#FDFBF6"; s.boxShadow = "inset 0 0 0 1px #E5DBC8"; s.borderRadius = "12px"; s.borderBottomColor = "transparent"; }}
+      onMouseLeave={e => { if (selected) return; const s = e.currentTarget.style; s.margin = "0"; s.padding = "20px 0"; s.background = "#fff"; s.boxShadow = "none"; s.borderRadius = "0"; s.borderBottomColor = "#F0EDE8"; }}>
 
       {/* Republished banner — shown above the Letter label when this card is a republish */}
       {item.republishedBy && (
@@ -458,7 +521,9 @@ function LetterCard({ item, onOpen, selected, onToggleLike, isLiked, onToggleRep
 function PostCard({ item, onOpen, selected, onToggleLike, isLiked, onToggleRepublish, isRepublished }) {
   return (
     <article onClick={() => onOpen && onOpen(item)}
-      style={{ borderBottom:"1px solid #F0EDE8", padding:"18px 0", cursor:"pointer", background: selected ? "#FDFAF4" : "#fff", borderLeft: selected ? "3px solid #C8A96E" : "3px solid transparent", paddingLeft: selected ? 12 : 0, transition:"all 0.15s" }}>
+      style={{ borderBottom:"1px solid #F0EDE8", padding:"18px 0", cursor:"pointer", background: selected ? "#FDFAF4" : "#fff", borderLeft: selected ? "3px solid #C8A96E" : "3px solid transparent", paddingLeft: selected ? 12 : 0, transition:"all 0.15s" }}
+      onMouseEnter={e => { if (selected) return; const s = e.currentTarget.style; s.margin = "0 -12px"; s.padding = "18px 12px"; s.background = "#FDFBF6"; s.boxShadow = "inset 0 0 0 1px #E5DBC8"; s.borderRadius = "12px"; s.borderBottomColor = "transparent"; }}
+      onMouseLeave={e => { if (selected) return; const s = e.currentTarget.style; s.margin = "0"; s.padding = "18px 0"; s.background = "#fff"; s.boxShadow = "none"; s.borderRadius = "0"; s.borderBottomColor = "#F0EDE8"; }}>
 
       {/* Republished banner — same treatment as LetterCard */}
       {item.republishedBy && (
@@ -782,7 +847,36 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
   const [composeText, setComposeText] = useState("");
   const [composeOpen, setComposeOpen] = useState(false);
   const [composingPost, setComposingPost] = useState(false);
-  const COMPOSE_LIMIT = 500;
+  const COMPOSE_LIMIT = 216;
+
+  // Follow graph — the set of user_ids the current user follows
+  const [myFollowing, setMyFollowing] = useState([]);
+  const [followBusy, setFollowBusy] = useState(false);
+  const isFollowing = (uid) => myFollowing.includes(uid);
+
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    supabase.from("follows").select("following_id").eq("follower_id", session.user.id)
+      .then(({ data }) => { if (data) setMyFollowing(data.map(f => f.following_id)); });
+  }, [session?.user?.id]);
+
+  const toggleFollow = async (targetId) => {
+    if (!session?.user?.id || !targetId || targetId === session.user.id) return;
+    setFollowBusy(true);
+    const already = myFollowing.includes(targetId);
+    if (already) {
+      setMyFollowing(prev => prev.filter(id => id !== targetId)); // optimistic
+      const { error } = await supabase.from("follows").delete()
+        .eq("follower_id", session.user.id).eq("following_id", targetId);
+      if (error) { setMyFollowing(prev => [...prev, targetId]); console.error("Unfollow failed:", error); }
+    } else {
+      setMyFollowing(prev => [...prev, targetId]); // optimistic
+      const { error } = await supabase.from("follows")
+        .insert({ follower_id: session.user.id, following_id: targetId });
+      if (error) { setMyFollowing(prev => prev.filter(id => id !== targetId)); console.error("Follow failed:", error); }
+    }
+    setFollowBusy(false);
+  };
 
   // Pull-to-refresh state — tracks gesture distance and refresh phase for the wax-seal animation
   const [pullDistance, setPullDistance] = useState(0);
@@ -905,6 +999,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
             type: "letter",
             kind: letter.kind || "letter", // "letter" (long) or "post" (short) — drives which feed card renders
             isReal: true,
+            userId: letter.user_id, // author — used by the follow button + Following filter
             author: profile.full_name || profile.username || "Anonymous",
             username: profile.username || "user",
             status: profile.status || "contributor",
@@ -1089,6 +1184,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
       const plain = composeText.trim();
       setRealLetters(prev => [{
         id: `real-${data.id}`, dbId: data.id, type: "letter", kind: "post", isReal: true,
+        userId: session.user.id,
         author: myName, username: myProfile?.username || "you", status: myProfile?.status || "founding",
         initial: myName[0].toUpperCase(), color: colorForId(session.user.id),
         timeAgo: "Just now", createdAt: data.created_at || new Date().toISOString(),
@@ -1118,10 +1214,16 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
     return 0;
   });
 
+  // "Following" tab: show only people you follow; if you follow no one yet, fall back to everyone.
+  const followingFeed =
+    myFollowing.length === 0
+      ? combinedFeedBase
+      : combinedFeedBase.filter(item => item.isReal && item.userId && myFollowing.includes(item.userId));
+
   const combinedFeed =
     activeFeedTab === "latest" ? latestFeed :
-    combinedFeedBase; // "for-you" and "following" both use the same base feed for now —
-                       // Following has no real follow graph yet, see empty state below.
+    activeFeedTab === "following" ? followingFeed :
+    combinedFeedBase;
 
   // Derive the open letter from the URL param (e.g. /feed/letter/abc123) instead
   // of separate local state, so individual letters are real, shareable URLs.
@@ -1285,18 +1387,18 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
               </div>
             </div>
 
-            {activeFeedTab === "following" ? (
+            {loadingFeed && realLetters.length === 0 ? (
+              <div style={{ textAlign:"center", padding:"40px 0", fontSize:11, color:"#CCC", fontFamily:"'DM Mono', monospace", letterSpacing:"0.1em" }}>Loading feed...</div>
+            ) : activeFeedTab === "following" && myFollowing.length > 0 && combinedFeed.length === 0 ? (
               <div style={{ textAlign:"center", padding:"60px 20px" }}>
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#DDD8CC" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom:16 }}>
                   <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
                 </svg>
-                <div style={{ fontSize:10, letterSpacing:"0.18em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:10 }}>Coming soon</div>
+                <div style={{ fontSize:10, letterSpacing:"0.18em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:10 }}>Quiet in here</div>
                 <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:15, color:"#AAA", margin:0, maxWidth:280, marginLeft:"auto", marginRight:"auto", lineHeight:1.6 }}>
-                  Following specific writers is on the way. For now, explore everyone's letters in For You.
+                  No new letters from the writers you follow yet. Explore For You to find more voices.
                 </p>
               </div>
-            ) : loadingFeed && realLetters.length === 0 ? (
-              <div style={{ textAlign:"center", padding:"40px 0", fontSize:11, color:"#CCC", fontFamily:"'DM Mono', monospace", letterSpacing:"0.1em" }}>Loading feed...</div>
             ) : combinedFeed.map(item => {
               if (item.type !== "letter") return <NewsCard key={item.id} item={item}/>;
               // For real letters and republish entries, pull the freshest like/reply counts
@@ -1347,6 +1449,8 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
                 </button>
               </div>
 
+              <LetterCover height={140} />
+
               <div style={{ padding:"24px 28px" }}>
                 {/* Source — only if linked */}
                 {openLetter.headline && (
@@ -1374,7 +1478,21 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
                       <span style={{ color: statusColors[openLetter.status] || "#AAA", marginLeft:5 }}>{contributorStatuses[openLetter.status] || contributorStatuses["contributor"]}</span>
                     </div>
                   </div>
-                  <span style={{ marginLeft:"auto", fontSize:10, color:"#BBB", fontFamily:"'DM Mono', monospace" }}>{openLetter.timeAgo}</span>
+                  <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:12 }}>
+                    {openLetter.isReal && openLetter.userId && session?.user?.id && openLetter.userId !== session.user.id && (
+                      <button onClick={() => toggleFollow(openLetter.userId)} disabled={followBusy}
+                        style={{
+                          background: isFollowing(openLetter.userId) ? "#F0EDE8" : "#111",
+                          color: isFollowing(openLetter.userId) ? "#888" : "#F0EAD8",
+                          border: isFollowing(openLetter.userId) ? "1px solid #E0D8CC" : "none",
+                          borderRadius:20, padding:"6px 16px", fontSize:12, fontFamily:"'DM Sans', sans-serif", fontWeight:600,
+                          cursor: followBusy ? "default" : "pointer", transition:"all 0.15s", whiteSpace:"nowrap"
+                        }}>
+                        {isFollowing(openLetter.userId) ? "Following" : "Follow"}
+                      </button>
+                    )}
+                    <span style={{ fontSize:10, color:"#BBB", fontFamily:"'DM Mono', monospace" }}>{openLetter.timeAgo}</span>
+                  </div>
                 </div>
 
                 {/* Title, if present */}
@@ -1382,10 +1500,16 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
                   <h2 style={{ fontFamily:"'Playfair Display', serif", fontSize:24, fontWeight:800, color:"#111", margin:"0 0 14px", lineHeight:1.2 }}>{openLetter.title}</h2>
                 )}
 
-                {/* Full body — real letters render their actual HTML, mock letters use placeholder paragraphs */}
+                {/* Full body — posts render plain text with line breaks preserved; real letters render their HTML; mock letters use placeholder paragraphs */}
                 {openLetter.isReal ? (
-                  <div style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:17, lineHeight:1.85, color:"#222", marginBottom:24 }}
-                    dangerouslySetInnerHTML={{ __html: openLetter.fullBody || "" }}/>
+                  openLetter.kind === "post" ? (
+                    <div style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:17, lineHeight:1.85, color:"#222", marginBottom:24, whiteSpace:"pre-wrap" }}>
+                      {openLetter.fullBody || ""}
+                    </div>
+                  ) : (
+                    <div style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:17, lineHeight:1.85, color:"#222", marginBottom:24 }}
+                      dangerouslySetInnerHTML={{ __html: openLetter.fullBody || "" }}/>
+                  )
                 ) : (
                   <div style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:17, lineHeight:1.85, color:"#222", marginBottom:24 }}>
                     <p style={{ margin:"0 0 16px" }}>{openLetter.preview}</p>
@@ -1522,6 +1646,51 @@ const realSourceColors = {
 };
 const colorForSource = (source) => realSourceColors[source] || "#888";
 
+// Sanitize RSS image URLs before use: RSS feeds frequently store HTML-encoded
+// URLs (e.g. Guardian's ...&amp;s=SIG), which break the request when dropped
+// into an <img src>. Decode entities and force https to dodge mixed-content
+// blocking. Returns "" for empty input so the color-block fallback still fires.
+const cleanImageUrl = (url) => {
+  if (!url) return "";
+  let u = String(url).trim();
+  const decode = (s) => s
+    .replace(/&amp;/gi, "&").replace(/&#0*38;?/g, "&").replace(/&#x0*26;?/gi, "&")
+    .replace(/&quot;/gi, '"').replace(/&#0*39;?/g, "'");
+  u = decode(decode(u)); // twice, to unwind double-encoding like &amp;amp;
+  if (u.startsWith("//")) u = "https:" + u;
+  else if (u.startsWith("http://")) u = "https://" + u.slice(7);
+  return u;
+};
+
+// Turn RSS description/title markup into clean display text. Feeds hand us
+// entity-escaped HTML (e.g. "&lt;p&gt;...&lt;/p&gt;"): decode entities so the
+// tags become real, convert block boundaries to paragraph breaks, strip the
+// remaining tags, then decode anything left in the text. Preserves \n\n so the
+// article reader can still split into paragraphs.
+const cleanNewsText = (raw) => {
+  if (!raw) return "";
+  const decode = (str) => {
+    if (typeof document === "undefined") {
+      return str
+        .replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/&quot;/gi, '"')
+        .replace(/&#0*39;/g, "'").replace(/&apos;/gi, "'").replace(/&nbsp;/gi, " ")
+        .replace(/&amp;/gi, "&");
+    }
+    const ta = document.createElement("textarea");
+    ta.innerHTML = str;
+    return ta.value;
+  };
+  let s = decode(String(raw));                                  // &lt;p&gt; -> <p>
+  s = s.replace(/<\/(p|div|li|h[1-6]|blockquote)>/gi, "\n\n")   // block ends -> breaks
+       .replace(/<br\s*\/?>/gi, "\n");
+  s = s.replace(/<[^>]*>/g, "");                                 // strip remaining tags
+  s = decode(s);                                                // decode entities in text
+  return s.replace(/[ \t\u00a0]+/g, " ")
+          .replace(/\n{3,}/g, "\n\n")
+          .replace(/[ \t]*\n[ \t]*/g, "\n")
+          .trim();
+};
+
 const timeAgoRead = (dateStr) => {
   const diffMs = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diffMs / 60000);
@@ -1624,14 +1793,10 @@ function ArticleReaderView({ article, onBack, onWriteAbout }) {
         </div>
 
         {/* Hero image */}
-        <div style={{ borderRadius:10, overflow:"hidden", marginBottom:28, background: article.color || "#888" }}>
-          {article.image_url ? (
-            <img src={article.image_url} alt={article.title} style={{ width:"100%", display:"block" }} onError={e => { e.target.style.display = "none"; }}/>
-          ) : article.imgId ? (
-            <img src={`https://picsum.photos/seed/${article.imgId}/640/360`} alt={article.title} style={{ width:"100%", display:"block" }}/>
-          ) : (
-            <div style={{ width:"100%", height:200 }}/>
-          )}
+        <div style={{ borderRadius:10, overflow:"hidden", marginBottom:28 }}>
+          <NewsThumb lead height={300} radius={0}
+            src={article.image_url || (article.imgId ? `https://picsum.photos/seed/${article.imgId}/640/360` : null)}
+            color={article.color} publication={article.publication} />
         </div>
 
         {/* Body */}
@@ -1713,7 +1878,7 @@ function PublicationPage({ publication, articles, onBack, onOpenArticle }) {
             onMouseLeave={e => e.currentTarget.style.borderColor="#E8E0D0"}>
             <div style={{ width:64, height:64, borderRadius:8, overflow:"hidden", flexShrink:0, background:article.color }}>
               {article.image_url ? (
-                <img src={article.image_url} alt={article.title} style={{ width:"100%", height:"100%", objectFit:"cover" }} onError={e => { e.target.style.display = "none"; }}/>
+                <img src={article.image_url} alt={article.title} style={{ width:"100%", height:"100%", objectFit:"cover" }} referrerPolicy="no-referrer" loading="lazy" onError={e => { e.target.style.display = "none"; }}/>
               ) : article.imgId ? (
                 <img src={`https://picsum.photos/seed/${article.imgId}/128/128`} alt={article.title} style={{ width:"100%", height:"100%", objectFit:"cover" }}/>
               ) : null}
@@ -1733,7 +1898,7 @@ function PublicationPage({ publication, articles, onBack, onOpenArticle }) {
   );
 }
 
-function ReadPage({ onNavigate }) {
+function ReadPage({ onNavigate, session }) {
   const [activeCategory, setActiveCategory] = useState("All");
   const navigate = useNavigate();
   const { articleId, publicationName } = useParams();
@@ -1744,6 +1909,7 @@ function ReadPage({ onNavigate }) {
   // Long letters (kind: "letter") to surface in the dedicated Letters section
   const [readLetters, setReadLetters] = useState([]);
   const [loadingReadLetters, setLoadingReadLetters] = useState(true);
+  const [readFollowing, setReadFollowing] = useState([]); // user_ids the current user follows
 
   const stripHtmlRead = (html) => {
     if (!html) return "";
@@ -1769,13 +1935,13 @@ function ReadPage({ onNavigate }) {
           id: `real-${a.id}`,
           dbId: a.id,
           isReal: true,
-          title: a.title,
+          title: cleanNewsText(a.title),
           publication: a.source,
           category: a.source_category,
           timeAgo: timeAgoRead(a.published_at),
           color: colorForSource(a.source),
-          image_url: a.image_url,
-          description: a.description,
+          image_url: cleanImageUrl(a.image_url),
+          description: cleanNewsText(a.description),
           link: a.link,
           letters_count: a.letters_count || 0,
           reason: "From your sources",
@@ -1803,6 +1969,7 @@ function ReadPage({ onNavigate }) {
           const plain = stripHtmlRead(l.body);
           return {
             dbId: l.id,
+            userId: l.user_id,
             title: l.title,
             author: profile.full_name || profile.username || "Anonymous",
             username: profile.username || "user",
@@ -1820,6 +1987,17 @@ function ReadPage({ onNavigate }) {
     };
     fetchReadLetters();
   }, []);
+
+  // Filter the Letters section to writers you follow; fall back to everyone when
+  // you follow no one yet (or none of them have posted long letters).
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    supabase.from("follows").select("following_id").eq("follower_id", session.user.id)
+      .then(({ data }) => { if (data) setReadFollowing(data.map(f => f.following_id)); });
+  }, [session?.user?.id]);
+
+  const followedLetters = readLetters.filter(l => readFollowing.includes(l.userId));
+  const displayLetters = (readFollowing.length > 0 && followedLetters.length > 0) ? followedLetters : readLetters;
 
   // Merge real articles ahead of mock ones — mock content fills in categories/sources
   // we haven't connected real RSS feeds for yet, so the page never looks sparse.
@@ -1873,7 +2051,7 @@ function ReadPage({ onNavigate }) {
   return (
     <div className="letters-main" style={{ minHeight:"100vh", background:"#F9F6F0", paddingBottom:80 }}>
       <TopBar title={<span>Read<span style={{ color:"#C8A96E" }}>.</span></span>}/>
-      <main style={{ maxWidth:680, margin:"0 auto", padding:"16px 20px 0" }}>
+      <main className="read-main" style={{ maxWidth:680, margin:"0 auto", padding:"16px 20px 0" }}>
 
         {/* Category filter */}
         <div style={{ display:"flex", gap:8, overflowX:"auto", paddingBottom:16 }}>
@@ -1885,85 +2063,111 @@ function ReadPage({ onNavigate }) {
           ))}
         </div>
 
-        {/* ── Letters — the editorial heart of the page, given top billing ── */}
-        {activeCategory === "All" && readLetters.length > 0 && (
-          <div style={{ marginBottom:32 }}>
-            {/* Masthead */}
-            <div style={{ borderTop:"3px solid #111", borderBottom:"1px solid #111", padding:"8px 0 6px", marginBottom:16, display:"flex", alignItems:"baseline", justifyContent:"space-between" }}>
-              <span style={{ fontFamily:"'Playfair Display', serif", fontSize:22, fontWeight:900, color:"#111", letterSpacing:"-0.01em" }}>
-                Letters<span style={{ color:"#C8A96E" }}>.</span>
-              </span>
-              <span style={{ fontSize:9.5, letterSpacing:"0.16em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace" }}>
-                From our writers
-              </span>
-            </div>
+        {/* ── Read layout (Option A): news column + persistent Letters rail ── */}
+        <div className="read-grid">
 
-            {/* Lead letter — full width, prominent */}
-            <div onClick={() => navigate(`/feed/letter/${readLetters[0].dbId}`)}
-              style={{ background:"#fff", border:"1px solid #E8E0D0", borderLeft:"3px solid #C8A96E", borderRadius:12, padding:"22px 24px", cursor:"pointer", marginBottom:14, transition:"border-color 0.15s" }}
-              onMouseEnter={e => e.currentTarget.style.borderColor="#C8A96E"}
-              onMouseLeave={e => { e.currentTarget.style.borderColor="#E8E0D0"; e.currentTarget.style.borderLeftColor="#C8A96E"; }}>
-              <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:12 }}>
-                <span style={{ fontSize:9, letterSpacing:"0.18em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontWeight:600 }}>Featured Letter</span>
-              </div>
-              {readLetters[0].title && (
-                <div style={{ fontFamily:"'Playfair Display', serif", fontSize:24, fontWeight:900, color:"#111", lineHeight:1.2, letterSpacing:"-0.01em", marginBottom:10 }}>{readLetters[0].title}</div>
-              )}
-              <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:16, lineHeight:1.65, color:"#555", margin:"0 0 14px", display:"-webkit-box", WebkitLineClamp:3, WebkitBoxOrient:"vertical", overflow:"hidden" }}>
-                {readLetters[0].snippet}
-              </p>
-              {readLetters[0].sourcePublication && (
-                <div style={{ fontSize:9.5, letterSpacing:"0.08em", textTransform:"uppercase", color:"#BBB", fontFamily:"'DM Mono', monospace", marginBottom:14 }}>
-                  In response to · {readLetters[0].sourcePublication}
-                </div>
-              )}
-              <div style={{ display:"flex", alignItems:"center", gap:10, paddingTop:12, borderTop:"1px solid #F0EDE8" }}>
-                <div style={{ width:32, height:32, borderRadius:"50%", background:readLetters[0].color, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:13, fontFamily:"'Playfair Display', serif", fontWeight:700, flexShrink:0 }}>{readLetters[0].initial}</div>
-                <div style={{ minWidth:0 }}>
-                  <div style={{ fontSize:13, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}>{readLetters[0].author}</div>
-                  <div style={{ fontSize:9.5, color: statusColors[readLetters[0].status] || "#AAA", fontFamily:"'DM Mono', monospace" }}>{contributorStatuses[readLetters[0].status] || contributorStatuses["contributor"]}</div>
-                </div>
-                <span style={{ marginLeft:"auto", fontSize:9.5, color:"#BBB", fontFamily:"'DM Mono', monospace", flexShrink:0 }}>{readLetters[0].timeAgo}</span>
-              </div>
-            </div>
-
-            {/* The rest — 2-up grid */}
-            {readLetters.length > 1 && (
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
-                {readLetters.slice(1, 5).map(letter => (
-                  <div key={letter.dbId} onClick={() => navigate(`/feed/letter/${letter.dbId}`)}
-                    style={{ background:"#fff", border:"1px solid #E8E0D0", borderRadius:12, padding:"16px 18px", cursor:"pointer", transition:"border-color 0.15s", display:"flex", flexDirection:"column" }}
-                    onMouseEnter={e => e.currentTarget.style.borderColor="#C8A96E"}
-                    onMouseLeave={e => e.currentTarget.style.borderColor="#E8E0D0"}>
-                    <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:10 }}>
-                      <div style={{ width:2, height:12, background:"#C8A96E", borderRadius:2 }}/>
-                      <span style={{ fontSize:8.5, letterSpacing:"0.18em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontWeight:600 }}>Letter</span>
-                    </div>
-                    {letter.title && (
-                      <div style={{ fontFamily:"'Playfair Display', serif", fontSize:17, fontWeight:800, color:"#111", lineHeight:1.25, marginBottom:6 }}>{letter.title}</div>
-                    )}
-                    <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:13.5, lineHeight:1.6, color:"#555", margin:"0 0 12px", display:"-webkit-box", WebkitLineClamp:3, WebkitBoxOrient:"vertical", overflow:"hidden" }}>
-                      {letter.snippet}
-                    </p>
-                    {letter.sourcePublication && (
-                      <div style={{ fontSize:9, letterSpacing:"0.08em", textTransform:"uppercase", color:"#BBB", fontFamily:"'DM Mono', monospace", marginBottom:10 }}>
-                        In response to · {letter.sourcePublication}
-                      </div>
-                    )}
-                    <div style={{ marginTop:"auto", display:"flex", alignItems:"center", gap:8, paddingTop:10, borderTop:"1px solid #F0EDE8" }}>
-                      <div style={{ width:26, height:26, borderRadius:"50%", background:letter.color, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:11, fontFamily:"'Playfair Display', serif", fontWeight:700, flexShrink:0 }}>{letter.initial}</div>
-                      <div style={{ minWidth:0 }}>
-                        <div style={{ fontSize:12, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif", overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis" }}>{letter.author}</div>
-                        <div style={{ fontSize:9, color: statusColors[letter.status] || "#AAA", fontFamily:"'DM Mono', monospace" }}>{contributorStatuses[letter.status] || contributorStatuses["contributor"]}</div>
-                      </div>
-                      <span style={{ marginLeft:"auto", fontSize:9.5, color:"#BBB", fontFamily:"'DM Mono', monospace", flexShrink:0 }}>{letter.timeAgo}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+        {/* ── Letters rail — the standing "letters to the editor" column.
+             DOM-first so it stacks ON TOP on mobile; grid-column places it on
+             the RIGHT on desktop (>=1200px). Persistent across categories. ── */}
+        <aside className="read-rail" style={{ marginBottom:28 }}>
+          {/* Masthead */}
+          <div style={{ borderTop:"3px solid #111", borderBottom:"1px solid #111", padding:"8px 0 6px", marginBottom:14, display:"flex", alignItems:"baseline", justifyContent:"space-between" }}>
+            <span style={{ fontFamily:"'Playfair Display', serif", fontSize:20, fontWeight:900, color:"#111", letterSpacing:"-0.01em" }}>
+              Letters<span style={{ color:"#C8A96E" }}>.</span>
+            </span>
+            <span style={{ fontSize:8.5, letterSpacing:"0.16em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace" }}>
+              From our writers
+            </span>
           </div>
-        )}
+
+          {loadingReadLetters ? (
+            /* Loading skeleton */
+            <div>
+              {[0,1,2].map(i => (
+                <div key={i} style={{ height:78, background:"#fff", border:"1px solid #EFE9DD", borderRadius:11, marginBottom:10, opacity:0.55 }}/>
+              ))}
+            </div>
+          ) : displayLetters.length === 0 ? (
+            /* Empty state — invite the reader to open the column */
+            <div style={{ background:"#fff", border:"1px solid #E8E0D0", borderLeft:"3px solid #C8A96E", borderRadius:11, padding:"20px 18px" }}>
+              <div style={{ fontSize:8.5, letterSpacing:"0.18em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontWeight:600, marginBottom:8 }}>The column is open</div>
+              <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontStyle:"italic", fontSize:15, lineHeight:1.5, color:"#666", margin:"0 0 14px" }}>
+                No letters yet. Be the first to weigh in — the editorial page is awaiting your reply.
+              </p>
+              <button onClick={() => navigate("/write")}
+                style={{ background:"#111", color:"#F0EAD8", border:"none", borderRadius:20, padding:"8px 16px", fontSize:11.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:"pointer", letterSpacing:"0.02em" }}>
+                Write a letter →
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Lead letter — featured */}
+              <div onClick={() => navigate(`/feed/letter/${displayLetters[0].dbId}`)}
+                style={{ background:"#fff", border:"1px solid #E8E0D0", borderLeft:"3px solid #C8A96E", borderRadius:11, overflow:"hidden", cursor:"pointer", marginBottom:11, transition:"border-color 0.15s" }}
+                onMouseEnter={e => e.currentTarget.style.borderColor="#C8A96E"}
+                onMouseLeave={e => { e.currentTarget.style.borderColor="#E8E0D0"; e.currentTarget.style.borderLeftColor="#C8A96E"; }}>
+                <LetterCover height={88} />
+                <div style={{ padding:"13px 17px 15px" }}>
+                <div style={{ fontSize:8, letterSpacing:"0.18em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontWeight:600, marginBottom:9 }}>Featured Letter</div>
+                {displayLetters[0].title && (
+                  <div style={{ fontFamily:"'Playfair Display', serif", fontSize:19, fontWeight:900, color:"#111", lineHeight:1.22, letterSpacing:"-0.01em", marginBottom:8 }}>{displayLetters[0].title}</div>
+                )}
+                <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:14, lineHeight:1.58, color:"#555", margin:"0 0 12px", display:"-webkit-box", WebkitLineClamp:3, WebkitBoxOrient:"vertical", overflow:"hidden" }}>
+                  {displayLetters[0].snippet}
+                </p>
+                {displayLetters[0].sourcePublication && (
+                  <div style={{ fontSize:8.5, letterSpacing:"0.08em", textTransform:"uppercase", color:"#BBB", fontFamily:"'DM Mono', monospace", marginBottom:11 }}>
+                    In response to · {displayLetters[0].sourcePublication}
+                  </div>
+                )}
+                <div style={{ display:"flex", alignItems:"center", gap:8, paddingTop:10, borderTop:"1px solid #F0EDE8" }}>
+                  <div style={{ width:28, height:28, borderRadius:"50%", background:displayLetters[0].color, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:12, fontFamily:"'Playfair Display', serif", fontWeight:700, flexShrink:0 }}>{displayLetters[0].initial}</div>
+                  <div style={{ minWidth:0 }}>
+                    <div style={{ fontSize:12, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif", overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis" }}>{displayLetters[0].author}</div>
+                    <div style={{ fontSize:8.5, color: statusColors[displayLetters[0].status] || "#AAA", fontFamily:"'DM Mono', monospace" }}>{contributorStatuses[displayLetters[0].status] || contributorStatuses["contributor"]}</div>
+                  </div>
+                  <span style={{ marginLeft:"auto", fontSize:8.5, color:"#BBB", fontFamily:"'DM Mono', monospace", flexShrink:0 }}>{displayLetters[0].timeAgo}</span>
+                </div>
+                </div>
+              </div>
+
+              {/* Remaining letters — compact single-column list */}
+              {displayLetters.slice(1, 6).map((letter, i, arr) => (
+                <div key={letter.dbId} onClick={() => navigate(`/feed/letter/${letter.dbId}`)}
+                  style={{ background:"#fff", border:"1px solid #E8E0D0", borderRadius:11, padding:"13px 15px", cursor:"pointer", marginBottom: i < arr.length-1 ? 10 : 0, transition:"border-color 0.15s" }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor="#C8A96E"}
+                  onMouseLeave={e => e.currentTarget.style.borderColor="#E8E0D0"}>
+                  <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:8 }}>
+                    <div style={{ width:2, height:11, background:"#C8A96E", borderRadius:2 }}/>
+                    <span style={{ fontSize:8, letterSpacing:"0.18em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontWeight:600 }}>Letter</span>
+                    <span style={{ marginLeft:"auto", fontSize:8.5, color:"#C4C4C4", fontFamily:"'DM Mono', monospace" }}>{letter.timeAgo}</span>
+                  </div>
+                  {letter.title && (
+                    <div style={{ fontFamily:"'Playfair Display', serif", fontSize:15.5, fontWeight:800, color:"#111", lineHeight:1.25, marginBottom:6 }}>{letter.title}</div>
+                  )}
+                  <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:13, lineHeight:1.55, color:"#666", margin:"0 0 10px", display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden" }}>
+                    {letter.snippet}
+                  </p>
+                  <div style={{ display:"flex", alignItems:"center", gap:7 }}>
+                    <div style={{ width:22, height:22, borderRadius:"50%", background:letter.color, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:10, fontFamily:"'Playfair Display', serif", fontWeight:700, flexShrink:0 }}>{letter.initial}</div>
+                    <div style={{ fontSize:11, fontWeight:600, color:"#333", fontFamily:"'DM Sans', sans-serif", overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis" }}>{letter.author}</div>
+                  </div>
+                </div>
+              ))}
+
+              {/* Foot — add your own reply */}
+              <button onClick={() => navigate("/write")}
+                style={{ width:"100%", marginTop:12, background:"none", color:"#8A7A55", border:"1px dashed #D8CDB2", borderRadius:10, padding:"10px", fontSize:11, fontFamily:"'DM Mono', monospace", letterSpacing:"0.06em", textTransform:"uppercase", cursor:"pointer", transition:"all 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor="#C8A96E"; e.currentTarget.style.color="#C8A96E"; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor="#D8CDB2"; e.currentTarget.style.color="#8A7A55"; }}>
+                + Add your reply
+              </button>
+            </>
+          )}
+        </aside>
+
+        {/* ── News column ── */}
+        <div className="read-news">
 
         {/* ── Trending — newspaper-style tiered layout ── */}
         <div style={{ marginBottom:32 }}>
@@ -1983,14 +2187,9 @@ function ReadPage({ onNavigate }) {
                   style={{ background:"#fff", border:"1px solid #E8E0D0", borderRadius:14, overflow:"hidden", cursor:"pointer", marginBottom:14, transition:"border-color 0.15s" }}
                   onMouseEnter={e => e.currentTarget.style.borderColor="#C8A96E"}
                   onMouseLeave={e => e.currentTarget.style.borderColor="#E8E0D0"}>
-                  <div style={{ position:"relative", height:220, overflow:"hidden", background:filteredArticles[0].color }}>
-                    {filteredArticles[0].image_url ? (
-                      <img src={filteredArticles[0].image_url} alt={filteredArticles[0].title} style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }} onError={e => { e.target.style.display = "none"; }}/>
-                    ) : filteredArticles[0].imgId ? (
-                      <img src={`https://picsum.photos/seed/${filteredArticles[0].imgId}/700/440`} alt={filteredArticles[0].title} style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }}/>
-                    ) : null}
-                    <div style={{ position:"absolute", bottom:0, left:0, right:0, height:"55%", background:"linear-gradient(to top, rgba(0,0,0,0.4), transparent)" }}/>
-                  </div>
+                  <NewsThumb lead height={220}
+                    src={filteredArticles[0].image_url || (filteredArticles[0].imgId ? `https://picsum.photos/seed/${filteredArticles[0].imgId}/700/440` : null)}
+                    color={filteredArticles[0].color} publication={filteredArticles[0].publication} gradient />
                   <div style={{ padding:"18px 20px 20px" }}>
                     <div style={{ marginBottom:8 }}>
                       <span style={{ fontSize:10.5, letterSpacing:"0.1em", textTransform:"uppercase", color:filteredArticles[0].color, fontFamily:"'DM Mono', monospace", fontWeight:600 }}>{filteredArticles[0].publication}</span>
@@ -2021,13 +2220,9 @@ function ReadPage({ onNavigate }) {
                       style={{ background:"#fff", border:"1px solid #E8E0D0", borderRadius:12, overflow:"hidden", cursor:"pointer", transition:"border-color 0.15s" }}
                       onMouseEnter={e => e.currentTarget.style.borderColor="#C8A96E"}
                       onMouseLeave={e => e.currentTarget.style.borderColor="#E8E0D0"}>
-                      <div style={{ height:110, overflow:"hidden", background:article.color }}>
-                        {article.image_url ? (
-                          <img src={article.image_url} alt={article.title} style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }} onError={e => { e.target.style.display = "none"; }}/>
-                        ) : article.imgId ? (
-                          <img src={`https://picsum.photos/seed/${article.imgId}/360/220`} alt={article.title} style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }}/>
-                        ) : null}
-                      </div>
+                      <NewsThumb height={110}
+                        src={article.image_url || (article.imgId ? `https://picsum.photos/seed/${article.imgId}/360/220` : null)}
+                        color={article.color} publication={article.publication} />
                       <div style={{ padding:"12px 14px" }}>
                         <span style={{ fontSize:9.5, letterSpacing:"0.1em", textTransform:"uppercase", color:article.color, fontFamily:"'DM Mono', monospace", fontWeight:600 }}>{article.publication}</span>
                         <div style={{ fontFamily:"'Playfair Display', serif", fontSize:15.5, fontWeight:700, color:"#111", lineHeight:1.28, margin:"5px 0 0" }}>
@@ -2091,6 +2286,8 @@ function ReadPage({ onNavigate }) {
             ))}
           </div>
         </div>
+        </div>{/* /read-news */}
+        </div>{/* /read-grid */}
 
         {/* Coming soon banner */}
         <div style={{ background:"#111", borderRadius:12, padding:"28px 24px", textAlign:"center", marginBottom:20 }}>
@@ -2312,7 +2509,7 @@ function WritePage({ session, onNavigate }) {
   const [error, setError] = useState(null);
   const [kind, setKind] = useState("letter"); // "letter" (full editor) | "post" (quick short post)
   const [postBody, setPostBody] = useState(""); // plain-text body used only in post mode
-  const POST_LIMIT = 500;
+  const POST_LIMIT = 216;
   const [showBrowse, setShowBrowse] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [showQuoteSource, setShowQuoteSource] = useState(false);
@@ -2337,11 +2534,11 @@ function WritePage({ session, onNavigate }) {
           id: `real-${a.id}`,
           dbId: a.id,
           isReal: true,
-          title: a.title,
+          title: cleanNewsText(a.title),
           publication: a.source,
           url: a.link,
           color: colorForSource(a.source),
-          image_url: a.image_url,
+          image_url: cleanImageUrl(a.image_url),
           readAt: timeAgoRead(a.published_at),
         }));
         setRealRecentArticles(mapped);
@@ -2547,7 +2744,7 @@ function WritePage({ session, onNavigate }) {
 
   if (success) return (
     <div className="letters-main" style={{ minHeight:"100vh", background:"#F9F6F0", paddingBottom:80 }}>
-      <TopBar title={<span>Write<span style={{ color:"#C8A96E" }}>.</span></span>}/>
+      <TopBar title={<span>Write<span style={{ color:"#C8A96E" }}>.</span></span>} maxWidth={1040}/>
       <div style={{ maxWidth:680, margin:"0 auto", padding:"60px 20px", textAlign:"center" }}>
         <div style={{ fontSize:10, letterSpacing:"0.2em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:16 }}>Published</div>
         <h2 style={{ fontFamily:"'Playfair Display', serif", fontSize:32, fontWeight:900, color:"#111", margin:"0 0 16px" }}>Your {kind === "post" ? "post" : "letter"} is live<span style={{ color:"#C8A96E" }}>.</span></h2>
@@ -2569,47 +2766,58 @@ function WritePage({ session, onNavigate }) {
   // ── Post mode — a stripped-down composer for short posts ──
   if (kind === "post") return (
     <div className="letters-main" style={{ minHeight:"100vh", background:"#F9F6F0", paddingBottom:80 }}>
-      <TopBar title={<span>Write<span style={{ color:"#C8A96E" }}>.</span></span>}/>
-      <main style={{ maxWidth:640, margin:"0 auto", padding:"24px 20px", display:"flex", flexDirection:"column", gap:20 }}>
+      <TopBar title={<span>Write<span style={{ color:"#C8A96E" }}>.</span></span>} maxWidth={1040}/>
+      <main className="letters-write-main" style={{ maxWidth:1040, margin:"0 auto", padding:"24px 20px", display:"flex", flexDirection:"column", gap:18 }}>
+
         {modeToggle}
 
-        {/* Hero */}
-        <div style={{ background:"#111", borderRadius:14, overflow:"hidden", position:"relative" }}>
-          <div style={{ position:"absolute", top:0, left:0, right:0, height:3, background:"linear-gradient(90deg, #C8A96E, #E8D5A8, #C8A96E)" }}/>
-          <div style={{ padding:"22px 28px" }}>
-            <div style={{ fontSize:9.5, letterSpacing:"0.22em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:6 }}>Letters · Est. 2025</div>
-            <h1 style={{ fontFamily:"'Playfair Display', serif", fontSize:30, fontWeight:900, color:"#F0EAD8", margin:0, letterSpacing:"-0.01em", lineHeight:1.1 }}>Write a Post<span style={{ color:"#C8A96E" }}>.</span></h1>
-            <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:13.5, color:"#888", margin:"8px 0 0" }}>A quick thought — no headline, no source, just say it.</p>
+        <div className="letters-write-row" style={{ display:"flex", flexDirection:"column", gap:28 }}>
+
+        {/* ── Form column — same flex width/position as the Letter editor, so toggling Letter↔Post doesn't shift the box ── */}
+        <div style={{ flex:"1.4 1 560px", minWidth:0, display:"flex", flexDirection:"column", gap:20 }}>
+
+          {/* Hero */}
+          <div style={{ background:"#111", borderRadius:14, overflow:"hidden", position:"relative" }}>
+            <div style={{ position:"absolute", top:0, left:0, right:0, height:3, background:"linear-gradient(90deg, #C8A96E, #E8D5A8, #C8A96E)" }}/>
+            <div style={{ padding:"22px 28px" }}>
+              <div style={{ fontSize:9.5, letterSpacing:"0.22em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:6 }}>Letters · Est. 2025</div>
+              <h1 style={{ fontFamily:"'Playfair Display', serif", fontSize:30, fontWeight:900, color:"#F0EAD8", margin:0, letterSpacing:"-0.01em", lineHeight:1.1 }}>Write a Post<span style={{ color:"#C8A96E" }}>.</span></h1>
+              <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:13.5, color:"#888", margin:"8px 0 0" }}>A quick thought — no headline, no source, just say it.</p>
+            </div>
           </div>
+
+          {/* Simple textarea */}
+          <div style={{ background:"#fff", border:"1px solid #E8E0D0", borderRadius:10, padding:"16px 18px" }}>
+            <textarea
+              value={postBody}
+              onChange={e => setPostBody(e.target.value.slice(0, POST_LIMIT))}
+              placeholder="What's on your mind?"
+              autoFocus
+              style={{ width:"100%", minHeight:150, border:"none", outline:"none", resize:"none", fontFamily:"'EB Garamond', Georgia, serif", fontSize:17, lineHeight:1.7, color:"#222", background:"none", boxSizing:"border-box" }}
+            />
+            <div style={{ display:"flex", justifyContent:"flex-end", marginTop:8, paddingTop:10, borderTop:"1px solid #F9F6F0" }}>
+              <span style={{ fontSize:11, color: postBody.length > POST_LIMIT - 30 ? "#C0392B" : "#CCC", fontFamily:"'DM Mono', monospace" }}>{postBody.length}/{POST_LIMIT}</span>
+            </div>
+          </div>
+
+          {error && (
+            <div style={{ background:"#FDF0F0", border:"1px solid #C8A8A8", borderRadius:5, padding:"10px 14px", fontSize:13, color:"#C0392B", fontFamily:"'EB Garamond', serif", fontStyle:"italic" }}>
+              {error}
+            </div>
+          )}
+
+          <button onClick={handlePublish} disabled={loading}
+            style={{ width:"100%", background:loading?"#555":"#111", color:"#F0EAD8", border:"none", borderRadius:6, padding:"15px 0", fontSize:14, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:loading?"not-allowed":"pointer", letterSpacing:"0.02em", lineHeight:1.4, transition:"background 0.15s" }}>
+            <span style={{ display:"block", fontSize:9.5, letterSpacing:"0.2em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontWeight:500, marginBottom:2 }}>
+              {loading ? "Posting..." : "Say it plainly"}
+            </span>
+            {loading ? "Please wait..." : "Publish Post →"}
+          </button>
         </div>
 
-        {/* Simple textarea */}
-        <div style={{ background:"#fff", border:"1px solid #E8E0D0", borderRadius:10, padding:"16px 18px" }}>
-          <textarea
-            value={postBody}
-            onChange={e => setPostBody(e.target.value.slice(0, POST_LIMIT))}
-            placeholder="What's on your mind?"
-            autoFocus
-            style={{ width:"100%", minHeight:150, border:"none", outline:"none", resize:"none", fontFamily:"'EB Garamond', Georgia, serif", fontSize:17, lineHeight:1.7, color:"#222", background:"none", boxSizing:"border-box" }}
-          />
-          <div style={{ display:"flex", justifyContent:"flex-end", marginTop:8, paddingTop:10, borderTop:"1px solid #F9F6F0" }}>
-            <span style={{ fontSize:11, color: postBody.length > POST_LIMIT - 50 ? "#C0392B" : "#CCC", fontFamily:"'DM Mono', monospace" }}>{postBody.length}/{POST_LIMIT}</span>
-          </div>
+        {/* Empty spacer reserves the source column's width so the form column stays put; source panel simply isn't shown for posts. Hidden on mobile. */}
+        <div className="write-source-spacer" style={{ flex:"1 1 340px", minWidth:0 }} />
         </div>
-
-        {error && (
-          <div style={{ background:"#FDF0F0", border:"1px solid #C8A8A8", borderRadius:5, padding:"10px 14px", fontSize:13, color:"#C0392B", fontFamily:"'EB Garamond', serif", fontStyle:"italic" }}>
-            {error}
-          </div>
-        )}
-
-        <button onClick={handlePublish} disabled={loading}
-          style={{ width:"100%", background:loading?"#555":"#111", color:"#F0EAD8", border:"none", borderRadius:6, padding:"15px 0", fontSize:14, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:loading?"not-allowed":"pointer", letterSpacing:"0.02em", lineHeight:1.4, transition:"background 0.15s" }}>
-          <span style={{ display:"block", fontSize:9.5, letterSpacing:"0.2em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontWeight:500, marginBottom:2 }}>
-            {loading ? "Posting..." : "Say it plainly"}
-          </span>
-          {loading ? "Please wait..." : "Publish Post →"}
-        </button>
       </main>
     </div>
   );
@@ -2619,13 +2827,15 @@ function WritePage({ session, onNavigate }) {
 
   return (
     <div className="letters-main" style={{ minHeight:"100vh", background:"#F9F6F0", paddingBottom:80 }}>
-      <TopBar title={<span>Write<span style={{ color:"#C8A96E" }}>.</span></span>}/>
-      <main className="letters-write-main" style={{ maxWidth:1040, margin:"0 auto", padding:"24px 20px", display:"flex", flexDirection:"column", gap:28 }}>
+      <TopBar title={<span>Write<span style={{ color:"#C8A96E" }}>.</span></span>} maxWidth={1040}/>
+      <main className="letters-write-main" style={{ maxWidth:1040, margin:"0 auto", padding:"24px 20px", display:"flex", flexDirection:"column", gap:18 }}>
+
+        {modeToggle}
+
+        <div className="letters-write-row" style={{ display:"flex", flexDirection:"column", gap:28 }}>
 
         {/* ── Form column ── */}
         <div style={{ flex:"1.4 1 560px", minWidth:0, display:"flex", flexDirection:"column", gap:20 }}>
-
-          {modeToggle}
 
           {/* ── Prominent writing hero banner ── */}
           <div style={{ background:"#111", borderRadius:14, overflow:"hidden", position:"relative" }}>
@@ -2830,7 +3040,7 @@ function WritePage({ session, onNavigate }) {
                         onMouseLeave={e => { if(!isSelected) e.currentTarget.style.borderColor="#E8E0D0"; }}>
                         <div style={{ width:36, height:36, borderRadius:6, overflow:"hidden", flexShrink:0, background:article.color, position:"relative" }}>
                           {article.image_url ? (
-                            <img src={article.image_url} alt={article.title} style={{ width:"100%", height:"100%", objectFit:"cover" }} onError={e => { e.target.style.display = "none"; }}/>
+                            <img src={article.image_url} alt={article.title} style={{ width:"100%", height:"100%", objectFit:"cover" }} referrerPolicy="no-referrer" loading="lazy" onError={e => { e.target.style.display = "none"; }}/>
                           ) : article.imgId ? (
                             <img src={`https://picsum.photos/seed/${article.imgId}/72/72`} alt={article.title} style={{ width:"100%", height:"100%", objectFit:"cover" }}/>
                           ) : null}
@@ -2871,6 +3081,7 @@ function WritePage({ session, onNavigate }) {
               </p>
             </div>
           </div>
+        </div>
         </div>
       </main>
 
@@ -3302,6 +3513,7 @@ function YouPage({ session, onSignOut }) {
   const [letters, setLetters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(null);
+  const [followCounts, setFollowCounts] = useState({ following: 0, followers: 0 });
   const [activeTab, setActiveTab] = useState("letters");
   const [editingLocation, setEditingLocation] = useState(false);
   const [location, setLocation] = useState("Cleveland, OH");
@@ -3314,6 +3526,18 @@ function YouPage({ session, onSignOut }) {
   const [loadingActivity, setLoadingActivity] = useState(true);
   const [realStats, setRealStats] = useState({ letters: 0, replies: 0, likes: 0 });
   const [savingField, setSavingField] = useState(null); // "bio" | "location" | null, for subtle saving feedback
+
+  // Real follower / following counts from the follows table
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    (async () => {
+      const [{ count: following }, { count: followers }] = await Promise.all([
+        supabase.from("follows").select("*", { count: "exact", head: true }).eq("follower_id", session.user.id),
+        supabase.from("follows").select("*", { count: "exact", head: true }).eq("following_id", session.user.id),
+      ]);
+      setFollowCounts({ following: following || 0, followers: followers || 0 });
+    })();
+  }, [session?.user?.id]);
 
   const saveLocation = async () => {
     const trimmed = locationInput.trim();
@@ -3558,8 +3782,8 @@ function YouPage({ session, onSignOut }) {
               { label:"Letters", value:realStats.letters },
               { label:"Replies", value:realStats.replies },
               { label:"Likes", value:realStats.likes },
-              { label:"Following", value:0 },
-              { label:"Followers", value:0 },
+              { label:"Following", value:followCounts.following },
+              { label:"Followers", value:followCounts.followers },
             ].map((stat, i) => (
               <div key={stat.label} style={{ flex:1, textAlign:"center", padding:"12px 4px", borderRight: i < 4 ? "1px solid #F0EDE8" : "none" }}>
                 <div style={{ fontFamily:"'Playfair Display', serif", fontSize:18, fontWeight:700, color:"#111", lineHeight:1 }}>{stat.value}</div>
@@ -4591,10 +4815,37 @@ function AuthenticatedApp({ session, handleSignOut }) {
           .letters-feed-pane.is-expanded { width: 760px !important; }
           .letters-detail-pane { display: flex !important; margin-right: 160px !important; }
           .letters-write-preview { display: block !important; }
-          .letters-write-main { flex-direction: row !important; }
+          .letters-write-row { flex-direction: row !important; }
+          .write-source-spacer { display: block !important; }
           .letters-bottom-nav { display: none !important; }
         }
+        /* ── Read tab (Option A): persistent Letters rail beside the news column.
+             Single stacked column until 1200px (below that the fixed 220px+160px
+             nav chrome leaves too little room for two columns); Letters on top. ── */
+        .read-grid { display: block; }
+        @media (min-width: 1200px) {
+          .read-main { max-width: 1120px !important; }
+          .read-grid {
+            display: grid !important;
+            grid-template-columns: minmax(0, 1fr) 312px;
+            gap: 32px;
+            align-items: start;
+          }
+          .read-news { grid-column: 1; grid-row: 1; min-width: 0; }
+          .read-rail {
+            grid-column: 2;
+            grid-row: 1;
+            position: sticky;
+            /* Clear the 54px sticky TopBar so the "Letters" banner pins cleanly
+               below it and the whole rail travels down with the scroll. */
+            top: 70px;
+            max-height: calc(100vh - 86px);
+            overflow-y: auto;
+            scrollbar-width: thin;
+          }
+        }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        .write-source-spacer { display: none; }
         .letters-editor:empty:before { content: attr(data-placeholder); color: #B0A898; font-style: italic; }
         blockquote { margin: 10px 0; padding: 8px 14px; border-left: 3px solid #C8A96E; background: #F9F6F0; font-style: italic; color: #555; }
         .letters-editor blockquote[data-quote="true"] { position: relative; padding-right: 30px; }
@@ -4624,9 +4875,9 @@ function AuthenticatedApp({ session, handleSignOut }) {
         <Route path="/" element={<Navigate to="/feed" replace/>}/>
         <Route path="/feed" element={<FeedPage session={session} onSignOut={handleSignOut} onNavigate={goToTab} activeTab={activeTab}/>}/>
         <Route path="/feed/letter/:letterId" element={<FeedPage session={session} onSignOut={handleSignOut} onNavigate={goToTab} activeTab={activeTab}/>}/>
-        <Route path="/read" element={<ReadPage onNavigate={goToTab}/>}/>
-        <Route path="/read/article/:articleId" element={<ReadPage onNavigate={goToTab}/>}/>
-        <Route path="/read/publication/:publicationName" element={<ReadPage onNavigate={goToTab}/>}/>
+        <Route path="/read" element={<ReadPage onNavigate={goToTab} session={session}/>}/>
+        <Route path="/read/article/:articleId" element={<ReadPage onNavigate={goToTab} session={session}/>}/>
+        <Route path="/read/publication/:publicationName" element={<ReadPage onNavigate={goToTab} session={session}/>}/>
         <Route path="/write" element={<WritePage session={session} onNavigate={goToTab}/>}/>
         <Route path="/forums" element={<ForumsPage/>}/>
         <Route path="/you" element={<YouPage session={session} onSignOut={handleSignOut}/>}/>
