@@ -3211,30 +3211,34 @@ const mockForumFeed = [
   { id:3, forum:"Climate & Earth", author:"Priya N.", initial:"P", color:"#27AE60", timeAgo:"28m ago", publication:"The Guardian", headline:"Arctic Ice Sheet Loss Accelerating", preview:"The modelling suggests we've crossed a threshold that wasn't supposed to happen until 2040. This isn't alarmism — it's the data, and it demands a policy response proportional to the scale of the problem...", replies:15, likes:47 },
 ];
 
-function ForumCard({ forum, joined, onJoin }) {
+function ForumCard({ forum, joined, onJoin, onOpen }) {
   const [hovered, setHovered] = useState(false);
+  const initial = (forum.name || "F").replace(/^the\s+/i, "").trim().charAt(0).toUpperCase();
   return (
     <div
+      onClick={onOpen}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      style={{ background:"#fff", border:`1px solid ${hovered ? "#C8A96E" : "#E8E0D0"}`, borderRadius:14, overflow:"hidden", transition:"border-color 0.15s", cursor:"pointer" }}>
-      {/* Cover image */}
-      <div style={{ height:100, background:forum.color, position:"relative", overflow:"hidden" }}>
-        <img src={`https://picsum.photos/seed/${forum.imgId}/600/200`} alt={forum.name} style={{ width:"100%", height:"100%", objectFit:"cover" }}/>
-        <div style={{ position:"absolute", inset:0, background:"linear-gradient(to top, rgba(0,0,0,0.5), rgba(0,0,0,0.1))" }}/>
-        {/* Type badge */}
+      style={{ background:"#fff", border:`1px solid ${hovered ? "#C8A96E" : "#E8E0D0"}`, borderRadius:14, overflow:"hidden", transition:"border-color 0.15s", cursor:"pointer", display:"flex", flexDirection:"column" }}>
+      {/* Cover — real image, or the forum color with a drop-cap initial */}
+      <div style={{ height:96, background:forum.color || "#1A1A1A", position:"relative", overflow:"hidden" }}>
+        {forum.cover_image ? (
+          <img src={forum.cover_image} alt="" referrerPolicy="no-referrer" loading="lazy" style={{ width:"100%", height:"100%", objectFit:"cover" }} onError={e => { e.currentTarget.style.display = "none"; }}/>
+        ) : (
+          <div aria-hidden="true" style={{ position:"absolute", right:-6, bottom:-26, fontFamily:"'Playfair Display', serif", fontWeight:900, fontSize:120, lineHeight:1, color:"rgba(249,246,240,0.16)", userSelect:"none" }}>{initial}</div>
+        )}
+        <div style={{ position:"absolute", inset:0, background:"linear-gradient(to top, rgba(0,0,0,0.42), rgba(0,0,0,0.06))" }}/>
         <div style={{ position:"absolute", top:10, left:12, display:"flex", gap:6 }}>
-          {forum.type === "institutional" && (
+          {forum.verified && (
             <span style={{ background:"rgba(0,0,0,0.6)", borderRadius:20, padding:"3px 10px", fontSize:9.5, color:"#F0EAD8", fontFamily:"'DM Mono', monospace", letterSpacing:"0.1em", display:"flex", alignItems:"center", gap:4 }}>
               <svg width="9" height="9" viewBox="0 0 24 24" fill="#C8A96E"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0 1 12 2.944a11.955 11.955 0 0 1-8.618 3.04A12.02 12.02 0 0 0 3 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
               Verified
             </span>
           )}
-          {forum.type === "user" && (
+          {forum.type === "user" && !forum.verified && (
             <span style={{ background:"rgba(0,0,0,0.6)", borderRadius:20, padding:"3px 10px", fontSize:9.5, color:"#F0EAD8", fontFamily:"'DM Mono', monospace", letterSpacing:"0.1em" }}>Community</span>
           )}
         </div>
-        {/* Live badge */}
         {forum.live && (
           <div style={{ position:"absolute", top:10, right:12, background:"#E74C3C", borderRadius:20, padding:"3px 10px", fontSize:9.5, color:"white", fontFamily:"'DM Mono', monospace", letterSpacing:"0.1em", display:"flex", alignItems:"center", gap:5 }}>
             <div style={{ width:5, height:5, borderRadius:"50%", background:"white", animation:"pulse 1.5s infinite" }}/>
@@ -3243,19 +3247,19 @@ function ForumCard({ forum, joined, onJoin }) {
         )}
       </div>
       {/* Content */}
-      <div style={{ padding:"14px 16px" }}>
+      <div style={{ padding:"14px 16px", display:"flex", flexDirection:"column", flex:1 }}>
         <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:8, marginBottom:6 }}>
           <div style={{ fontFamily:"'Playfair Display', serif", fontSize:16, fontWeight:700, color:"#111", lineHeight:1.2 }}>{forum.name}</div>
           <button
-            onClick={e => { e.stopPropagation(); onJoin(forum.id); }}
+            onClick={e => { e.stopPropagation(); onJoin(); }}
             style={{ background: joined ? "#F0EDE8" : "#111", color: joined ? "#888" : "#F0EAD8", border:"none", borderRadius:20, padding:"5px 14px", fontSize:11.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:"pointer", flexShrink:0, transition:"all 0.15s" }}>
             {joined ? "Joined" : "Join"}
           </button>
         </div>
-        <p style={{ fontFamily:"'EB Garamond', serif", fontSize:13.5, color:"#888", fontStyle:"italic", margin:"0 0 10px", lineHeight:1.5, display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden" }}>{forum.description}</p>
+        <p style={{ fontFamily:"'EB Garamond', serif", fontSize:13.5, color:"#888", fontStyle:"italic", margin:"0 0 10px", lineHeight:1.5, display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden", flex:1 }}>{forum.description}</p>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-          <span style={{ fontSize:10, color:"#BBB", fontFamily:"'DM Mono', monospace" }}>{forum.members.toLocaleString()} members</span>
-          <span style={{ fontSize:10, color:"#C8A96E", fontFamily:"'DM Mono', monospace", letterSpacing:"0.08em", textTransform:"uppercase" }}>{forum.topic}</span>
+          <span style={{ fontSize:10, color:"#BBB", fontFamily:"'DM Mono', monospace" }}>{(forum.member_count || 0).toLocaleString()} {forum.member_count === 1 ? "member" : "members"}</span>
+          {forum.topic && <span style={{ fontSize:10, color:"#C8A96E", fontFamily:"'DM Mono', monospace", letterSpacing:"0.08em", textTransform:"uppercase" }}>{forum.topic}</span>}
         </div>
       </div>
     </div>
@@ -3364,130 +3368,260 @@ function RequestForumModal({ onClose }) {
   );
 }
 
-function ForumsPage() {
-  const [activeTab, setActiveTab] = useState("my");
-  const [activeFilter, setActiveFilter] = useState("All");
-  const [joined, setJoined] = useState([1, 2]); // IDs of joined forums
+function ForumsPage({ session, onSignOut, onNavigate }) {
+  const navigate = useNavigate();
+  const userId = session?.user?.id;
+  const [forums, setForums] = useState([]);
+  const [joinedIds, setJoinedIds] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+  const [focused, setFocused] = useState(false);
   const [showRequest, setShowRequest] = useState(false);
-  const filters = ["All", "Institutional", "Topic", "Community", "Live"];
 
-  const toggleJoin = (id) => setJoined(prev => prev.includes(id) ? prev.filter(j=>j!==id) : [...prev, id]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const { data: f } = await supabase.from("forums").select("*")
+        .order("live", { ascending:false }).order("member_count", { ascending:false });
+      let mine = [];
+      if (userId) {
+        const { data: m } = await supabase.from("forum_members").select("forum_id").eq("user_id", userId);
+        mine = (m || []).map(r => r.forum_id);
+      }
+      if (!cancelled) { setForums(f || []); setJoinedIds(mine); setLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [userId]);
 
-  const filteredForums = allForums.filter(f => {
-    if (activeFilter === "All") return true;
-    if (activeFilter === "Institutional") return f.type === "institutional";
-    if (activeFilter === "Topic") return f.type === "topic";
-    if (activeFilter === "Community") return f.type === "user";
-    if (activeFilter === "Live") return f.live;
-    return true;
-  });
+  const toggleJoin = async (forum) => {
+    if (!userId) return;
+    const isJoined = joinedIds.includes(forum.id);
+    setJoinedIds(prev => isJoined ? prev.filter(id => id !== forum.id) : [...prev, forum.id]);
+    setForums(prev => prev.map(f => f.id === forum.id ? { ...f, member_count: Math.max(0, (f.member_count||0) + (isJoined ? -1 : 1)) } : f));
+    if (isJoined) await supabase.from("forum_members").delete().eq("forum_id", forum.id).eq("user_id", userId);
+    else await supabase.from("forum_members").insert({ forum_id: forum.id, user_id: userId });
+  };
+
+  const openForum = (forum) => navigate(`/forums/${forum.slug}`);
+
+  const q = query.trim().toLowerCase();
+  const matches = q ? forums.filter(f => f.name.toLowerCase().includes(q) || (f.topic||"").toLowerCase().includes(q)).slice(0, 6) : [];
+
+  const suggested = (() => {
+    const notJoined = forums.filter(f => !joinedIds.includes(f.id));
+    const founder = notJoined.find(f => f.slug === "founders-forum");
+    const rest = notJoined.filter(f => f.slug !== "founders-forum");
+    return [founder, ...rest].filter(Boolean).slice(0, 3);
+  })();
 
   return (
     <div className="letters-main" style={{ minHeight:"100vh", background:"#F9F6F0", paddingBottom:80 }}>
-      <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
-      <TopBar
-        title={<span>Forums<span style={{ color:"#C8A96E" }}>.</span></span>}
-        rightAction={
-          <button onClick={() => setShowRequest(true)}
-            style={{ background:"#111", border:"none", borderRadius:20, padding:"5px 14px", fontSize:12, color:"#F0EAD8", fontFamily:"'DM Sans', sans-serif", fontWeight:500, cursor:"pointer" }}>
-            + Request
-          </button>
-        }
-      />
+      <style>{`
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        .forums-suggest-grid { grid-template-columns: 1fr; }
+        @media (min-width: 720px) { .forums-suggest-grid { grid-template-columns: repeat(3, 1fr); } }
+      `}</style>
+      <TopBar title={<span>Forums<span style={{ color:"#C8A96E" }}>.</span></span>} maxWidth={1040}/>
 
-      {/* Tabs */}
-      <div style={{ background:"rgba(249,246,240,0.97)", borderBottom:"1px solid #E8E0D0", position:"sticky", top:54, zIndex:40 }}>
-        <div style={{ maxWidth:680, margin:"0 auto", padding:"0 20px", display:"flex" }}>
-          {[{id:"my",label:"My Forums"},{id:"discover",label:"Discover"}].map(t => (
-            <button key={t.id} onClick={() => setActiveTab(t.id)}
-              style={{ background:"none", border:"none", borderBottom: activeTab===t.id ? "2px solid #C8A96E" : "2px solid transparent", padding:"12px 18px", fontSize:13, fontFamily:"'DM Sans', sans-serif", fontWeight: activeTab===t.id ? 600 : 400, color: activeTab===t.id ? "#111" : "#BBB", cursor:"pointer" }}>
-              {t.label}
-            </button>
-          ))}
+      <main style={{ maxWidth:840, margin:"0 auto", padding:"0 20px" }}>
+
+        {/* ── Masthead banner ── */}
+        <div style={{ textAlign:"center", padding:"56px 0 36px" }}>
+          <div style={{ fontSize:10, letterSpacing:"0.26em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:16, paddingLeft:"0.26em" }}>Est. 2025 · A place for readers</div>
+          <h1 style={{ fontFamily:"'Playfair Display', serif", fontSize:"clamp(38px, 6vw, 60px)", fontWeight:900, color:"#141414", letterSpacing:"-0.02em", lineHeight:1.02, margin:0 }}>
+            Letters Forums<span style={{ color:"#C8A96E" }}>.</span>
+          </h1>
+          <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:"clamp(18px, 2.4vw, 23px)", color:"#8A8172", margin:"12px 0 0" }}>Where we meet.</p>
         </div>
-      </div>
 
-      <main style={{ maxWidth:680, margin:"0 auto", padding:"20px 20px 0" }}>
-
-        {/* ── My Forums tab ── */}
-        {activeTab === "my" && (
-          <>
-            {/* My forums horizontal scroll */}
-            {myForums.length > 0 && (
-              <div style={{ marginBottom:24 }}>
-                <div style={{ fontSize:10, letterSpacing:"0.14em", textTransform:"uppercase", color:"#AAA", fontFamily:"'DM Mono', monospace", marginBottom:12 }}>Your forums</div>
-                <div style={{ display:"flex", gap:10, overflowX:"auto", paddingBottom:4 }}>
-                  {myForums.map(f => (
-                    <div key={f.id} style={{ flexShrink:0, width:140, background:"#fff", border:"1px solid #E8E0D0", borderRadius:12, overflow:"hidden", cursor:"pointer" }}>
-                      <div style={{ height:60, background:f.color, position:"relative", overflow:"hidden" }}>
-                        <img src={`https://picsum.photos/seed/${f.imgId}/280/120`} alt={f.name} style={{ width:"100%", height:"100%", objectFit:"cover" }}/>
-                        <div style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.2)" }}/>
-                        {f.unread > 0 && (
-                          <div style={{ position:"absolute", top:6, right:6, background:"#C0392B", color:"white", borderRadius:"50%", width:18, height:18, display:"flex", alignItems:"center", justifyContent:"center", fontSize:9.5, fontFamily:"'DM Sans', sans-serif", fontWeight:700 }}>{f.unread}</div>
-                        )}
-                      </div>
-                      <div style={{ padding:"8px 10px" }}>
-                        <div style={{ fontFamily:"'DM Sans', sans-serif", fontSize:12, fontWeight:600, color:"#111", marginBottom:2, overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis" }}>{f.name}</div>
-                        <div style={{ fontSize:9.5, color:"#BBB", fontFamily:"'DM Mono', monospace" }}>{f.lastActive}</div>
-                      </div>
-                    </div>
-                  ))}
-                  {/* Join more */}
-                  <button onClick={() => setActiveTab("discover")}
-                    style={{ flexShrink:0, width:100, background:"none", border:"1px dashed #C8BFA8", borderRadius:12, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:6, cursor:"pointer", padding:12 }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C8BFA8" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
-                    <span style={{ fontSize:10, color:"#BBB", fontFamily:"'DM Mono', monospace", textAlign:"center", lineHeight:1.4 }}>Find more</span>
-                  </button>
-                </div>
-              </div>
+        {/* ── Search with autocomplete ── */}
+        <div style={{ maxWidth:560, margin:"0 auto", position:"relative" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10, background:"#fff", border:`1.5px solid ${focused ? "#C8A96E" : "#E2D8C4"}`, borderRadius: (focused && (matches.length || q)) ? "16px 16px 0 0" : 999, padding:"0 18px", height:54, boxShadow: focused ? "0 6px 22px rgba(200,169,110,0.15)" : "0 1px 3px rgba(0,0,0,0.04)", transition:"border-color 0.15s, box-shadow 0.15s" }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C8A96E" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <input
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setTimeout(() => setFocused(false), 160)}
+              placeholder="Search forums…"
+              style={{ flex:1, border:"none", outline:"none", background:"transparent", fontSize:16, fontFamily:"'DM Sans', sans-serif", color:"#141414" }}/>
+            {query && (
+              <button onMouseDown={e => { e.preventDefault(); setQuery(""); }} style={{ background:"none", border:"none", cursor:"pointer", color:"#C4BCA8", padding:4, display:"flex" }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+              </button>
             )}
+          </div>
 
-            {/* Feed from joined forums */}
-            <div style={{ fontSize:10, letterSpacing:"0.14em", textTransform:"uppercase", color:"#AAA", fontFamily:"'DM Mono', monospace", marginBottom:4 }}>Latest from your forums</div>
-            {mockForumFeed.map(item => <ForumFeedCard key={item.id} item={item}/>)}
-          </>
-        )}
-
-        {/* ── Discover tab ── */}
-        {activeTab === "discover" && (
-          <>
-            {/* Filter chips */}
-            <div style={{ display:"flex", gap:8, overflowX:"auto", paddingBottom:16 }}>
-              {filters.map(f => (
-                <button key={f} onClick={() => setActiveFilter(f)}
-                  style={{ background: activeFilter===f ? "#111" : "#fff", color: activeFilter===f ? "#F0EAD8" : "#888", border:"1px solid #E0D8CC", borderRadius:20, padding:"6px 16px", fontSize:12, fontFamily:"'DM Sans', sans-serif", fontWeight: activeFilter===f ? 600 : 400, cursor:"pointer", whiteSpace:"nowrap", flexShrink:0, transition:"all 0.15s", display:"flex", alignItems:"center", gap:5 }}>
-                  {f === "Live" && <div style={{ width:5, height:5, borderRadius:"50%", background: activeFilter==="Live" ? "#F0EAD8" : "#E74C3C" }}/>}
-                  {f}
+          {focused && matches.length > 0 && (
+            <div style={{ position:"absolute", left:0, right:0, top:54, background:"#fff", border:"1.5px solid #C8A96E", borderTop:"1px solid #F0EDE8", borderRadius:"0 0 16px 16px", boxShadow:"0 10px 28px rgba(0,0,0,0.09)", overflow:"hidden", zIndex:30 }}>
+              {matches.map(f => (
+                <button key={f.id} onMouseDown={() => openForum(f)}
+                  style={{ display:"flex", alignItems:"center", gap:12, width:"100%", textAlign:"left", background:"none", border:"none", borderBottom:"1px solid #F5F1E9", padding:"11px 18px", cursor:"pointer" }}
+                  onMouseEnter={e => e.currentTarget.style.background="#FBF8F1"}
+                  onMouseLeave={e => e.currentTarget.style.background="none"}>
+                  <div style={{ width:30, height:30, borderRadius:8, background:f.color || "#1A1A1A", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", color:"#F4ECD8", fontFamily:"'Playfair Display', serif", fontWeight:700, fontSize:14 }}>{(f.name||"F").replace(/^the\s+/i,"").charAt(0).toUpperCase()}</div>
+                  <div style={{ minWidth:0, flex:1 }}>
+                    <div style={{ fontSize:14, fontWeight:600, color:"#141414", fontFamily:"'DM Sans', sans-serif", display:"flex", alignItems:"center", gap:5 }}>
+                      {f.name}
+                      {f.verified && <svg width="12" height="12" viewBox="0 0 24 24" fill="#C8A96E"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0 1 12 2.944a11.955 11.955 0 0 1-8.618 3.04A12.02 12.02 0 0 0 3 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>}
+                    </div>
+                    <div style={{ fontSize:11, color:"#AAA", fontFamily:"'DM Mono', monospace" }}>{(f.member_count||0).toLocaleString()} members{f.topic ? ` · ${f.topic}` : ""}</div>
+                  </div>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#DDD5C2" strokeWidth="2" strokeLinecap="round"><path d="m9 18 6-6-6-6"/></svg>
                 </button>
               ))}
             </div>
+          )}
 
-            {/* Forum cards grid */}
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
-              {filteredForums.map(forum => (
-                <ForumCard key={forum.id} forum={forum} joined={joined.includes(forum.id)} onJoin={toggleJoin}/>
+          {focused && q && matches.length === 0 && (
+            <div style={{ position:"absolute", left:0, right:0, top:54, background:"#fff", border:"1.5px solid #C8A96E", borderTop:"1px solid #F0EDE8", borderRadius:"0 0 16px 16px", padding:"16px 18px", zIndex:30, textAlign:"center" }}>
+              <span style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:14, color:"#999" }}>No forum matches “{query}” yet.</span>
+              <button onMouseDown={() => setShowRequest(true)} style={{ marginLeft:8, background:"none", border:"none", color:"#C8A96E", fontFamily:"'DM Sans', sans-serif", fontSize:13, fontWeight:600, cursor:"pointer" }}>Request it →</button>
+            </div>
+          )}
+        </div>
+
+        {/* ── Suggested forums ── */}
+        <div style={{ marginTop:52 }}>
+          <div style={{ fontSize:10, letterSpacing:"0.16em", textTransform:"uppercase", color:"#AAA", fontFamily:"'DM Mono', monospace", marginBottom:16, textAlign:"center" }}>Suggested forums</div>
+          {loading ? (
+            <div className="forums-suggest-grid" style={{ display:"grid", gap:16 }}>
+              {[0,1,2].map(i => <div key={i} style={{ height:232, background:"#fff", border:"1px solid #EFE9DD", borderRadius:14, opacity:0.5 }}/>)}
+            </div>
+          ) : suggested.length === 0 ? (
+            <p style={{ textAlign:"center", fontFamily:"'EB Garamond', serif", fontStyle:"italic", color:"#AAA", fontSize:15 }}>You've joined every forum there is — more on the way.</p>
+          ) : (
+            <div className="forums-suggest-grid" style={{ display:"grid", gap:16 }}>
+              {suggested.map(f => (
+                <ForumCard key={f.id} forum={f} joined={joinedIds.includes(f.id)} onJoin={() => toggleJoin(f)} onOpen={() => openForum(f)}/>
               ))}
             </div>
+          )}
 
-            {/* Request a forum CTA */}
-            <div style={{ background:"#111", borderRadius:12, padding:"24px 20px", marginTop:24, marginBottom:8, display:"flex", alignItems:"center", justifyContent:"space-between", gap:16 }}>
-              <div>
-                <div style={{ fontSize:9.5, letterSpacing:"0.16em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:6 }}>Don't see yours?</div>
-                <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:14.5, color:"#888", margin:0, lineHeight:1.5 }}>
-                  Request a new forum — we review all submissions within 48 hours.
-                </p>
-              </div>
-              <button onClick={() => setShowRequest(true)}
-                style={{ background:"#F0EAD8", color:"#111", border:"none", borderRadius:6, padding:"10px 18px", fontSize:13, fontFamily:"'DM Sans', sans-serif", fontWeight:700, cursor:"pointer", flexShrink:0 }}>
-                Request →
-              </button>
-            </div>
-          </>
-        )}
+          <div style={{ textAlign:"center", marginTop:30 }}>
+            <button onClick={() => setShowRequest(true)} style={{ background:"none", border:"none", color:"#B0A488", fontFamily:"'DM Mono', monospace", fontSize:11.5, letterSpacing:"0.04em", cursor:"pointer" }}>
+              Don't see your forum? Request one →
+            </button>
+          </div>
+        </div>
       </main>
 
       {showRequest && <RequestForumModal onClose={() => setShowRequest(false)}/>}
     </div>
+  );
+}
+
+function ForumDetailPage({ session, onNavigate }) {
+  const navigate = useNavigate();
+  const { slug } = useParams();
+  const userId = session?.user?.id;
+  const [forum, setForum] = useState(null);
+  const [joined, setJoined] = useState(false);
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const { data: f } = await supabase.from("forums").select("*").eq("slug", slug).maybeSingle();
+      if (!f) { if (!cancelled) { setForum(null); setLoading(false); } return; }
+      let isJoined = false;
+      if (userId) {
+        const { data: m } = await supabase.from("forum_members").select("forum_id").eq("forum_id", f.id).eq("user_id", userId).maybeSingle();
+        isJoined = !!m;
+      }
+      const { data: pp } = await supabase.from("letters").select("id, title, body, created_at").eq("forum_id", f.id).order("created_at", { ascending:false }).limit(30);
+      if (!cancelled) { setForum(f); setJoined(isJoined); setPosts(pp || []); setLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [slug, userId]);
+
+  const toggleJoin = async () => {
+    if (!userId || !forum) return;
+    const next = !joined;
+    setJoined(next);
+    setForum(prev => prev ? { ...prev, member_count: Math.max(0, (prev.member_count||0) + (next ? 1 : -1)) } : prev);
+    if (next) await supabase.from("forum_members").insert({ forum_id: forum.id, user_id: userId });
+    else await supabase.from("forum_members").delete().eq("forum_id", forum.id).eq("user_id", userId);
+  };
+
+  const shell = (children) => (
+    <div className="letters-main" style={{ minHeight:"100vh", background:"#F9F6F0", paddingBottom:80 }}>
+      <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
+      <TopBar title={<span>Forums<span style={{ color:"#C8A96E" }}>.</span></span>} maxWidth={1040}/>
+      {children}
+    </div>
+  );
+
+  if (loading) return shell(<div style={{ textAlign:"center", padding:"80px 0", fontFamily:"'DM Mono', monospace", fontSize:11, color:"#CCC", letterSpacing:"0.1em" }}>Loading forum…</div>);
+  if (!forum) return shell(
+    <main style={{ maxWidth:560, margin:"0 auto", padding:"80px 20px", textAlign:"center" }}>
+      <div style={{ fontFamily:"'Playfair Display', serif", fontSize:26, fontWeight:900, color:"#141414", marginBottom:10 }}>Forum not found</div>
+      <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", color:"#999", marginBottom:20 }}>This forum may have been renamed or removed.</p>
+      <button onClick={() => navigate("/forums")} style={{ background:"#111", color:"#F0EAD8", border:"none", borderRadius:20, padding:"9px 20px", fontSize:13, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:"pointer" }}>← Back to Forums</button>
+    </main>
+  );
+
+  const initial = (forum.name || "F").replace(/^the\s+/i, "").trim().charAt(0).toUpperCase();
+  return shell(
+    <main style={{ maxWidth:680, margin:"0 auto", padding:"18px 20px 40px" }}>
+      <button onClick={() => navigate("/forums")} style={{ background:"none", border:"none", color:"#B0A488", fontFamily:"'DM Mono', monospace", fontSize:11.5, letterSpacing:"0.06em", cursor:"pointer", marginBottom:16, display:"flex", alignItems:"center", gap:6 }}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="m15 18-6-6 6-6"/></svg> Forums
+      </button>
+
+      <div style={{ height:150, borderRadius:14, overflow:"hidden", position:"relative", background:forum.color || "#1A1A1A", marginBottom:18 }}>
+        {forum.cover_image ? (
+          <img src={forum.cover_image} alt="" referrerPolicy="no-referrer" style={{ width:"100%", height:"100%", objectFit:"cover" }} onError={e => { e.currentTarget.style.display = "none"; }}/>
+        ) : (
+          <div aria-hidden="true" style={{ position:"absolute", right:-4, bottom:-42, fontFamily:"'Playfair Display', serif", fontWeight:900, fontSize:200, lineHeight:1, color:"rgba(249,246,240,0.15)", userSelect:"none" }}>{initial}</div>
+        )}
+        <div style={{ position:"absolute", inset:0, background:"linear-gradient(to top, rgba(0,0,0,0.4), rgba(0,0,0,0.05))" }}/>
+        {forum.live && (
+          <div style={{ position:"absolute", top:12, right:14, background:"#E74C3C", borderRadius:20, padding:"3px 11px", fontSize:9.5, color:"white", fontFamily:"'DM Mono', monospace", letterSpacing:"0.1em", display:"flex", alignItems:"center", gap:5 }}>
+            <div style={{ width:5, height:5, borderRadius:"50%", background:"white", animation:"pulse 1.5s infinite" }}/> LIVE
+          </div>
+        )}
+      </div>
+
+      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:14, marginBottom:10 }}>
+        <div style={{ minWidth:0 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:7, marginBottom:5 }}>
+            <h1 style={{ fontFamily:"'Playfair Display', serif", fontSize:28, fontWeight:900, color:"#141414", letterSpacing:"-0.01em", margin:0 }}>{forum.name}</h1>
+            {forum.verified && <svg width="18" height="18" viewBox="0 0 24 24" fill="#C8A96E"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0 1 12 2.944a11.955 11.955 0 0 1-8.618 3.04A12.02 12.02 0 0 0 3 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>}
+          </div>
+          <div style={{ fontSize:11, color:"#AAA", fontFamily:"'DM Mono', monospace", letterSpacing:"0.04em" }}>
+            {(forum.member_count||0).toLocaleString()} {forum.member_count === 1 ? "member" : "members"}{forum.topic ? ` · ${forum.topic}` : ""}
+          </div>
+        </div>
+        <button onClick={toggleJoin} disabled={!userId}
+          style={{ background: joined ? "#F0EDE8" : "#111", color: joined ? "#888" : "#F0EAD8", border: joined ? "1px solid #E0D8C8" : "none", borderRadius:22, padding:"9px 20px", fontSize:13, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor: userId ? "pointer" : "default", flexShrink:0, transition:"all 0.15s" }}>
+          {joined ? "Joined" : "Join"}
+        </button>
+      </div>
+      {forum.description && <p style={{ fontFamily:"'EB Garamond', serif", fontSize:16, lineHeight:1.6, color:"#555", margin:"0 0 26px" }}>{forum.description}</p>}
+
+      <div style={{ borderTop:"1px solid #E8E0D0", paddingTop:22 }}>
+        <div style={{ fontSize:10, letterSpacing:"0.16em", textTransform:"uppercase", color:"#AAA", fontFamily:"'DM Mono', monospace", marginBottom:14 }}>Discussion</div>
+        {posts.length === 0 ? (
+          <div style={{ textAlign:"center", padding:"40px 20px", background:"#fff", border:"1px dashed #E0D8C8", borderRadius:12 }}>
+            <div style={{ fontFamily:"'Playfair Display', serif", fontSize:18, fontWeight:700, color:"#333", marginBottom:6 }}>No letters here yet</div>
+            <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:14.5, color:"#999", margin:"0 auto", maxWidth:340, lineHeight:1.55 }}>
+              Posting straight into a forum is coming next — soon you'll be able to write a letter into {forum.name}.
+            </p>
+          </div>
+        ) : (
+          posts.map(post => (
+            <article key={post.id} style={{ borderBottom:"1px solid #F0EDE8", padding:"18px 0" }}>
+              {post.title && <div style={{ fontFamily:"'Playfair Display', serif", fontSize:18, fontWeight:800, color:"#141414", lineHeight:1.25, marginBottom:6 }}>{post.title}</div>}
+              <p style={{ fontFamily:"'EB Garamond', serif", fontSize:14.5, lineHeight:1.6, color:"#555", margin:0, display:"-webkit-box", WebkitLineClamp:3, WebkitBoxOrient:"vertical", overflow:"hidden" }}>{post.body}</p>
+              <div style={{ fontSize:10, color:"#BBB", fontFamily:"'DM Mono', monospace", marginTop:8 }}>{new Date(post.created_at).toLocaleDateString()}</div>
+            </article>
+          ))
+        )}
+      </div>
+    </main>
   );
 }
 
@@ -4879,7 +5013,8 @@ function AuthenticatedApp({ session, handleSignOut }) {
         <Route path="/read/article/:articleId" element={<ReadPage onNavigate={goToTab} session={session}/>}/>
         <Route path="/read/publication/:publicationName" element={<ReadPage onNavigate={goToTab} session={session}/>}/>
         <Route path="/write" element={<WritePage session={session} onNavigate={goToTab}/>}/>
-        <Route path="/forums" element={<ForumsPage/>}/>
+        <Route path="/forums" element={<ForumsPage session={session} onSignOut={handleSignOut} onNavigate={goToTab}/>}/>
+        <Route path="/forums/:slug" element={<ForumDetailPage session={session} onNavigate={goToTab}/>}/>
         <Route path="/you" element={<YouPage session={session} onSignOut={handleSignOut}/>}/>
         <Route path="*" element={<Navigate to="/feed" replace/>}/>
       </Routes>
