@@ -90,12 +90,14 @@ function LetterCover({ height = 96, section }) {
   );
 }
 
-function TopBar({ title, onSignOut, rightAction, maxWidth = 680 }) {
+function TopBar({ title, onSignOut, rightAction, maxWidth = 680, onLogoClick }) {
   return (
     <header style={{ position:"sticky", top:0, zIndex:50, background:"rgba(249,246,240,0.97)", backdropFilter:"blur(10px)", borderBottom:"1px solid #E8E0D0" }}>
       <div style={{ maxWidth, margin:"0 auto", padding:"0 20px", height:54, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-          <Logo size={32}/>
+          {onLogoClick
+            ? <button onClick={onLogoClick} aria-label="Back" style={{ background:"none", border:"none", padding:0, cursor:"pointer", display:"flex" }}><Logo size={32}/></button>
+            : <Logo size={32}/>}
           <span style={{ fontFamily:"'Playfair Display', serif", fontSize:17, fontWeight:900, color:"#111", letterSpacing:"-0.01em" }}>
             {title || <span>Letters<span style={{ color:"#C8A96E" }}>.</span></span>}
           </span>
@@ -3545,12 +3547,21 @@ function ForumsPage({ session, onSignOut, onNavigate }) {
     return [founder, ...rest].filter(Boolean).slice(0, 3);
   })();
 
+  const myForums = forums.filter(f => joinedIds.includes(f.id));
+
   return (
     <div className="letters-main" style={{ minHeight:"100vh", background:"#F9F6F0", paddingBottom:80 }}>
       <style>{`
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
         .forums-suggest-grid { grid-template-columns: 1fr; }
-        @media (min-width: 720px) { .forums-suggest-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (min-width: 720px) { .forums-suggest-grid { grid-template-columns: repeat(2, 1fr); } }
+        .forums-grid { display: block; }
+        @media (min-width: 1200px) {
+          .forums-grid { display: grid; grid-template-columns: minmax(0, 1fr) 288px; gap: 40px; align-items: start; }
+          .forums-main { grid-column: 1; grid-row: 1; min-width: 0; }
+          .forums-rail { grid-column: 2; grid-row: 1; position: sticky; top: 70px; }
+          .forums-suggest-grid { grid-template-columns: repeat(3, 1fr); }
+        }
       `}</style>
       <TopBar title={<span>Forums<span style={{ color:"#C8A96E" }}>.</span></span>} maxWidth={1040}
         rightAction={
@@ -3560,7 +3571,9 @@ function ForumsPage({ session, onSignOut, onNavigate }) {
           </button>
         }/>
 
-      <main style={{ maxWidth:840, margin:"0 auto", padding:"0 20px" }}>
+      <main style={{ maxWidth:1180, margin:"0 auto", padding:"0 20px" }}>
+        <div className="forums-grid">
+        <div className="forums-main">
 
         {/* ── Masthead banner ── */}
         <div style={{ textAlign:"center", padding:"56px 0 36px" }}>
@@ -3654,10 +3667,189 @@ function ForumsPage({ session, onSignOut, onNavigate }) {
             </button>
           </div>
         </div>
+        </div>{/* /forums-main */}
+
+        <aside className="forums-rail">
+          <div style={{ borderTop:"3px solid #111", borderBottom:"1px solid #111", padding:"8px 0 6px", marginBottom:14, display:"flex", alignItems:"baseline", justifyContent:"space-between" }}>
+            <span style={{ fontFamily:"'Playfair Display', serif", fontSize:19, fontWeight:900, color:"#111", letterSpacing:"-0.01em" }}>My Forums<span style={{ color:"#C8A96E" }}>.</span></span>
+            <span style={{ fontSize:8.5, letterSpacing:"0.14em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace" }}>{myForums.length} joined</span>
+          </div>
+          {loading ? (
+            <div>{[0,1,2].map(i => <div key={i} style={{ height:54, background:"#fff", border:"1px solid #EFE9DD", borderRadius:11, marginBottom:8, opacity:0.5 }}/>)}</div>
+          ) : myForums.length === 0 ? (
+            <div style={{ background:"#fff", border:"1px dashed #E0D8C8", borderRadius:11, padding:"18px 16px", textAlign:"center" }}>
+              <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:13.5, color:"#999", margin:0, lineHeight:1.5 }}>You haven't joined any forums yet. Join one and it'll live here.</p>
+            </div>
+          ) : (
+            myForums.map(f => (
+              <button key={f.id} onClick={() => openForum(f)}
+                style={{ display:"flex", alignItems:"center", gap:11, width:"100%", textAlign:"left", background:"#fff", border:"1px solid #E8E0D0", borderRadius:11, padding:"10px 12px", marginBottom:8, cursor:"pointer", transition:"border-color 0.15s" }}
+                onMouseEnter={e => e.currentTarget.style.borderColor="#C8A96E"}
+                onMouseLeave={e => e.currentTarget.style.borderColor="#E8E0D0"}>
+                <div style={{ width:34, height:34, borderRadius:9, background:f.color || "#1A1A1A", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", color:"#F4ECD8", fontFamily:"'Playfair Display', serif", fontWeight:700, fontSize:15 }}>{(f.name||"F").replace(/^the\s+/i,"").charAt(0).toUpperCase()}</div>
+                <div style={{ minWidth:0, flex:1 }}>
+                  <div style={{ fontSize:13, fontWeight:600, color:"#141414", fontFamily:"'DM Sans', sans-serif", display:"flex", alignItems:"center", gap:4 }}>
+                    <span style={{ overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis" }}>{f.name}</span>
+                    {f.verified && <svg width="11" height="11" viewBox="0 0 24 24" fill="#C8A96E" style={{ flexShrink:0 }}><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0 1 12 2.944a11.955 11.955 0 0 1-8.618 3.04A12.02 12.02 0 0 0 3 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>}
+                  </div>
+                  <div style={{ fontSize:10, color:"#AAA", fontFamily:"'DM Mono', monospace" }}>{(f.member_count||0).toLocaleString()} members</div>
+                </div>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#DDD5C2" strokeWidth="2" strokeLinecap="round" style={{ flexShrink:0 }}><path d="m9 18 6-6-6-6"/></svg>
+              </button>
+            ))
+          )}
+        </aside>
+        </div>{/* /forums-grid */}
       </main>
 
       {showRequest && <RequestForumModal session={session} initialName={prefill} onClose={() => setShowRequest(false)}/>}
       {showCreate && <CreateForumModal session={session} initialName={prefill} onClose={() => setShowCreate(false)} onCreated={(forum) => { setShowCreate(false); if (forum && forum.slug) navigate(`/forums/${forum.slug}`); }}/>}
+    </div>
+  );
+}
+
+function EditorialBoardModal({ forum, session, onClose }) {
+  const userId = session?.user?.id;
+  const isStaff = !!session?.user?.email && session.user.email.toLowerCase().endsWith("@tryletters.tech");
+  const [editors, setEditors] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const avatarPalette = ["#2E4A3F","#3A4A5A","#6B4A2E","#4A3A5A","#5A3A3A","#2C3E50"];
+  const colorFor = (id) => avatarPalette[(((id||"x").charCodeAt(0) || 0) + (id||"x").length) % avatarPalette.length];
+
+  const loadBoard = async () => {
+    const { data: rows } = await supabase.from("forum_editors").select("user_id, added_at").eq("forum_id", forum.id).order("added_at", { ascending:true });
+    const ids = (rows || []).map(r => r.user_id);
+    let profs = [];
+    if (ids.length) {
+      const { data: pr } = await supabase.from("profiles").select("id, username, full_name, status").in("id", ids);
+      profs = pr || [];
+    }
+    return (rows || []).map(r => {
+      const pf = profs.find(x => x.id === r.user_id) || {};
+      return { user_id: r.user_id, added_at: r.added_at, username: pf.username, full_name: pf.full_name, status: pf.status };
+    });
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => { setLoading(true); const m = await loadBoard(); if (!cancelled) { setEditors(m); setLoading(false); } })();
+    return () => { cancelled = true; };
+  }, [forum.id]);
+
+  const canManage = isStaff || editors.some(e => e.user_id === userId);
+  const full = editors.length >= 10;
+
+  // Live user search (staff/editors only)
+  useEffect(() => {
+    const q = query.trim().replace(/[%,()]/g, "");
+    if (!q || !canManage) { setResults([]); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.from("profiles").select("id, username, full_name")
+        .or(`username.ilike.%${q}%,full_name.ilike.%${q}%`).limit(8);
+      const editorIds = new Set(editors.map(e => e.user_id));
+      if (!cancelled) setResults((data || []).filter(pp => !editorIds.has(pp.id)));
+    })();
+    return () => { cancelled = true; };
+  }, [query, canManage, editors]);
+
+  const addEditor = async (profile) => {
+    if (busy || full) return;
+    setBusy(true);
+    const { error } = await supabase.from("forum_editors").insert({ forum_id: forum.id, user_id: profile.id, added_by: userId });
+    if (!error) { setEditors(await loadBoard()); setQuery(""); setResults([]); }
+    setBusy(false);
+  };
+
+  const removeEditor = async (uid) => {
+    if (busy || editors.length <= 1) return;
+    setBusy(true);
+    const { error } = await supabase.from("forum_editors").delete().eq("forum_id", forum.id).eq("user_id", uid);
+    if (!error) setEditors(prev => prev.filter(e => e.user_id !== uid));
+    setBusy(false);
+  };
+
+  const nameOf = (e) => e.full_name || e.username || "Board member";
+  const initialOf = (e) => (e.full_name || e.username || "?").trim().charAt(0).toUpperCase();
+
+  return (
+    <div onClick={onClose} style={{ position:"fixed", inset:0, zIndex:200, background:"rgba(0,0,0,0.5)", display:"flex", alignItems:"flex-end", justifyContent:"center", animation:"lettersFadeIn 0.2s ease" }}>
+      <style>{`@keyframes lettersFadeIn{from{opacity:0}to{opacity:1}}@keyframes lettersSheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}`}</style>
+      <div onClick={e=>e.stopPropagation()} style={{ background:"#F9F6F0", borderRadius:"16px 16px 0 0", width:"100%", maxWidth:560, maxHeight:"86vh", display:"flex", flexDirection:"column", animation:"lettersSheetUp 0.34s cubic-bezier(0.22,1,0.36,1)" }}>
+        <div style={{ display:"flex", justifyContent:"center", padding:"12px 0 4px" }}><div style={{ width:36, height:4, borderRadius:2, background:"#DDD8CC" }}/></div>
+        <div style={{ padding:"8px 24px 16px", borderBottom:"1px solid #E8E0D0" }}>
+          <div style={{ display:"flex", alignItems:"baseline", justifyContent:"space-between", gap:10 }}>
+            <div style={{ fontSize:10, letterSpacing:"0.16em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:4 }}>Editorial Board</div>
+            {!loading && <div style={{ fontSize:10, letterSpacing:"0.08em", color: full ? "#C0392B" : "#B0A488", fontFamily:"'DM Mono', monospace" }}>{editors.length} / 10 seats</div>}
+          </div>
+          <div style={{ fontFamily:"'Playfair Display', serif", fontSize:22, fontWeight:900, color:"#141414" }}>{forum.name}</div>
+          <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:13.5, color:"#888", margin:"4px 0 0", lineHeight:1.5 }}>
+            The board grants verified privileges to this forum's contributors.
+          </p>
+        </div>
+        <div style={{ overflowY:"auto", flex:1, padding:"14px 24px 24px" }}>
+          {loading ? (
+            <div>{[0,1,2].map(i => <div key={i} style={{ height:60, background:"#fff", border:"1px solid #EFE9DD", borderRadius:11, marginBottom:10, opacity:0.5 }}/>)}</div>
+          ) : (
+            <>
+              {editors.map((e, i) => (
+                <div key={e.user_id} style={{ display:"flex", alignItems:"center", gap:12, background:"#fff", border:"1px solid #E8E0D0", borderRadius:11, padding:"12px 14px", marginBottom:10 }}>
+                  <div style={{ width:40, height:40, borderRadius:"50%", background:colorFor(e.user_id), flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", color:"#F4ECD8", fontFamily:"'Playfair Display', serif", fontWeight:700, fontSize:17 }}>{initialOf(e)}</div>
+                  <div style={{ minWidth:0, flex:1 }}>
+                    <div style={{ fontSize:14.5, fontWeight:600, color:"#141414", fontFamily:"'DM Sans', sans-serif" }}>{nameOf(e)}</div>
+                    <div style={{ fontSize:11, color:"#AAA", fontFamily:"'DM Mono', monospace" }}>{e.username ? `@${e.username}` : "Editorial board"}{i === 0 ? " · Chair" : ""}</div>
+                  </div>
+                  {canManage && editors.length > 1 && (
+                    <button onClick={() => removeEditor(e.user_id)} disabled={busy} aria-label={`Remove ${nameOf(e)}`}
+                      style={{ background:"none", border:"1px solid #ECD9D5", color:"#C0392B", borderRadius:"50%", width:28, height:28, display:"flex", alignItems:"center", justifyContent:"center", cursor: busy ? "default" : "pointer", flexShrink:0, transition:"all 0.15s" }}
+                      onMouseEnter={ev => { if(!busy){ ev.currentTarget.style.background="#FBEEEC"; ev.currentTarget.style.borderColor="#C0392B"; } }}
+                      onMouseLeave={ev => { ev.currentTarget.style.background="none"; ev.currentTarget.style.borderColor="#ECD9D5"; }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                    </button>
+                  )}
+                </div>
+              ))}
+
+              {canManage && (
+                <div style={{ marginTop:16, paddingTop:16, borderTop:"1px dashed #E0D8C8" }}>
+                  <div style={{ fontSize:9.5, letterSpacing:"0.14em", textTransform:"uppercase", color:"#A99F86", fontFamily:"'DM Mono', monospace", marginBottom:9 }}>Add to board</div>
+                  {full ? (
+                    <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:13.5, color:"#999", margin:0 }}>All 10 seats are filled. Remove a member to add someone new.</p>
+                  ) : (
+                    <div style={{ position:"relative" }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:9, background:"#fff", border:"1px solid #C8BFA8", borderRadius: results.length ? "10px 10px 0 0" : 10, padding:"0 13px", height:44 }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#B0A488" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+                        <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search people by name or @username…"
+                          style={{ flex:1, border:"none", outline:"none", background:"transparent", fontSize:14, fontFamily:"'DM Sans', sans-serif", color:"#141414" }}/>
+                      </div>
+                      {results.length > 0 && (
+                        <div style={{ position:"absolute", left:0, right:0, top:44, background:"#fff", border:"1px solid #C8BFA8", borderTop:"1px solid #F0EDE8", borderRadius:"0 0 10px 10px", overflow:"hidden", zIndex:5, boxShadow:"0 8px 20px rgba(0,0,0,0.08)" }}>
+                          {results.map(pp => (
+                            <button key={pp.id} onClick={() => addEditor(pp)} disabled={busy}
+                              style={{ display:"flex", alignItems:"center", gap:11, width:"100%", textAlign:"left", background:"none", border:"none", borderBottom:"1px solid #F5F1E9", padding:"10px 13px", cursor: busy ? "default" : "pointer" }}
+                              onMouseEnter={ev => ev.currentTarget.style.background="#FBF8F1"}
+                              onMouseLeave={ev => ev.currentTarget.style.background="none"}>
+                              <div style={{ width:30, height:30, borderRadius:"50%", background:colorFor(pp.id), flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", color:"#F4ECD8", fontFamily:"'Playfair Display', serif", fontWeight:700, fontSize:13 }}>{(pp.full_name || pp.username || "?").trim().charAt(0).toUpperCase()}</div>
+                              <div style={{ minWidth:0, flex:1 }}>
+                                <div style={{ fontSize:13.5, fontWeight:600, color:"#141414", fontFamily:"'DM Sans', sans-serif" }}>{pp.full_name || pp.username || "Member"}</div>
+                                {pp.username && <div style={{ fontSize:10.5, color:"#AAA", fontFamily:"'DM Mono', monospace" }}>@{pp.username}</div>}
+                              </div>
+                              <span style={{ fontSize:11, color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontWeight:600 }}>Add</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -3670,6 +3862,7 @@ function ForumDetailPage({ session, onNavigate }) {
   const [joined, setJoined] = useState(false);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showBoard, setShowBoard] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -3700,7 +3893,7 @@ function ForumDetailPage({ session, onNavigate }) {
   const shell = (children) => (
     <div className="letters-main" style={{ minHeight:"100vh", background:"#F9F6F0", paddingBottom:80 }}>
       <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
-      <TopBar title={<span>Forums<span style={{ color:"#C8A96E" }}>.</span></span>} maxWidth={1040}/>
+      <TopBar title={<span>Forums<span style={{ color:"#C8A96E" }}>.</span></span>} maxWidth={1040} onLogoClick={() => navigate("/forums")}/>
       {children}
     </div>
   );
@@ -3745,10 +3938,19 @@ function ForumDetailPage({ session, onNavigate }) {
             {(forum.member_count||0).toLocaleString()} {forum.member_count === 1 ? "member" : "members"}{forum.topic ? ` · ${forum.topic}` : ""}
           </div>
         </div>
-        <button onClick={toggleJoin} disabled={!userId}
-          style={{ background: joined ? "#F0EDE8" : "#111", color: joined ? "#888" : "#F0EAD8", border: joined ? "1px solid #E0D8C8" : "none", borderRadius:22, padding:"9px 20px", fontSize:13, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor: userId ? "pointer" : "default", flexShrink:0, transition:"all 0.15s" }}>
-          {joined ? "Joined" : "Join"}
-        </button>
+        <div style={{ display:"flex", gap:10, flexShrink:0, flexWrap:"wrap", justifyContent:"flex-end" }}>
+          <button onClick={() => setShowBoard(true)}
+            style={{ display:"inline-flex", alignItems:"center", gap:6, background:"#fff", color:"#6B6250", border:"1px solid #E0D8C8", borderRadius:22, padding:"9px 16px", fontSize:13, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:"pointer", transition:"all 0.15s" }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor="#C8A96E"; e.currentTarget.style.color="#141414"; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor="#E0D8C8"; e.currentTarget.style.color="#6B6250"; }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            Editorial Board
+          </button>
+          <button onClick={toggleJoin} disabled={!userId}
+            style={{ background: joined ? "#F0EDE8" : "#111", color: joined ? "#888" : "#F0EAD8", border: joined ? "1px solid #E0D8C8" : "none", borderRadius:22, padding:"9px 20px", fontSize:13, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor: userId ? "pointer" : "default", flexShrink:0, transition:"all 0.15s" }}>
+            {joined ? "Joined" : "Join"}
+          </button>
+        </div>
       </div>
       {forum.description && <p style={{ fontFamily:"'EB Garamond', serif", fontSize:16, lineHeight:1.6, color:"#555", margin:"0 0 26px" }}>{forum.description}</p>}
 
@@ -3771,6 +3973,7 @@ function ForumDetailPage({ session, onNavigate }) {
           ))
         )}
       </div>
+      {showBoard && <EditorialBoardModal forum={forum} session={session} onClose={() => setShowBoard(false)}/>}
     </main>
   );
 }
@@ -3794,6 +3997,7 @@ const demoFollowedPublications = [
 const demoStats = { letters: 12, replies: 47, likes: 203, following: 34, followers: 89 };
 
 function YouPage({ session, onSignOut }) {
+  const navigate = useNavigate();
   const [letters, setLetters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(null);
@@ -4178,6 +4382,101 @@ function YouPage({ session, onSignOut }) {
             </div>
           )}
         </div>
+        <div style={{ marginTop:34, paddingTop:20, borderTop:"1px solid #F0EDE8", textAlign:"center" }}>
+          <button onClick={() => navigate("/guide")} style={{ background:"none", border:"none", color:"#8A7A55", fontFamily:"'DM Mono', monospace", fontSize:11.5, letterSpacing:"0.06em", cursor:"pointer" }}>
+            Read the User Guide →
+          </button>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function GuidePage({ session, onNavigate }) {
+  const navigate = useNavigate();
+  const H2 = ({ children }) => <h2 style={{ fontFamily:"'Playfair Display', serif", fontSize:26, fontWeight:900, color:"#141414", letterSpacing:"-0.01em", margin:"0 0 14px", paddingTop:28, borderTop:"1px solid #E8E0D0" }}>{children}</h2>;
+  const H3 = ({ children }) => <h3 style={{ fontFamily:"'Playfair Display', serif", fontSize:17, fontWeight:800, color:"#222", margin:"22px 0 8px" }}>{children}</h3>;
+  const P = ({ children }) => <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:16.5, lineHeight:1.72, color:"#40382C", margin:"0 0 14px" }}>{children}</p>;
+  const B = ({ children }) => <strong style={{ fontWeight:700, color:"#141414" }}>{children}</strong>;
+  const Pill = () => <span style={{ display:"inline-block", fontSize:8.5, letterSpacing:"0.14em", textTransform:"uppercase", color:"#B0873E", background:"#F5EEDD", border:"1px solid #E7D9B8", borderRadius:20, padding:"2px 8px", fontFamily:"'DM Mono', monospace", marginLeft:6 }}>Rolling out</span>;
+
+  return (
+    <div className="letters-main" style={{ minHeight:"100vh", background:"#F9F6F0", paddingBottom:70 }}>
+      <TopBar title={<span>Guide<span style={{ color:"#C8A96E" }}>.</span></span>} maxWidth={1040} onLogoClick={() => navigate("/you")}/>
+      <main style={{ maxWidth:700, margin:"0 auto", padding:"0 22px" }}>
+        <button onClick={() => navigate("/you")} style={{ background:"none", border:"none", color:"#B0A488", fontFamily:"'DM Mono', monospace", fontSize:11.5, letterSpacing:"0.06em", cursor:"pointer", margin:"18px 0 4px", display:"flex", alignItems:"center", gap:6 }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="m15 18-6-6 6-6"/></svg> You
+        </button>
+
+        <div style={{ textAlign:"center", padding:"28px 0 28px", borderBottom:"3px double #141414", marginBottom:30 }}>
+          <div style={{ fontSize:10, letterSpacing:"0.24em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:14, paddingLeft:"0.24em" }}>The Letters Guide</div>
+          <h1 style={{ fontFamily:"'Playfair Display', serif", fontSize:"clamp(34px,6vw,50px)", fontWeight:900, color:"#141414", letterSpacing:"-0.02em", lineHeight:1.05, margin:0 }}>How Letters Works<span style={{ color:"#C8A96E" }}>.</span></h1>
+          <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:18, color:"#8A8172", margin:"12px 0 0" }}>For readers, writers, and forum editorial boards.</p>
+        </div>
+
+        <P>Letters is a broadsheet-styled space where you read curated news, write <B>Letters</B> (long, blog-like pieces) and <B>Posts</B> (short notes), and reply to one another. Standing here comes from the quality of what you write — not from chasing virality.</P>
+
+        <H2>Forums</H2>
+        <P>A <B>forum</B> is a room organized around a subject or an institution — a place where a community reads and publishes together. Forums come in three kinds: <B>Institutional</B> (an official, verified outlet), <B>Topic</B> (a subject room run by Letters), and <B>Community</B> (member-run). Official forums carry a gold <B>Verified</B> check, and a <B>Live</B> badge appears when discussion is active.</P>
+
+        <H3>Finding &amp; joining</H3>
+        <P>The Forums homepage is search-first — start typing and forums autocomplete by name or category. Below are <B>Suggested forums</B> to discover, and the ones you join collect in your <B>My Forums</B> rail. Joining is open to anyone and makes you a <B>member</B> — but membership alone doesn't let you publish into a forum.</P>
+
+        <H3>Creating a forum</H3>
+        <P><B>Letters staff</B> can create a forum directly, and it goes live immediately. <B>Everyone else</B> submits a request, which staff review and create if approved. Whoever creates a forum automatically becomes its first member and the <B>Chair</B> of its editorial board.</P>
+
+        <H2>Editorial Boards</H2>
+        <P>Every forum is governed by an <B>editorial board</B> of up to <B>10 members</B>. The board is the forum's steward: it decides who may publish there, and it manages its own membership. Anyone can view a forum's board; only staff and board members see the management controls.</P>
+
+        <H3>Verified contributors</H3>
+        <P><B>Verification</B> is a privilege the board grants. A verified contributor may publish their longform <B>Letters</B> (the 500+ character, newsletter-style pieces) into that forum. It reflects the board's editorial judgment about who publishes under the forum's banner — not something membership confers.</P>
+        <P>Your profile will list the forums you're verified in — for example, <em>"Verified in NBA, New York Times, and Hunting forums."</em> <Pill/> And when writing, you'll be able to type <B>#</B> to publish into a trending topic or into a forum where you're verified. <Pill/></P>
+
+        <H2>How Board Decisions Are Made</H2>
+        <P>Board membership is a <B>collective decision</B>, not something any single editor can impose.</P>
+
+        <H3>Adding a member</H3>
+        <P>Any board member (or staff) may <B>add</B> someone directly, up to the 10-seat limit. Adding is immediate — no vote.</P>
+
+        <H3>Removing a member</H3>
+        <P>Removal is a board vote. When an editor starts a removal, a <B>proposal</B> opens against that member and the rest of the board votes to approve or reject; the proposer's action counts as one approval. When it passes, the removal executes automatically.</P>
+        <P><B>Threshold:</B> a majority of the <B>non-target board</B> must approve — the target doesn't vote and isn't counted. On a 4-person board, removing one needs 2 of the remaining 3.</P>
+        <P><B>Small boards:</B> editor-initiated removals require a board of <B>3 or more</B>. On a 2-person board an editor can't start one, so no one can unilaterally oust their only colleague.</P>
+        <P><B>Lifecycle:</B> a proposal stays open until it's approved, until reject votes make approval impossible, or until <B>7 days</B> pass — whichever comes first. There's one open removal per member at a time, and the member being voted on can see it but can't vote. <Pill/></P>
+
+        <H3>Staff override &amp; safeguards</H3>
+        <P>Letters staff can add or remove board members <B>directly, without a vote</B> — they seat initial boards, resolve disputes, and break deadlocks. And a forum can never be left empty-handed: the <B>last remaining board member cannot be removed</B>.</P>
+
+        <H2>Roles at a Glance</H2>
+        <div style={{ overflowX:"auto" }}>
+          <table style={{ width:"100%", borderCollapse:"collapse" }}>
+            <thead>
+              <tr style={{ borderBottom:"2px solid #141414" }}>
+                {["Role","Read","Join","Publish longform","Grant verification","Manage board"].map(h => (
+                  <th key={h} style={{ textAlign:"left", padding:"8px 10px 8px 0", fontSize:9, letterSpacing:"0.06em", textTransform:"uppercase", color:"#888", fontFamily:"'DM Mono', monospace", fontWeight:500 }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                ["Member","yes","yes","—","—","—"],
+                ["Verified contributor","yes","yes","that forum","—","—"],
+                ["Board member","yes","yes","yes","yes","add direct · remove by vote"],
+                ["Letters staff","yes","yes","yes","yes","direct"],
+              ].map((row, ri) => (
+                <tr key={ri} style={{ borderBottom:"1px solid #EEE8DA" }}>
+                  {row.map((cell, ci) => (
+                    <td key={ci} style={{ padding:"9px 10px 9px 0", color: ci===0 ? "#141414" : "#666", fontWeight: ci===0 ? 600 : 400, fontFamily: ci===0 ? "'DM Sans', sans-serif" : "'DM Mono', monospace", fontSize: ci===0 ? 13 : 11 }}>{cell}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:13.5, color:"#A99F86", margin:"32px 0 0", textAlign:"center" }}>
+          Sections for the Feed, Read, and Write experiences will join this guide as they're finalized.
+        </p>
       </main>
     </div>
   );
@@ -5166,6 +5465,7 @@ function AuthenticatedApp({ session, handleSignOut }) {
         <Route path="/forums" element={<ForumsPage session={session} onSignOut={handleSignOut} onNavigate={goToTab}/>}/>
         <Route path="/forums/:slug" element={<ForumDetailPage session={session} onNavigate={goToTab}/>}/>
         <Route path="/you" element={<YouPage session={session} onSignOut={handleSignOut}/>}/>
+        <Route path="/guide" element={<GuidePage session={session} onNavigate={goToTab}/>}/>
         <Route path="*" element={<Navigate to="/feed" replace/>}/>
       </Routes>
 
