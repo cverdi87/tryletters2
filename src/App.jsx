@@ -3618,6 +3618,19 @@ function ForumsPage({ session, onSignOut, onNavigate }) {
           )}
         </div>
 
+        {isStaff && (
+          <div style={{ textAlign:"center", marginTop:26 }}>
+            <div style={{ fontSize:9, letterSpacing:"0.2em", textTransform:"uppercase", color:"#C0B79E", fontFamily:"'DM Mono', monospace", marginBottom:9 }}>Letters staff</div>
+            <button onClick={() => openCreator("")}
+              style={{ display:"inline-flex", alignItems:"center", gap:8, background:"#111", color:"#F0EAD8", border:"none", borderRadius:26, padding:"12px 26px", fontSize:14, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:"pointer", boxShadow:"0 3px 14px rgba(0,0,0,0.15)", transition:"transform 0.12s, box-shadow 0.12s" }}
+              onMouseEnter={e => { e.currentTarget.style.transform="translateY(-1px)"; e.currentTarget.style.boxShadow="0 5px 18px rgba(0,0,0,0.2)"; }}
+              onMouseLeave={e => { e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.boxShadow="0 3px 14px rgba(0,0,0,0.15)"; }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C8A96E" strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+              Create a Forum
+            </button>
+          </div>
+        )}
+
         {/* ── Suggested forums ── */}
         <div style={{ marginTop:52 }}>
           <div style={{ fontSize:10, letterSpacing:"0.16em", textTransform:"uppercase", color:"#AAA", fontFamily:"'DM Mono', monospace", marginBottom:16, textAlign:"center" }}>Suggested forums</div>
