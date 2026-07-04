@@ -3298,10 +3298,26 @@ function ForumFeedCard({ item }) {
   );
 }
 
-function RequestForumModal({ onClose }) {
-  const [form, setForm] = useState({ name:"", topic:"", description:"", reason:"" });
+function RequestForumModal({ onClose, session, initialName }) {
+  const [form, setForm] = useState({ name: initialName || "", topic:"", description:"", reason:"" });
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
   const [focused, setFocused] = useState(null);
+  const handleSubmit = async () => {
+    if (!form.name.trim() || !form.description.trim() || submitting) return;
+    setSubmitting(true); setError("");
+    const { error: err } = await supabase.from("forum_requests").insert({
+      requested_by: session?.user?.id || null,
+      name: form.name.trim(),
+      topic: form.topic || null,
+      description: form.description.trim(),
+      reason: form.reason.trim() || null,
+    });
+    setSubmitting(false);
+    if (err) { setError("Something went wrong — please try again."); return; }
+    setSubmitted(true);
+  };
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
   const inputStyle = (field, multi=false) => ({
     width:"100%", padding:"10px 13px", fontSize:14,
@@ -3346,10 +3362,11 @@ function RequestForumModal({ onClose }) {
                 <label style={labelStyle}>Why should Letters approve this forum?</label>
                 <textarea placeholder="Tell us why this community would add value to Letters..." value={form.reason} onChange={e=>set("reason",e.target.value)} onFocus={()=>setFocused("reason")} onBlur={()=>setFocused(null)} style={{...inputStyle("reason",true), minHeight:80}} rows={3}/>
               </div>
-              <button onClick={() => form.name && form.description ? setSubmitted(true) : null}
-                style={{ width:"100%", background:"#111", color:"#F0EAD8", border:"none", borderRadius:6, padding:"13px 0", fontSize:13.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:"pointer", lineHeight:1.4 }}>
+              {error && <div style={{ fontSize:12.5, color:"#C0392B", fontFamily:"'DM Sans', sans-serif", textAlign:"center" }}>{error}</div>}
+              <button onClick={handleSubmit} disabled={submitting || !form.name.trim() || !form.description.trim()}
+                style={{ width:"100%", background:"#111", color:"#F0EAD8", border:"none", borderRadius:6, padding:"13px 0", fontSize:13.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor: submitting ? "default" : "pointer", opacity: (submitting || !form.name.trim() || !form.description.trim()) ? 0.6 : 1, lineHeight:1.4 }}>
                 <span style={{ display:"block", fontSize:9.5, letterSpacing:"0.16em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:2 }}>Submit for review</span>
-                Request This Forum →
+                {submitting ? "Submitting…" : "Request This Forum →"}
               </button>
             </div>
           ) : (
@@ -3368,6 +3385,115 @@ function RequestForumModal({ onClose }) {
   );
 }
 
+function CreateForumModal({ session, onClose, onCreated, initialName }) {
+  const slugify = (s) => (s || "").toLowerCase().trim()
+    .replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+  const [form, setForm] = useState({ name: initialName || "", slug: slugify(initialName || ""), type:"topic", topic:"", description:"", color:"#1A1A1A", cover_image:"", verified:false, live:false });
+  const [slugEdited, setSlugEdited] = useState(false);
+  const [focused, setFocused] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const onName = (v) => setForm(f => ({ ...f, name: v, slug: slugEdited ? f.slug : slugify(v) }));
+  const palette = ["#1A1A1A","#C0392B","#27AE60","#8E44AD","#2C3E50","#E67E22","#F39C12","#C8A96E"];
+  const inputStyle = (field, multi=false) => ({ width:"100%", padding:"10px 13px", fontSize:14, fontFamily: multi ? "'EB Garamond', Georgia, serif" : "'DM Sans', sans-serif", color:"#111", background: focused===field ? "#fff" : "#FDFCF8", border:`1px solid ${focused===field ? "#111" : "#C8BFA8"}`, borderRadius:5, outline:"none", transition:"all 0.15s", boxSizing:"border-box", resize:"none" });
+  const labelStyle = { fontSize:9.5, letterSpacing:"0.14em", textTransform:"uppercase", color:"#888", fontFamily:"'DM Mono', monospace", display:"block", marginBottom:5 };
+
+  const handleCreate = async () => {
+    const name = form.name.trim();
+    const slug = (form.slug || slugify(name)).trim();
+    if (!name || !slug || submitting) return;
+    setSubmitting(true); setError("");
+    const { data, error: err } = await supabase.from("forums").insert({
+      slug, name, type: form.type, verified: form.verified,
+      description: form.description.trim() || null, topic: form.topic || null,
+      color: form.color, cover_image: form.cover_image.trim() || null,
+      live: form.live, created_by: session?.user?.id || null,
+    }).select().maybeSingle();
+    setSubmitting(false);
+    if (err) {
+      if (err.code === "23505" || /duplicate|unique/i.test(err.message || "")) setError(`The slug "${slug}" is already taken — pick another.`);
+      else if (/row-level security|policy/i.test(err.message || "")) setError("Only Letters staff can create forums.");
+      else setError("Couldn't create the forum — please try again.");
+      return;
+    }
+    onCreated && onCreated(data);
+  };
+
+  return (
+    <div onClick={onClose} style={{ position:"fixed", inset:0, zIndex:200, background:"rgba(0,0,0,0.5)", display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
+      <div onClick={e=>e.stopPropagation()} style={{ background:"#F9F6F0", borderRadius:"16px 16px 0 0", width:"100%", maxWidth:680, maxHeight:"90vh", display:"flex", flexDirection:"column" }}>
+        <div style={{ display:"flex", justifyContent:"center", padding:"12px 0 4px" }}><div style={{ width:36, height:4, borderRadius:2, background:"#DDD8CC" }}/></div>
+        <div style={{ padding:"8px 24px 16px", borderBottom:"1px solid #E8E0D0" }}>
+          <div style={{ fontSize:10, letterSpacing:"0.16em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:4 }}>Staff · Create a Forum</div>
+          <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:13.5, color:"#888", margin:0, lineHeight:1.5 }}>This forum goes live immediately.</p>
+        </div>
+        <div style={{ overflowY:"auto", flex:1, padding:"20px 24px", display:"flex", flexDirection:"column", gap:16 }}>
+          <div>
+            <label style={labelStyle}>Forum Name</label>
+            <input type="text" placeholder="e.g. Climate & Earth" value={form.name} onChange={e=>onName(e.target.value)} onFocus={()=>setFocused("name")} onBlur={()=>setFocused(null)} style={inputStyle("name")}/>
+          </div>
+          <div>
+            <label style={labelStyle}>URL Slug</label>
+            <div style={{ display:"flex", alignItems:"center" }}>
+              <span style={{ fontFamily:"'DM Mono', monospace", fontSize:12.5, color:"#B0A488", paddingRight:4, whiteSpace:"nowrap" }}>/forums/</span>
+              <input type="text" value={form.slug} onChange={e=>{ setSlugEdited(true); set("slug", slugify(e.target.value)); }} onFocus={()=>setFocused("slug")} onBlur={()=>setFocused(null)} style={{...inputStyle("slug"), fontFamily:"'DM Mono', monospace", fontSize:13}}/>
+            </div>
+          </div>
+          <div style={{ display:"flex", gap:12 }}>
+            <div style={{ flex:1 }}>
+              <label style={labelStyle}>Type</label>
+              <select value={form.type} onChange={e=>set("type",e.target.value)} style={{...inputStyle("type"), cursor:"pointer"}}>
+                <option value="topic">Topic</option>
+                <option value="institutional">Institutional</option>
+                <option value="user">Community</option>
+              </select>
+            </div>
+            <div style={{ flex:1 }}>
+              <label style={labelStyle}>Category</label>
+              <select value={form.topic} onChange={e=>set("topic",e.target.value)} style={{...inputStyle("cat"), cursor:"pointer"}}>
+                <option value="">None</option>
+                {["News","Politics","Technology","Culture","Sports","World","Economy","Science","Letters","Other"].map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label style={labelStyle}>Description</label>
+            <textarea placeholder="What is this forum about?" value={form.description} onChange={e=>set("description",e.target.value)} onFocus={()=>setFocused("desc")} onBlur={()=>setFocused(null)} style={{...inputStyle("desc",true), minHeight:74}} rows={3}/>
+          </div>
+          <div>
+            <label style={labelStyle}>Accent Color</label>
+            <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+              {palette.map(c => (
+                <button key={c} onClick={()=>set("color",c)} style={{ width:30, height:30, borderRadius:8, background:c, border: form.color===c ? "2px solid #111" : "1px solid #E0D8C8", cursor:"pointer", padding:0 }}/>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label style={labelStyle}>Cover Image URL (optional)</label>
+            <input type="text" placeholder="https://…" value={form.cover_image} onChange={e=>set("cover_image",e.target.value)} onFocus={()=>setFocused("cover")} onBlur={()=>setFocused(null)} style={{...inputStyle("cover"), fontFamily:"'DM Mono', monospace", fontSize:12.5}}/>
+          </div>
+          <div style={{ display:"flex", gap:22 }}>
+            <label style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer" }}>
+              <input type="checkbox" checked={form.verified} onChange={e=>set("verified",e.target.checked)}/>
+              <span style={{ fontSize:13, fontFamily:"'DM Sans', sans-serif", color:"#444" }}>Verified badge</span>
+            </label>
+            <label style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer" }}>
+              <input type="checkbox" checked={form.live} onChange={e=>set("live",e.target.checked)}/>
+              <span style={{ fontSize:13, fontFamily:"'DM Sans', sans-serif", color:"#444" }}>Live now</span>
+            </label>
+          </div>
+          {error && <div style={{ fontSize:12.5, color:"#C0392B", fontFamily:"'DM Sans', sans-serif" }}>{error}</div>}
+          <button onClick={handleCreate} disabled={submitting || !form.name.trim() || !form.slug.trim()}
+            style={{ width:"100%", background:"#111", color:"#F0EAD8", border:"none", borderRadius:6, padding:"13px 0", fontSize:13.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor: submitting ? "default" : "pointer", opacity: (submitting || !form.name.trim() || !form.slug.trim()) ? 0.6 : 1 }}>
+            {submitting ? "Creating…" : "Create Forum →"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ForumsPage({ session, onSignOut, onNavigate }) {
   const navigate = useNavigate();
   const userId = session?.user?.id;
@@ -3377,6 +3503,10 @@ function ForumsPage({ session, onSignOut, onNavigate }) {
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
   const [showRequest, setShowRequest] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
+  const [prefill, setPrefill] = useState("");
+  const isStaff = !!session?.user?.email && session.user.email.toLowerCase().endsWith("@tryletters.tech");
+  const openCreator = (name = "") => { setPrefill(name); if (isStaff) setShowCreate(true); else setShowRequest(true); };
 
   useEffect(() => {
     let cancelled = false;
@@ -3422,7 +3552,13 @@ function ForumsPage({ session, onSignOut, onNavigate }) {
         .forums-suggest-grid { grid-template-columns: 1fr; }
         @media (min-width: 720px) { .forums-suggest-grid { grid-template-columns: repeat(3, 1fr); } }
       `}</style>
-      <TopBar title={<span>Forums<span style={{ color:"#C8A96E" }}>.</span></span>} maxWidth={1040}/>
+      <TopBar title={<span>Forums<span style={{ color:"#C8A96E" }}>.</span></span>} maxWidth={1040}
+        rightAction={
+          <button onClick={() => openCreator("")}
+            style={{ background:"#111", border:"none", borderRadius:20, padding:"5px 14px", fontSize:12, color:"#F0EAD8", fontFamily:"'DM Sans', sans-serif", fontWeight:500, cursor:"pointer" }}>
+            {isStaff ? "+ Create" : "+ Request"}
+          </button>
+        }/>
 
       <main style={{ maxWidth:840, margin:"0 auto", padding:"0 20px" }}>
 
@@ -3477,7 +3613,7 @@ function ForumsPage({ session, onSignOut, onNavigate }) {
           {focused && q && matches.length === 0 && (
             <div style={{ position:"absolute", left:0, right:0, top:54, background:"#fff", border:"1.5px solid #C8A96E", borderTop:"1px solid #F0EDE8", borderRadius:"0 0 16px 16px", padding:"16px 18px", zIndex:30, textAlign:"center" }}>
               <span style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:14, color:"#999" }}>No forum matches “{query}” yet.</span>
-              <button onMouseDown={() => setShowRequest(true)} style={{ marginLeft:8, background:"none", border:"none", color:"#C8A96E", fontFamily:"'DM Sans', sans-serif", fontSize:13, fontWeight:600, cursor:"pointer" }}>Request it →</button>
+              <button onMouseDown={() => openCreator(query)} style={{ marginLeft:8, background:"none", border:"none", color:"#C8A96E", fontFamily:"'DM Sans', sans-serif", fontSize:13, fontWeight:600, cursor:"pointer" }}>{isStaff ? "Create it →" : "Request it →"}</button>
             </div>
           )}
         </div>
@@ -3500,14 +3636,15 @@ function ForumsPage({ session, onSignOut, onNavigate }) {
           )}
 
           <div style={{ textAlign:"center", marginTop:30 }}>
-            <button onClick={() => setShowRequest(true)} style={{ background:"none", border:"none", color:"#B0A488", fontFamily:"'DM Mono', monospace", fontSize:11.5, letterSpacing:"0.04em", cursor:"pointer" }}>
-              Don't see your forum? Request one →
+            <button onClick={() => openCreator("")} style={{ background:"none", border:"none", color:"#B0A488", fontFamily:"'DM Mono', monospace", fontSize:11.5, letterSpacing:"0.04em", cursor:"pointer" }}>
+              {isStaff ? "+ Create a new forum" : "Don't see your forum? Request one →"}
             </button>
           </div>
         </div>
       </main>
 
-      {showRequest && <RequestForumModal onClose={() => setShowRequest(false)}/>}
+      {showRequest && <RequestForumModal session={session} initialName={prefill} onClose={() => setShowRequest(false)}/>}
+      {showCreate && <CreateForumModal session={session} initialName={prefill} onClose={() => setShowCreate(false)} onCreated={(forum) => { setShowCreate(false); if (forum && forum.slug) navigate(`/forums/${forum.slug}`); }}/>}
     </div>
   );
 }
