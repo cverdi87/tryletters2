@@ -2521,6 +2521,33 @@ function WritePage({ session, onNavigate }) {
   const [realRecentArticles, setRealRecentArticles] = useState([]);
   const [loadingRecentArticles, setLoadingRecentArticles] = useState(true);
   const editorRef = useRef(null);
+  const writerUserId = session?.user?.id;
+  const isWriterStaff = !!session?.user?.email && session.user.email.toLowerCase().endsWith("@tryletters.tech");
+  const [eligibleForums, setEligibleForums] = useState([]);
+  const [hashMenu, setHashMenu] = useState(null);   // { query, x, y } while a #token is active
+  const [hashIndex, setHashIndex] = useState(0);
+
+  // Forums this writer may publish into (verified in, or editor/staff of)
+  useEffect(() => {
+    if (!writerUserId) return;
+    let cancelled = false;
+    (async () => {
+      if (isWriterStaff) {
+        const { data } = await supabase.from("forums").select("id, name, slug, color, verified").order("name");
+        if (!cancelled) setEligibleForums(data || []);
+        return;
+      }
+      const [{ data: v }, { data: ed }] = await Promise.all([
+        supabase.from("forum_verified").select("forum_id").eq("user_id", writerUserId),
+        supabase.from("forum_editors").select("forum_id").eq("user_id", writerUserId),
+      ]);
+      const ids = [...new Set([...(v || []).map(r => r.forum_id), ...(ed || []).map(r => r.forum_id)])];
+      if (!ids.length) { if (!cancelled) setEligibleForums([]); return; }
+      const { data } = await supabase.from("forums").select("id, name, slug, color, verified").in("id", ids);
+      if (!cancelled) setEligibleForums(data || []);
+    })();
+    return () => { cancelled = true; };
+  }, [writerUserId, isWriterStaff]);
 
   // Pull the 4 most recently published real articles for the source-linking panel
   useEffect(() => {
@@ -2588,13 +2615,88 @@ function WritePage({ session, onNavigate }) {
     setShowQuoteSource(false);
   };
 
+  // ── "#" menu: publish into a forum you're cleared for, or add a topic tag ──
+  const HASH_RE = /(?:^|\s)#([^\s#]*)$/;
+  const detectHashMenu = () => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) { setHashMenu(null); return; }
+    const range = sel.getRangeAt(0);
+    const node = range.startContainer;
+    if (!node || node.nodeType !== 3 || !editorRef.current || !editorRef.current.contains(node)) { setHashMenu(null); return; }
+    const before = node.textContent.slice(0, range.startOffset);
+    const m = before.match(HASH_RE);
+    if (!m) { setHashMenu(null); return; }
+    let rect = range.getBoundingClientRect();
+    if (!rect || (!rect.left && !rect.top)) {
+      const er = editorRef.current.getBoundingClientRect();
+      rect = { left: er.left + 24, bottom: er.top + 48 };
+    }
+    setHashMenu({ query: m[1], x: Math.min(rect.left, window.innerWidth - 316), y: rect.bottom + 6 });
+    setHashIndex(0);
+  };
+
+  const getHashItems = () => {
+    if (!hashMenu) return [];
+    const q = hashMenu.query.toLowerCase();
+    const items = eligibleForums.filter(f => f.name.toLowerCase().includes(q)).slice(0, 6).map(f => ({ type: "forum", forum: f }));
+    if (hashMenu.query.trim().length >= 1) items.push({ type: "tag", tag: hashMenu.query.trim() });
+    return items;
+  };
+
+  const removeHashToken = () => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    const node = range.startContainer;
+    if (node.nodeType !== 3) return;
+    const end = range.startOffset;
+    const start = end - ((hashMenu?.query || "").length + 1);
+    const text = node.textContent;
+    if (start < 0 || text[start] !== "#") return;
+    node.textContent = text.slice(0, start) + text.slice(end);
+    const r = document.createRange();
+    r.setStart(node, Math.min(start, node.textContent.length));
+    r.collapse(true);
+    sel.removeAllRanges(); sel.addRange(r);
+    if (editorRef.current) set("body", editorRef.current.innerHTML);
+  };
+
+  const pickForum = (forum) => {
+    removeHashToken();
+    setForm(f => ({ ...f, forumId: forum.id, forumName: forum.name }));
+    setHashMenu(null);
+    if (editorRef.current) editorRef.current.focus();
+  };
+
+  const pickTag = () => {
+    document.execCommand("insertText", false, " ");   // confirm the typed #tag with a trailing space
+    if (editorRef.current) set("body", editorRef.current.innerHTML);
+    setHashMenu(null);
+    if (editorRef.current) editorRef.current.focus();
+  };
+
+  const selectHashItem = (item) => {
+    if (!item) return;
+    if (item.type === "forum") pickForum(item.forum); else pickTag();
+  };
+
   const handleEditorInput = () => {
     if (editorRef.current) set("body", editorRef.current.innerHTML);
+    detectHashMenu();
   };
 
   // Pressing Enter while the cursor sits at the end of a blockquote should
   // break out into a normal paragraph instead of staying trapped inside the quote.
   const handleEditorKeyDown = (e) => {
+    if (hashMenu) {
+      const items = getHashItems();
+      if (e.key === "Escape") { e.preventDefault(); setHashMenu(null); return; }
+      if (items.length) {
+        if (e.key === "ArrowDown") { e.preventDefault(); setHashIndex(i => Math.min(i + 1, items.length - 1)); return; }
+        if (e.key === "ArrowUp") { e.preventDefault(); setHashIndex(i => Math.max(i - 1, 0)); return; }
+        if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); selectHashItem(items[Math.min(hashIndex, items.length - 1)]); return; }
+      }
+    }
     if (e.key !== "Enter") return;
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return;
@@ -2724,6 +2826,7 @@ function WritePage({ session, onNavigate }) {
             source_title: form.sourceTitle || null,
             source_publication: form.sourcePublication || null,
             kind: "letter",
+            forum_id: form.forumId || null,
           }
     );
     if (error) { setError(error.message); setLoading(false); return; }
@@ -2869,6 +2972,53 @@ function WritePage({ session, onNavigate }) {
             </div>
           </div>
 
+          {/* Forum destination chip */}
+          {form.forumId && (
+            <div>
+              <div style={{ display:"inline-flex", alignItems:"center", gap:9, background:"#141414", color:"#F0EAD8", borderRadius:22, padding:"6px 8px 6px 15px", fontSize:13, fontFamily:"'DM Sans', sans-serif", fontWeight:600 }}>
+                <span style={{ fontSize:8.5, letterSpacing:"0.16em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace" }}>Publishing into</span>
+                {form.forumName}
+                <button onMouseDown={e => { e.preventDefault(); setForm(f => ({ ...f, forumId: null, forumName: null })); }} title="Remove forum"
+                  style={{ background:"rgba(255,255,255,0.16)", border:"none", borderRadius:"50%", width:19, height:19, color:"#F0EAD8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* # menu (forums you can post to + free-form topic tag) */}
+          {hashMenu && getHashItems().length > 0 && (
+            <div style={{ position:"fixed", left:hashMenu.x, top:hashMenu.y, zIndex:300, width:300, background:"#fff", border:"1px solid #E0D8C8", borderRadius:12, boxShadow:"0 12px 32px rgba(0,0,0,0.15)", overflow:"hidden" }}>
+              {(() => {
+                const items = getHashItems();
+                const hasForums = items.some(it => it.type === "forum");
+                return items.map((it, i) => {
+                  const active = i === hashIndex;
+                  if (it.type === "forum") {
+                    const f = it.forum;
+                    return (
+                      <button key={f.id} onMouseDown={e => { e.preventDefault(); selectHashItem(it); }} onMouseEnter={() => setHashIndex(i)}
+                        style={{ display:"flex", alignItems:"center", gap:10, width:"100%", textAlign:"left", background: active ? "#FBF8F1" : "none", border:"none", padding:"9px 13px", cursor:"pointer" }}>
+                        <div style={{ width:26, height:26, borderRadius:7, background:f.color || "#1A1A1A", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", color:"#F4ECD8", fontFamily:"'Playfair Display', serif", fontWeight:700, fontSize:12 }}>{(f.name||"F").replace(/^the\s+/i,"").charAt(0).toUpperCase()}</div>
+                        <span style={{ flex:1, minWidth:0, fontSize:13.5, fontWeight:600, color:"#141414", fontFamily:"'DM Sans', sans-serif", overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis" }}>{f.name}</span>
+                        {f.verified && <svg width="12" height="12" viewBox="0 0 24 24" fill="#C8A96E"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0 1 12 2.944a11.955 11.955 0 0 1-8.618 3.04A12.02 12.02 0 0 0 3 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>}
+                        <span style={{ fontSize:8.5, letterSpacing:"0.08em", textTransform:"uppercase", color:"#B0A488", fontFamily:"'DM Mono', monospace", flexShrink:0 }}>Forum</span>
+                      </button>
+                    );
+                  }
+                  return (
+                    <button key="tag" onMouseDown={e => { e.preventDefault(); selectHashItem(it); }} onMouseEnter={() => setHashIndex(i)}
+                      style={{ display:"flex", alignItems:"center", gap:10, width:"100%", textAlign:"left", background: active ? "#FBF8F1" : "none", border:"none", borderTop: hasForums ? "1px solid #F0EDE8" : "none", padding:"9px 13px", cursor:"pointer" }}>
+                      <div style={{ width:26, height:26, borderRadius:7, background:"#F0EDE8", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", color:"#8A7A55", fontFamily:"'DM Mono', monospace", fontWeight:700, fontSize:15 }}>#</div>
+                      <span style={{ flex:1, fontSize:13.5, color:"#444", fontFamily:"'DM Sans', sans-serif" }}>Add topic <strong style={{ color:"#141414" }}>#{it.tag}</strong></span>
+                      <span style={{ fontSize:8.5, letterSpacing:"0.08em", textTransform:"uppercase", color:"#B0A488", fontFamily:"'DM Mono', monospace", flexShrink:0 }}>Trending</span>
+                    </button>
+                  );
+                });
+              })()}
+            </div>
+          )}
+
           {/* ── Letter body — word-processor style with floating toolbar ── */}
           <div style={{ display:"flex", gap:10 }}>
 
@@ -2951,7 +3101,7 @@ function WritePage({ session, onNavigate }) {
                   onInput={handleEditorInput}
                   onKeyDown={handleEditorKeyDown}
                   onFocus={()=>setFocused("body")}
-                  onBlur={()=>setFocused(null)}
+                  onBlur={()=>{ setFocused(null); setTimeout(() => setHashMenu(null), 150); }}
                   data-placeholder="Dear reader..."
                   className="letters-editor"
                   style={{ width:"100%", padding:0, fontSize:bodyFontSize, fontFamily: fontOptions.find(f=>f.name===bodyFont)?.stack || "'EB Garamond', Georgia, serif", lineHeight:1.85, color:"#222", background:"none", border:"none", outline:"none", boxSizing:"border-box", minHeight:420 }}
