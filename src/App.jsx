@@ -3862,12 +3862,20 @@ function EditorialBoardModal({ forum, session, onClose }) {
   const userId = session?.user?.id;
   const isStaff = !!session?.user?.email && session.user.email.toLowerCase().endsWith("@tryletters.tech");
   const [editors, setEditors] = useState([]);
+  const [proposals, setProposals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
   const avatarPalette = ["#2E4A3F","#3A4A5A","#6B4A2E","#4A3A5A","#5A3A3A","#2C3E50"];
   const colorFor = (id) => avatarPalette[(((id||"x").charCodeAt(0) || 0) + (id||"x").length) % avatarPalette.length];
+  const fmtLeft = (iso) => {
+    const ms = new Date(iso).getTime() - Date.now();
+    if (ms <= 0) return "expiring…";
+    const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000);
+    return h >= 1 ? `${h}h left` : `${m}m left`;
+  };
 
   const loadBoard = async () => {
     const { data: rows } = await supabase.from("forum_editors").select("user_id, added_at").eq("forum_id", forum.id).order("added_at", { ascending:true });
@@ -3883,61 +3891,110 @@ function EditorialBoardModal({ forum, session, onClose }) {
     });
   };
 
+  const loadProposals = async (board) => {
+    const { data: props } = await supabase.from("forum_board_proposals").select("*").eq("forum_id", forum.id).eq("status", "open").order("created_at", { ascending:true });
+    if (!props || !props.length) return [];
+    const ids = props.map(x => x.id);
+    const uids = [...new Set(props.flatMap(x => [x.target_user, x.proposed_by]))];
+    const [{ data: votes }, { data: profs }] = await Promise.all([
+      supabase.from("forum_board_votes").select("proposal_id, voter, vote, round").in("proposal_id", ids),
+      supabase.from("profiles").select("id, username, full_name").in("id", uids),
+    ]);
+    const nm = (id) => { const pf = (profs || []).find(x => x.id === id); return pf ? (pf.full_name || pf.username || "Member") : "Member"; };
+    const boardIds = new Set(board.map(e => e.user_id));
+    return props.map(pp => {
+      const rv = (votes || []).filter(v => v.proposal_id === pp.id && v.round === pp.round);
+      const approvals = rv.filter(v => v.vote === "approve").length;
+      const rejections = rv.filter(v => v.vote === "reject").length;
+      const eligible = board.length - (pp.kind === "remove" ? 1 : 0);
+      const majority = Math.floor(eligible / 2) + 1;
+      const youVoted = rv.some(v => v.voter === userId);
+      const canVote = boardIds.has(userId) && !(pp.kind === "remove" && pp.target_user === userId) && !youVoted;
+      return { ...pp, targetName: nm(pp.target_user), proposerName: nm(pp.proposed_by), approvals, rejections, eligible, majority, youVoted, canVote };
+    });
+  };
+
+  const reload = async () => {
+    const board = await loadBoard();
+    const props = await loadProposals(board);
+    setEditors(board); setProposals(props);
+  };
+
   useEffect(() => {
     let cancelled = false;
-    (async () => { setLoading(true); const m = await loadBoard(); if (!cancelled) { setEditors(m); setLoading(false); } })();
+    (async () => { setLoading(true); const board = await loadBoard(); const props = await loadProposals(board); if (!cancelled) { setEditors(board); setProposals(props); setLoading(false); } })();
     return () => { cancelled = true; };
   }, [forum.id]);
 
   const canManage = isStaff || editors.some(e => e.user_id === userId);
-  const full = editors.length >= 10;
+  const full = editors.length >= 9;
+  const pendingTargets = new Set(proposals.map(pp => pp.target_user));
 
-  // Live user search (staff/editors only)
   useEffect(() => {
     const q = query.trim().replace(/[%,()]/g, "");
     if (!q || !canManage) { setResults([]); return; }
     let cancelled = false;
     (async () => {
-      const { data } = await supabase.from("profiles").select("id, username, full_name")
-        .or(`username.ilike.%${q}%,full_name.ilike.%${q}%`).limit(8);
+      const { data } = await supabase.from("profiles").select("id, username, full_name").or(`username.ilike.%${q}%,full_name.ilike.%${q}%`).limit(8);
       const editorIds = new Set(editors.map(e => e.user_id));
-      if (!cancelled) setResults((data || []).filter(pp => !editorIds.has(pp.id)));
+      if (!cancelled) setResults((data || []).filter(pp => !editorIds.has(pp.id) && !pendingTargets.has(pp.id)));
     })();
     return () => { cancelled = true; };
-  }, [query, canManage, editors]);
-
-  const addEditor = async (profile) => {
-    if (busy || full) return;
-    setBusy(true);
-    const { error } = await supabase.from("forum_editors").insert({ forum_id: forum.id, user_id: profile.id, added_by: userId });
-    if (!error) { setEditors(await loadBoard()); setQuery(""); setResults([]); }
-    setBusy(false);
-  };
-
-  const removeEditor = async (uid) => {
-    if (busy || editors.length <= 1) return;
-    setBusy(true);
-    const { error } = await supabase.from("forum_editors").delete().eq("forum_id", forum.id).eq("user_id", uid);
-    if (!error) setEditors(prev => prev.filter(e => e.user_id !== uid));
-    setBusy(false);
-  };
+  }, [query, canManage, editors, proposals]);
 
   const nameOf = (e) => e.full_name || e.username || "Board member";
   const initialOf = (e) => (e.full_name || e.username || "?").trim().charAt(0).toUpperCase();
 
+  const vote = async (proposalId, choice) => {
+    if (busy) return; setBusy(true);
+    await supabase.from("forum_board_votes").insert({ proposal_id: proposalId, voter: userId, vote: choice });
+    await reload();
+    setBusy(false);
+  };
+
+  const addEditor = async (profile) => {
+    if (busy || full) return; setBusy(true); setNotice("");
+    if (isStaff) {
+      const { error } = await supabase.from("forum_editors").insert({ forum_id: forum.id, user_id: profile.id, added_by: userId });
+      if (error) setNotice(error.message || "Couldn't add."); else { setQuery(""); setResults([]); await reload(); }
+    } else {
+      const { error } = await supabase.from("forum_board_proposals").insert({ forum_id: forum.id, kind: "add", target_user: profile.id, proposed_by: userId });
+      if (error) setNotice(error.message || "Couldn't open proposal."); else { setQuery(""); setResults([]); await reload(); setNotice(`Proposed adding ${profile.full_name || profile.username || "them"} — the board will vote.`); }
+    }
+    setBusy(false);
+  };
+
+  const removeEditor = async (e) => {
+    if (busy) return; setNotice("");
+    if (isStaff) {
+      if (editors.length <= 1) return;
+      setBusy(true);
+      const { error } = await supabase.from("forum_editors").delete().eq("forum_id", forum.id).eq("user_id", e.user_id);
+      if (!error) await reload();
+      setBusy(false);
+    } else {
+      setBusy(true);
+      const { error } = await supabase.from("forum_board_proposals").insert({ forum_id: forum.id, kind: "remove", target_user: e.user_id, proposed_by: userId });
+      if (error) setNotice(error.message || "Couldn't open proposal."); else { await reload(); setNotice(`Proposed removing ${nameOf(e)} — the board will vote.`); }
+      setBusy(false);
+    }
+  };
+
+  const canRemoveRow = (e) => !pendingTargets.has(e.user_id) && (isStaff ? editors.length > 1 : editors.length >= 3);
+
   return (
     <div onClick={onClose} style={{ position:"fixed", inset:0, zIndex:200, background:"rgba(0,0,0,0.5)", display:"flex", alignItems:"flex-end", justifyContent:"center", animation:"lettersFadeIn 0.2s ease" }}>
       <style>{`@keyframes lettersFadeIn{from{opacity:0}to{opacity:1}}@keyframes lettersSheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}`}</style>
-      <div onClick={e=>e.stopPropagation()} style={{ background:"#F9F6F0", borderRadius:"16px 16px 0 0", width:"100%", maxWidth:560, maxHeight:"86vh", display:"flex", flexDirection:"column", animation:"lettersSheetUp 0.34s cubic-bezier(0.22,1,0.36,1)" }}>
+      <div onClick={e=>e.stopPropagation()} style={{ background:"#F9F6F0", borderRadius:"16px 16px 0 0", width:"100%", maxWidth:560, maxHeight:"88vh", display:"flex", flexDirection:"column", animation:"lettersSheetUp 0.34s cubic-bezier(0.22,1,0.36,1)" }}>
         <div style={{ display:"flex", justifyContent:"center", padding:"12px 0 4px" }}><div style={{ width:36, height:4, borderRadius:2, background:"#DDD8CC" }}/></div>
         <div style={{ padding:"8px 24px 16px", borderBottom:"1px solid #E8E0D0" }}>
           <div style={{ display:"flex", alignItems:"baseline", justifyContent:"space-between", gap:10 }}>
             <div style={{ fontSize:10, letterSpacing:"0.16em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:4 }}>Editorial Board</div>
-            {!loading && <div style={{ fontSize:10, letterSpacing:"0.08em", color: full ? "#C0392B" : "#B0A488", fontFamily:"'DM Mono', monospace" }}>{editors.length} / 10 seats</div>}
+            {!loading && <div style={{ fontSize:10, letterSpacing:"0.08em", color: full ? "#C0392B" : "#B0A488", fontFamily:"'DM Mono', monospace" }}>{editors.length} / 9 seats</div>}
           </div>
           <div style={{ fontFamily:"'Playfair Display', serif", fontSize:22, fontWeight:900, color:"#141414" }}>{forum.name}</div>
           <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:13.5, color:"#888", margin:"4px 0 0", lineHeight:1.5 }}>
-            The board grants verified privileges to this forum's contributors.
+            The board grants verified privileges to contributors. Board changes are decided by a vote{isStaff ? "; staff may act directly" : ""}.
           </p>
         </div>
         <div style={{ overflowY:"auto", flex:1, padding:"14px 24px 24px" }}>
@@ -3945,6 +4002,35 @@ function EditorialBoardModal({ forum, session, onClose }) {
             <div>{[0,1,2].map(i => <div key={i} style={{ height:60, background:"#fff", border:"1px solid #EFE9DD", borderRadius:11, marginBottom:10, opacity:0.5 }}/>)}</div>
           ) : (
             <>
+              {proposals.length > 0 && (
+                <div style={{ marginBottom:18 }}>
+                  <div style={{ fontSize:9.5, letterSpacing:"0.14em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:9 }}>Open votes</div>
+                  {proposals.map(pp => (
+                    <div key={pp.id} style={{ background:"#fff", border:"1px solid #E0D8C8", borderLeft:`3px solid ${pp.kind === "remove" ? "#C0392B" : "#1E8449"}`, borderRadius:11, padding:"13px 15px", marginBottom:10 }}>
+                      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8, marginBottom:6 }}>
+                        <span style={{ fontSize:8.5, letterSpacing:"0.14em", textTransform:"uppercase", color: pp.kind === "remove" ? "#C0392B" : "#1E8449", fontFamily:"'DM Mono', monospace", fontWeight:600 }}>{pp.kind === "remove" ? "Remove" : "Add"}{pp.round > 1 ? " · Revote" : ""}</span>
+                        <span style={{ fontSize:9.5, color:"#B0A488", fontFamily:"'DM Mono', monospace" }}>{fmtLeft(pp.expires_at)}</span>
+                      </div>
+                      <div style={{ fontSize:14.5, fontWeight:600, color:"#141414", fontFamily:"'DM Sans', sans-serif" }}>{pp.targetName}</div>
+                      <div style={{ fontSize:11, color:"#999", fontFamily:"'DM Mono', monospace", marginBottom:9 }}>Proposed by {pp.proposerName}</div>
+                      <div style={{ fontSize:11, color:"#666", fontFamily:"'DM Mono', monospace", marginBottom: pp.canVote ? 10 : 0 }}>
+                        {pp.approvals} approve · {pp.rejections} reject · needs {pp.majority} of {pp.eligible}
+                      </div>
+                      {pp.canVote ? (
+                        <div style={{ display:"flex", gap:8 }}>
+                          <button onClick={() => vote(pp.id, "approve")} disabled={busy} style={{ flex:1, background:"#1E8449", color:"#fff", border:"none", borderRadius:8, padding:"8px 0", fontSize:12.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor: busy ? "default" : "pointer" }}>Approve</button>
+                          <button onClick={() => vote(pp.id, "reject")} disabled={busy} style={{ flex:1, background:"#fff", color:"#C0392B", border:"1px solid #E0C4C0", borderRadius:8, padding:"8px 0", fontSize:12.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor: busy ? "default" : "pointer" }}>Reject</button>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize:11, color:"#B0A488", fontFamily:"'DM Mono', monospace", fontStyle:"italic" }}>{pp.target_user === userId ? "You can't vote on this." : pp.youVoted ? "You voted — awaiting the board." : "Board vote in progress."}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {proposals.length > 0 && <div style={{ fontSize:9.5, letterSpacing:"0.14em", textTransform:"uppercase", color:"#A99F86", fontFamily:"'DM Mono', monospace", marginBottom:9 }}>Board</div>}
+
               {editors.map((e, i) => (
                 <div key={e.user_id} style={{ display:"flex", alignItems:"center", gap:12, background:"#fff", border:"1px solid #E8E0D0", borderRadius:11, padding:"12px 14px", marginBottom:10 }}>
                   <div style={{ width:40, height:40, borderRadius:"50%", background:colorFor(e.user_id), flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", color:"#F4ECD8", fontFamily:"'Playfair Display', serif", fontWeight:700, fontSize:17 }}>{initialOf(e)}</div>
@@ -3952,8 +4038,11 @@ function EditorialBoardModal({ forum, session, onClose }) {
                     <div style={{ fontSize:14.5, fontWeight:600, color:"#141414", fontFamily:"'DM Sans', sans-serif" }}>{nameOf(e)}</div>
                     <div style={{ fontSize:11, color:"#AAA", fontFamily:"'DM Mono', monospace" }}>{e.username ? `@${e.username}` : "Editorial board"}{i === 0 ? " · Chair" : ""}</div>
                   </div>
-                  {canManage && editors.length > 1 && (
-                    <button onClick={() => removeEditor(e.user_id)} disabled={busy} aria-label={`Remove ${nameOf(e)}`}
+                  {canManage && pendingTargets.has(e.user_id) && (
+                    <span style={{ fontSize:8.5, letterSpacing:"0.1em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", border:"1px solid #E7D9B8", borderRadius:20, padding:"3px 9px", flexShrink:0 }}>Vote open</span>
+                  )}
+                  {canManage && canRemoveRow(e) && (
+                    <button onClick={() => removeEditor(e)} disabled={busy} aria-label={`Remove ${nameOf(e)}`}
                       style={{ background:"none", border:"1px solid #ECD9D5", color:"#C0392B", borderRadius:"50%", width:28, height:28, display:"flex", alignItems:"center", justifyContent:"center", cursor: busy ? "default" : "pointer", flexShrink:0, transition:"all 0.15s" }}
                       onMouseEnter={ev => { if(!busy){ ev.currentTarget.style.background="#FBEEEC"; ev.currentTarget.style.borderColor="#C0392B"; } }}
                       onMouseLeave={ev => { ev.currentTarget.style.background="none"; ev.currentTarget.style.borderColor="#ECD9D5"; }}>
@@ -3963,11 +4052,13 @@ function EditorialBoardModal({ forum, session, onClose }) {
                 </div>
               ))}
 
+              {notice && <div style={{ fontSize:12.5, color: notice.startsWith("Proposed") ? "#1E8449" : "#C0392B", fontFamily:"'DM Sans', sans-serif", margin:"2px 0 12px" }}>{notice}</div>}
+
               {canManage && (
                 <div style={{ marginTop:16, paddingTop:16, borderTop:"1px dashed #E0D8C8" }}>
-                  <div style={{ fontSize:9.5, letterSpacing:"0.14em", textTransform:"uppercase", color:"#A99F86", fontFamily:"'DM Mono', monospace", marginBottom:9 }}>Add to board</div>
+                  <div style={{ fontSize:9.5, letterSpacing:"0.14em", textTransform:"uppercase", color:"#A99F86", fontFamily:"'DM Mono', monospace", marginBottom:9 }}>{isStaff ? "Add to board" : "Propose a new member"}</div>
                   {full ? (
-                    <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:13.5, color:"#999", margin:0 }}>All 10 seats are filled. Remove a member to add someone new.</p>
+                    <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:13.5, color:"#999", margin:0 }}>All 9 seats are filled.</p>
                   ) : (
                     <div style={{ position:"relative" }}>
                       <div style={{ display:"flex", alignItems:"center", gap:9, background:"#fff", border:"1px solid #C8BFA8", borderRadius: results.length ? "10px 10px 0 0" : 10, padding:"0 13px", height:44 }}>
@@ -3987,7 +4078,7 @@ function EditorialBoardModal({ forum, session, onClose }) {
                                 <div style={{ fontSize:13.5, fontWeight:600, color:"#141414", fontFamily:"'DM Sans', sans-serif" }}>{pp.full_name || pp.username || "Member"}</div>
                                 {pp.username && <div style={{ fontSize:10.5, color:"#AAA", fontFamily:"'DM Mono', monospace" }}>@{pp.username}</div>}
                               </div>
-                              <span style={{ fontSize:11, color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontWeight:600 }}>Add</span>
+                              <span style={{ fontSize:11, color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontWeight:600 }}>{isStaff ? "Add" : "Propose"}</span>
                             </button>
                           ))}
                         </div>
@@ -3996,6 +4087,139 @@ function EditorialBoardModal({ forum, session, onClose }) {
                   )}
                 </div>
               )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ManageContributorsModal({ forum, session, onClose }) {
+  const userId = session?.user?.id;
+  const [verified, setVerified] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+  const [busy, setBusy] = useState(false);
+  const avatarPalette = ["#2E4A3F","#3A4A5A","#6B4A2E","#4A3A5A","#5A3A3A","#2C3E50"];
+  const colorFor = (id) => avatarPalette[(((id||"x").charCodeAt(0) || 0) + (id||"x").length) % avatarPalette.length];
+
+  const hydrate = async (rows) => {
+    const ids = rows.map(r => r.user_id);
+    if (!ids.length) return [];
+    const { data: pr } = await supabase.from("profiles").select("id, username, full_name").in("id", ids);
+    return rows.map(r => { const pf = (pr || []).find(x => x.id === r.user_id) || {}; return { user_id: r.user_id, username: pf.username, full_name: pf.full_name }; });
+  };
+
+  const load = async () => {
+    const [{ data: vr }, { data: mr }] = await Promise.all([
+      supabase.from("forum_verified").select("user_id, granted_at").eq("forum_id", forum.id).order("granted_at", { ascending:true }),
+      supabase.from("forum_members").select("user_id, joined_at").eq("forum_id", forum.id).order("joined_at", { ascending:true }),
+    ]);
+    const [v, m] = await Promise.all([hydrate(vr || []), hydrate(mr || [])]);
+    return { v, m };
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => { setLoading(true); const { v, m } = await load(); if (!cancelled) { setVerified(v); setMembers(m); setLoading(false); } })();
+    return () => { cancelled = true; };
+  }, [forum.id]);
+
+  const nameOf = (e) => e.full_name || e.username || "Member";
+  const initialOf = (e) => (e.full_name || e.username || "?").trim().charAt(0).toUpperCase();
+  const verifiedIds = new Set(verified.map(x => x.user_id));
+  const q = query.trim().toLowerCase();
+  const pool = members.filter(m => !verifiedIds.has(m.user_id));
+  const candidates = (q ? pool.filter(m => (m.full_name||"").toLowerCase().includes(q) || (m.username||"").toLowerCase().includes(q)) : pool).slice(0, 8);
+
+  const grant = async (m) => {
+    if (busy) return; setBusy(true);
+    const { error } = await supabase.from("forum_verified").insert({ forum_id: forum.id, user_id: m.user_id, granted_by: userId });
+    if (!error) { setVerified(prev => [...prev, m]); setQuery(""); }
+    setBusy(false);
+  };
+  const revoke = async (uid) => {
+    if (busy) return; setBusy(true);
+    const { error } = await supabase.from("forum_verified").delete().eq("forum_id", forum.id).eq("user_id", uid);
+    if (!error) setVerified(prev => prev.filter(x => x.user_id !== uid));
+    setBusy(false);
+  };
+
+  return (
+    <div onClick={onClose} style={{ position:"fixed", inset:0, zIndex:200, background:"rgba(0,0,0,0.5)", display:"flex", alignItems:"flex-end", justifyContent:"center", animation:"lettersFadeIn 0.2s ease" }}>
+      <style>{`@keyframes lettersFadeIn{from{opacity:0}to{opacity:1}}@keyframes lettersSheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}`}</style>
+      <div onClick={e=>e.stopPropagation()} style={{ background:"#F9F6F0", borderRadius:"16px 16px 0 0", width:"100%", maxWidth:560, maxHeight:"88vh", display:"flex", flexDirection:"column", animation:"lettersSheetUp 0.34s cubic-bezier(0.22,1,0.36,1)" }}>
+        <div style={{ display:"flex", justifyContent:"center", padding:"12px 0 4px" }}><div style={{ width:36, height:4, borderRadius:2, background:"#DDD8CC" }}/></div>
+        <div style={{ padding:"8px 24px 16px", borderBottom:"1px solid #E8E0D0" }}>
+          <div style={{ fontSize:10, letterSpacing:"0.16em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:4 }}>Verified Contributors</div>
+          <div style={{ fontFamily:"'Playfair Display', serif", fontSize:22, fontWeight:900, color:"#141414" }}>{forum.name}</div>
+          <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:13.5, color:"#888", margin:"4px 0 0", lineHeight:1.5 }}>
+            Verified contributors can publish their longform Letters into this forum. Only forum members can be verified.
+          </p>
+        </div>
+        <div style={{ overflowY:"auto", flex:1, padding:"14px 24px 24px" }}>
+          {loading ? (
+            <div>{[0,1,2].map(i => <div key={i} style={{ height:56, background:"#fff", border:"1px solid #EFE9DD", borderRadius:11, marginBottom:10, opacity:0.5 }}/>)}</div>
+          ) : (
+            <>
+              {verified.length === 0 ? (
+                <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", color:"#999", fontSize:14, margin:"4px 0 8px" }}>No verified contributors yet.</p>
+              ) : (
+                verified.map(e => (
+                  <div key={e.user_id} style={{ display:"flex", alignItems:"center", gap:12, background:"#fff", border:"1px solid #E8E0D0", borderRadius:11, padding:"11px 14px", marginBottom:10 }}>
+                    <div style={{ width:38, height:38, borderRadius:"50%", background:colorFor(e.user_id), flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", color:"#F4ECD8", fontFamily:"'Playfair Display', serif", fontWeight:700, fontSize:16 }}>{initialOf(e)}</div>
+                    <div style={{ minWidth:0, flex:1 }}>
+                      <div style={{ fontSize:14, fontWeight:600, color:"#141414", fontFamily:"'DM Sans', sans-serif", display:"flex", alignItems:"center", gap:5 }}>
+                        {nameOf(e)}
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="#C8A96E"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0 1 12 2.944a11.955 11.955 0 0 1-8.618 3.04A12.02 12.02 0 0 0 3 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                      </div>
+                      <div style={{ fontSize:11, color:"#AAA", fontFamily:"'DM Mono', monospace" }}>{e.username ? `@${e.username}` : "Verified"}</div>
+                    </div>
+                    <button onClick={() => revoke(e.user_id)} disabled={busy} aria-label="Revoke"
+                      style={{ background:"none", border:"1px solid #ECD9D5", color:"#C0392B", borderRadius:"50%", width:28, height:28, display:"flex", alignItems:"center", justifyContent:"center", cursor: busy ? "default" : "pointer", flexShrink:0 }}
+                      onMouseEnter={ev => { if(!busy){ ev.currentTarget.style.background="#FBEEEC"; } }}
+                      onMouseLeave={ev => ev.currentTarget.style.background="none"}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                    </button>
+                  </div>
+                ))
+              )}
+
+              <div style={{ marginTop:16, paddingTop:16, borderTop:"1px dashed #E0D8C8" }}>
+                <div style={{ fontSize:9.5, letterSpacing:"0.14em", textTransform:"uppercase", color:"#A99F86", fontFamily:"'DM Mono', monospace", marginBottom:9 }}>Verify a member</div>
+                {pool.length === 0 ? (
+                  <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:13.5, color:"#999", margin:0 }}>
+                    Everyone who has joined is already verified. People must join the forum before they can be verified.
+                  </p>
+                ) : (
+                  <>
+                    <div style={{ display:"flex", alignItems:"center", gap:9, background:"#fff", border:"1px solid #C8BFA8", borderRadius:10, padding:"0 13px", height:44, marginBottom:8 }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#B0A488" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+                      <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search members by name or @username…"
+                        style={{ flex:1, border:"none", outline:"none", background:"transparent", fontSize:14, fontFamily:"'DM Sans', sans-serif", color:"#141414" }}/>
+                    </div>
+                    {candidates.length === 0 ? (
+                      <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:13, color:"#AAA", margin:"6px 2px" }}>No members match that.</p>
+                    ) : (
+                      candidates.map(m => (
+                        <button key={m.user_id} onClick={() => grant(m)} disabled={busy}
+                          style={{ display:"flex", alignItems:"center", gap:11, width:"100%", textAlign:"left", background:"#fff", border:"1px solid #EFE9DD", borderRadius:10, padding:"9px 12px", marginBottom:7, cursor: busy ? "default" : "pointer" }}
+                          onMouseEnter={ev => { if(!busy) ev.currentTarget.style.borderColor="#C8A96E"; }}
+                          onMouseLeave={ev => ev.currentTarget.style.borderColor="#EFE9DD"}>
+                          <div style={{ width:30, height:30, borderRadius:"50%", background:colorFor(m.user_id), flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", color:"#F4ECD8", fontFamily:"'Playfair Display', serif", fontWeight:700, fontSize:13 }}>{initialOf(m)}</div>
+                          <div style={{ minWidth:0, flex:1 }}>
+                            <div style={{ fontSize:13.5, fontWeight:600, color:"#141414", fontFamily:"'DM Sans', sans-serif" }}>{nameOf(m)}</div>
+                            {m.username && <div style={{ fontSize:10.5, color:"#AAA", fontFamily:"'DM Mono', monospace" }}>@{m.username}</div>}
+                          </div>
+                          <span style={{ fontSize:11, color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontWeight:600 }}>Verify</span>
+                        </button>
+                      ))
+                    )}
+                  </>
+                )}
+              </div>
             </>
           )}
         </div>
@@ -4013,6 +4237,9 @@ function ForumDetailPage({ session, onNavigate }) {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showBoard, setShowBoard] = useState(false);
+  const [showContributors, setShowContributors] = useState(false);
+  const [isEditor, setIsEditor] = useState(false);
+  const isStaff = !!session?.user?.email && session.user.email.toLowerCase().endsWith("@tryletters.tech");
 
   useEffect(() => {
     let cancelled = false;
@@ -4021,12 +4248,15 @@ function ForumDetailPage({ session, onNavigate }) {
       const { data: f } = await supabase.from("forums").select("*").eq("slug", slug).maybeSingle();
       if (!f) { if (!cancelled) { setForum(null); setLoading(false); } return; }
       let isJoined = false;
+      let editor = false;
       if (userId) {
         const { data: m } = await supabase.from("forum_members").select("forum_id").eq("forum_id", f.id).eq("user_id", userId).maybeSingle();
         isJoined = !!m;
+        const { data: ed } = await supabase.from("forum_editors").select("forum_id").eq("forum_id", f.id).eq("user_id", userId).maybeSingle();
+        editor = !!ed;
       }
       const { data: pp } = await supabase.from("letters").select("id, title, body, created_at").eq("forum_id", f.id).order("created_at", { ascending:false }).limit(30);
-      if (!cancelled) { setForum(f); setJoined(isJoined); setPosts(pp || []); setLoading(false); }
+      if (!cancelled) { setForum(f); setJoined(isJoined); setIsEditor(editor); setPosts(pp || []); setLoading(false); }
     })();
     return () => { cancelled = true; };
   }, [slug, userId]);
@@ -4096,6 +4326,15 @@ function ForumDetailPage({ session, onNavigate }) {
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             Editorial Board
           </button>
+          {(isStaff || isEditor) && (
+            <button onClick={() => setShowContributors(true)}
+              style={{ display:"inline-flex", alignItems:"center", gap:6, background:"#fff", color:"#6B6250", border:"1px solid #E0D8C8", borderRadius:22, padding:"9px 16px", fontSize:13, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:"pointer", transition:"all 0.15s" }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor="#C8A96E"; e.currentTarget.style.color="#141414"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor="#E0D8C8"; e.currentTarget.style.color="#6B6250"; }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M16 11l2 2 4-4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/><circle cx="9" cy="9" r="3"/><path d="M3 19a5 5 0 0 1 9-3"/></svg>
+              Contributors
+            </button>
+          )}
           <button onClick={toggleJoin} disabled={!userId}
             style={{ background: joined ? "#F0EDE8" : "#111", color: joined ? "#888" : "#F0EAD8", border: joined ? "1px solid #E0D8C8" : "none", borderRadius:22, padding:"9px 20px", fontSize:13, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor: userId ? "pointer" : "default", flexShrink:0, transition:"all 0.15s" }}>
             {joined ? "Joined" : "Join"}
@@ -4109,8 +4348,8 @@ function ForumDetailPage({ session, onNavigate }) {
         {posts.length === 0 ? (
           <div style={{ textAlign:"center", padding:"40px 20px", background:"#fff", border:"1px dashed #E0D8C8", borderRadius:12 }}>
             <div style={{ fontFamily:"'Playfair Display', serif", fontSize:18, fontWeight:700, color:"#333", marginBottom:6 }}>No letters here yet</div>
-            <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:14.5, color:"#999", margin:"0 auto", maxWidth:340, lineHeight:1.55 }}>
-              Posting straight into a forum is coming next — soon you'll be able to write a letter into {forum.name}.
+            <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:14.5, color:"#999", margin:"0 auto", maxWidth:360, lineHeight:1.55 }}>
+              Verified contributors publish here by writing a Letter and typing <strong>#{forum.name}</strong> to publish it into this forum.
             </p>
           </div>
         ) : (
@@ -4124,6 +4363,7 @@ function ForumDetailPage({ session, onNavigate }) {
         )}
       </div>
       {showBoard && <EditorialBoardModal forum={forum} session={session} onClose={() => setShowBoard(false)}/>}
+      {showContributors && <ManageContributorsModal forum={forum} session={session} onClose={() => setShowContributors(false)}/>}
     </main>
   );
 }
@@ -4164,6 +4404,23 @@ function YouPage({ session, onSignOut }) {
   const [loadingActivity, setLoadingActivity] = useState(true);
   const [realStats, setRealStats] = useState({ letters: 0, replies: 0, likes: 0 });
   const [savingField, setSavingField] = useState(null); // "bio" | "location" | null, for subtle saving feedback
+  const [verifiedForums, setVerifiedForums] = useState([]);
+  useEffect(() => {
+    const uid = session?.user?.id;
+    if (!uid) return;
+    let cancelled = false;
+    (async () => {
+      const [{ data: v }, { data: e }] = await Promise.all([
+        supabase.from("forum_verified").select("forum_id").eq("user_id", uid),
+        supabase.from("forum_editors").select("forum_id").eq("user_id", uid),
+      ]);
+      const ids = [...new Set([...(v || []).map(r => r.forum_id), ...(e || []).map(r => r.forum_id)])];
+      if (!ids.length) { if (!cancelled) setVerifiedForums([]); return; }
+      const { data: forums } = await supabase.from("forums").select("id, name, slug").in("id", ids).order("name");
+      if (!cancelled) setVerifiedForums(forums || []);
+    })();
+    return () => { cancelled = true; };
+  }, [session?.user?.id]);
 
   // Real follower / following counts from the follows table
   useEffect(() => {
@@ -4413,6 +4670,22 @@ function YouPage({ session, onSignOut }) {
               <span style={{ fontSize:10, color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontStyle:"italic", display:"block", marginTop:6 }}>Saving...</span>
             )}
           </div>
+
+          {/* Verified in forums */}
+          {verifiedForums.length > 0 && (
+            <div style={{ padding:"12px 0 14px", borderTop:"1px solid #F0EDE8", fontSize:14, lineHeight:1.85 }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="#C8A96E" style={{ verticalAlign:"-2px", marginRight:7 }}><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0 1 12 2.944a11.955 11.955 0 0 1-8.618 3.04A12.02 12.02 0 0 0 3 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+              <span style={{ fontFamily:"'EB Garamond', Georgia, serif", fontStyle:"italic", fontSize:14.5, color:"#9A8E76", marginRight:6 }}>Verified in</span>
+              {verifiedForums.map((f, i) => (
+                <span key={f.id}>
+                  <button onClick={() => navigate(`/forums/${f.slug}`)}
+                    style={{ background:"none", border:"none", padding:0, cursor:"pointer", fontFamily:"'DM Sans', sans-serif", fontSize:13.5, fontWeight:600, color:"#2E2A22", borderBottom:"1px solid transparent", transition:"border-color 0.15s" }}
+                    onMouseEnter={e => e.currentTarget.style.borderColor="#C8A96E"}
+                    onMouseLeave={e => e.currentTarget.style.borderColor="transparent"}>{f.name}</button>{i < verifiedForums.length - 1 ? <span style={{ color:"#B0A488" }}>, </span> : ""}
+                </span>
+              ))}
+            </div>
+          )}
 
           {/* Stats row */}
           <div style={{ display:"flex", gap:0, borderTop:"1px solid #F0EDE8", marginBottom:0 }}>
@@ -5519,6 +5792,67 @@ function InvitePage({ navigate }) {
 // old setTab("write")-style calls into real navigation, so every existing
 // page component (FeedPage, ReadPage, WritePage, ForumsPage, YouPage) keeps
 // working with minimal internal changes.
+function BoardVoteAlert({ session }) {
+  const userId = session?.user?.id;
+  const [pending, setPending] = useState([]);
+  const [dismissed, setDismissed] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    (async () => {
+      const { data: ed } = await supabase.from("forum_editors").select("forum_id").eq("user_id", userId);
+      const forumIds = (ed || []).map(r => r.forum_id);
+      if (!forumIds.length) return;
+      const { data: props } = await supabase.from("forum_board_proposals").select("*").in("forum_id", forumIds).eq("status", "open");
+      const relevant = (props || []).filter(pp => !(pp.kind === "remove" && pp.target_user === userId));
+      if (!relevant.length) return;
+      const ids = relevant.map(pp => pp.id);
+      const { data: myVotes } = await supabase.from("forum_board_votes").select("proposal_id, round").eq("voter", userId).in("proposal_id", ids);
+      const voted = new Set((myVotes || []).filter(v => { const pp = relevant.find(x => x.id === v.proposal_id); return pp && v.round === pp.round; }).map(v => v.proposal_id));
+      const todo = relevant.filter(pp => !voted.has(pp.id));
+      if (!todo.length) return;
+      const [{ data: fs }, { data: profs }] = await Promise.all([
+        supabase.from("forums").select("id, name, slug").in("id", [...new Set(todo.map(pp => pp.forum_id))]),
+        supabase.from("profiles").select("id, username, full_name").in("id", [...new Set(todo.flatMap(pp => [pp.target_user, pp.proposed_by]))]),
+      ]);
+      const fById = {}; (fs || []).forEach(f => fById[f.id] = f);
+      const nm = (id) => { const pf = (profs || []).find(x => x.id === id); return pf ? (pf.full_name || pf.username || "Member") : "Member"; };
+      const enriched = todo.map(pp => ({ ...pp, forumName: (fById[pp.forum_id] || {}).name || "a forum", targetName: nm(pp.target_user), proposerName: nm(pp.proposed_by) }));
+      if (!cancelled) setPending(enriched);
+    })();
+    return () => { cancelled = true; };
+  }, [userId]);
+
+  const vote = async (pp, choice) => {
+    if (busy) return; setBusy(true);
+    await supabase.from("forum_board_votes").insert({ proposal_id: pp.id, voter: userId, vote: choice });
+    setPending(prev => prev.filter(x => x.id !== pp.id));
+    setBusy(false);
+  };
+
+  if (dismissed || pending.length === 0) return null;
+  const pp = pending[0];
+  return (
+    <div style={{ position:"fixed", inset:0, zIndex:400, background:"rgba(0,0,0,0.55)", display:"flex", alignItems:"center", justifyContent:"center", padding:20, animation:"lettersFadeIn 0.2s ease" }}>
+      <style>{`@keyframes lettersFadeIn{from{opacity:0}to{opacity:1}}@keyframes lettersPop{from{opacity:0;transform:translateY(10px) scale(0.98)}to{opacity:1;transform:none}}`}</style>
+      <div style={{ background:"#F9F6F0", borderRadius:16, width:"100%", maxWidth:420, padding:"24px", animation:"lettersPop 0.28s cubic-bezier(0.22,1,0.36,1)", boxShadow:"0 20px 50px rgba(0,0,0,0.3)" }}>
+        <div style={{ fontSize:10, letterSpacing:"0.16em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:8 }}>Board decision needed{pending.length > 1 ? ` · ${pending.length} pending` : ""}</div>
+        <div style={{ fontFamily:"'Playfair Display', serif", fontSize:20, fontWeight:900, color:"#141414", marginBottom:8 }}>{pp.forumName}</div>
+        <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:15.5, lineHeight:1.6, color:"#444", margin:"0 0 18px" }}>
+          <strong>{pp.proposerName}</strong> proposed to {pp.kind === "remove" ? "remove" : "add"} <strong>{pp.targetName}</strong> {pp.kind === "remove" ? "from" : "to"} the editorial board{pp.round > 1 ? " (revote)" : ""}.
+        </p>
+        <div style={{ display:"flex", gap:10, marginBottom:12 }}>
+          <button onClick={() => vote(pp, "approve")} disabled={busy} style={{ flex:1, background:"#1E8449", color:"#fff", border:"none", borderRadius:10, padding:"11px 0", fontSize:13.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor: busy ? "default" : "pointer" }}>Approve</button>
+          <button onClick={() => vote(pp, "reject")} disabled={busy} style={{ flex:1, background:"#fff", color:"#C0392B", border:"1px solid #E0C4C0", borderRadius:10, padding:"11px 0", fontSize:13.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor: busy ? "default" : "pointer" }}>Reject</button>
+        </div>
+        <button onClick={() => setDismissed(true)} style={{ width:"100%", background:"none", border:"none", color:"#B0A488", fontFamily:"'DM Mono', monospace", fontSize:11.5, letterSpacing:"0.04em", cursor:"pointer" }}>Ignore for now</button>
+      </div>
+    </div>
+  );
+}
+
 function AuthenticatedApp({ session, handleSignOut }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -5618,6 +5952,8 @@ function AuthenticatedApp({ session, handleSignOut }) {
         <Route path="/guide" element={<GuidePage session={session} onNavigate={goToTab}/>}/>
         <Route path="*" element={<Navigate to="/feed" replace/>}/>
       </Routes>
+
+      {session && <BoardVoteAlert session={session}/>}
 
       {/* Global mobile bottom nav */}
       <div className="letters-bottom-nav">
