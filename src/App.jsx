@@ -3686,7 +3686,7 @@ function RequestForumModal({ onClose, session, initialName }) {
 function CreateForumModal({ session, onClose, onCreated, initialName }) {
   const slugify = (s) => (s || "").toLowerCase().trim()
     .replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
-  const [form, setForm] = useState({ name: initialName || "", slug: slugify(initialName || ""), type:"topic", topic:"", description:"", color:"#1A1A1A", cover_image:"", verified:false, live:false });
+  const [form, setForm] = useState({ name: initialName || "", slug: slugify(initialName || ""), type:"topic", topic:"", description:"", color:"#1A1A1A", cover_image:"", verified:false, live:false, post_policy:"verified" });
   const [slugEdited, setSlugEdited] = useState(false);
   const [focused, setFocused] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -3706,7 +3706,7 @@ function CreateForumModal({ session, onClose, onCreated, initialName }) {
       slug, name, type: form.type, verified: form.verified,
       description: form.description.trim() || null, topic: form.topic || null,
       color: form.color, cover_image: form.cover_image.trim() || null,
-      live: form.live, created_by: session?.user?.id || null,
+      post_policy: form.post_policy, live: form.live, created_by: session?.user?.id || null,
     }).select().maybeSingle();
     setSubmitting(false);
     if (err) {
@@ -3770,6 +3770,16 @@ function CreateForumModal({ session, onClose, onCreated, initialName }) {
           <div>
             <label style={labelStyle}>Cover Image URL (optional)</label>
             <input type="text" placeholder="https://…" value={form.cover_image} onChange={e=>set("cover_image",e.target.value)} onFocus={()=>setFocused("cover")} onBlur={()=>setFocused(null)} style={{...inputStyle("cover"), fontFamily:"'DM Mono', monospace", fontSize:12.5}}/>
+          </div>
+          <div>
+            <label style={labelStyle}>Who can post</label>
+            <select value={form.post_policy} onChange={e=>set("post_policy", e.target.value)} style={{...inputStyle("policy"), cursor:"pointer"}}>
+              <option value="verified">Verified contributors only</option>
+              <option value="open">Any forum member</option>
+            </select>
+            <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:12.5, color:"#999", margin:"6px 0 0", lineHeight:1.4 }}>
+              {form.post_policy === "open" ? "Any member who joins can publish letters here." : "Only verified contributors (and the board) can publish here."}
+            </p>
           </div>
           <div style={{ display:"flex", gap:22 }}>
             <label style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer" }}>
@@ -4656,6 +4666,18 @@ function ForumDetailPage({ session, onNavigate }) {
         </div>
       </div>
       {forum.description && <p style={{ fontFamily:"'EB Garamond', serif", fontSize:16, lineHeight:1.6, color:"#555", margin:"0 0 26px" }}>{forum.description}</p>}
+
+      {isStaff && (
+        <div style={{ display:"flex", alignItems:"center", gap:9, marginBottom:20, fontSize:11.5, color:"#8A7A55", fontFamily:"'DM Mono', monospace" }}>
+          <span style={{ letterSpacing:"0.04em" }}>Who can post:</span>
+          <select value={forum.post_policy || "verified"}
+            onChange={async (e) => { const v = e.target.value; setForum(prev => prev ? { ...prev, post_policy: v } : prev); await supabase.from("forums").update({ post_policy: v }).eq("id", forum.id); }}
+            style={{ fontFamily:"'DM Mono', monospace", fontSize:11.5, color:"#141414", background:"#fff", border:"1px solid #E0D8C8", borderRadius:6, padding:"4px 8px", cursor:"pointer" }}>
+            <option value="verified">Verified contributors only</option>
+            <option value="open">Any member</option>
+          </select>
+        </div>
+      )}
 
       <div style={{ borderTop:"1px solid #E8E0D0", paddingTop:22 }}>
         {(() => {
