@@ -5178,7 +5178,6 @@ function GuidePage({ session, onNavigate }) {
   const H3 = ({ children }) => <h3 style={{ fontFamily:"'Playfair Display', serif", fontSize:17, fontWeight:800, color:"#222", margin:"22px 0 8px" }}>{children}</h3>;
   const P = ({ children }) => <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:16.5, lineHeight:1.72, color:"#40382C", margin:"0 0 14px" }}>{children}</p>;
   const B = ({ children }) => <strong style={{ fontWeight:700, color:"#141414" }}>{children}</strong>;
-  const Pill = () => <span style={{ display:"inline-block", fontSize:8.5, letterSpacing:"0.14em", textTransform:"uppercase", color:"#B0873E", background:"#F5EEDD", border:"1px solid #E7D9B8", borderRadius:20, padding:"2px 8px", fontFamily:"'DM Mono', monospace", marginLeft:6 }}>Rolling out</span>;
 
   return (
     <div className="letters-main" style={{ minHeight:"100vh", background:"#F9F6F0", paddingBottom:70 }}>
@@ -5206,42 +5205,50 @@ function GuidePage({ session, onNavigate }) {
         <P><B>Letters staff</B> can create a forum directly, and it goes live immediately. <B>Everyone else</B> submits a request, which staff review and create if approved. Whoever creates a forum automatically becomes its first member and the <B>Chair</B> of its editorial board.</P>
 
         <H2>Editorial Boards</H2>
-        <P>Every forum is governed by an <B>editorial board</B> of up to <B>10 members</B>. The board is the forum's steward: it decides who may publish there, and it manages its own membership. Anyone can view a forum's board; only staff and board members see the management controls.</P>
+        <P>Every forum is governed by an <B>editorial board</B> of up to <B>9 members</B> — an odd cap, so votes stay decisive. The board is the forum's steward: it decides who may publish there, how open the forum is, and who sits on the board itself. Anyone can view a forum's board; only staff and board members see the management controls.</P>
 
         <H3>Verified contributors</H3>
-        <P><B>Verification</B> is a privilege the board grants. A verified contributor may publish their longform <B>Letters</B> (the 500+ character, newsletter-style pieces) into that forum. It reflects the board's editorial judgment about who publishes under the forum's banner — not something membership confers.</P>
-        <P>Your profile will list the forums you're verified in — for example, <em>"Verified in NBA, New York Times, and Hunting forums."</em> <Pill/> And when writing, you'll be able to type <B>#</B> to publish into a trending topic or into a forum where you're verified. <Pill/></P>
+        <P><B>Verification</B> is a privilege the board grants, and it requires that the person has <B>joined</B> the forum first. A verified contributor may publish their longform <B>Letters</B> into that forum. It reflects the board's editorial judgment about who publishes under the forum's banner — not something membership alone confers. Leaving a forum gives up any verification you held there.</P>
+        <P>Your profile lists the forums you're verified in — for example, <em>"Verified in Politics &amp; Policy, Technology, and the Founder's Forum."</em></P>
+
+        <H2>Who Can Publish: Post Policies</H2>
+        <P>Each forum sets its own <B>posting policy</B>, and its board can change it at any time. It governs one thing only — who may <B>publish</B> into the forum. Reading and joining are always open to anyone.</P>
+        <P><B>Verified</B> (the default) — only verified contributors, board members, and staff may publish. This keeps the forum's front page curated.</P>
+        <P><B>Open</B> — any <B>member</B> may publish, no verification needed. Better suited to lively, discussion-first rooms.</P>
 
         <H2>How Board Decisions Are Made</H2>
-        <P>Board membership is a <B>collective decision</B>, not something any single editor can impose.</P>
+        <P>Changing the board — whether <B>adding</B> or <B>removing</B> a member — is a <B>collective decision</B>, not something any single editor can impose. Both run through the same proposal-and-vote process.</P>
 
-        <H3>Adding a member</H3>
-        <P>Any board member (or staff) may <B>add</B> someone directly, up to the 10-seat limit. Adding is immediate — no vote.</P>
-
-        <H3>Removing a member</H3>
-        <P>Removal is a board vote. When an editor starts a removal, a <B>proposal</B> opens against that member and the rest of the board votes to approve or reject; the proposer's action counts as one approval. When it passes, the removal executes automatically.</P>
-        <P><B>Threshold:</B> a majority of the <B>non-target board</B> must approve — the target doesn't vote and isn't counted. On a 4-person board, removing one needs 2 of the remaining 3.</P>
-        <P><B>Small boards:</B> editor-initiated removals require a board of <B>3 or more</B>. On a 2-person board an editor can't start one, so no one can unilaterally oust their only colleague.</P>
-        <P><B>Lifecycle:</B> a proposal stays open until it's approved, until reject votes make approval impossible, or until <B>7 days</B> pass — whichever comes first. There's one open removal per member at a time, and the member being voted on can see it but can't vote. <Pill/></P>
+        <H3>Proposals &amp; votes</H3>
+        <P>When an editor proposes an add or a removal, a <B>proposal</B> opens and the eligible board votes to approve or reject. The proposer's own action counts as their approval. Once enough approvals land, the change executes automatically.</P>
+        <P><B>Threshold:</B> a <B>majority of eligible voters</B> must approve. For an add, the whole board is eligible; for a removal, the person being removed neither votes nor counts. On a five-person board, an add needs three approvals, and a removal needs three of the remaining four.</P>
+        <P><B>New &amp; small boards:</B> when you create a forum you're its only board member — the <B>Chair</B> — so your earliest additions pass instantly, since you're the only vote. As the board grows, additions need real support. Editor-initiated <B>removals</B> require a board of at least <B>3</B>; on a two-person board, neither editor can move to remove the other.</P>
+        <P><B>Ties &amp; expiry:</B> a proposal stays open until it's decided or until <B>48 hours</B> pass. If every eligible editor votes and it lands in an exact tie, the proposal gets <B>one fresh revote</B> — another 48 hours — and a second tie fails it. There's one open proposal per person at a time, and the person in a removal vote can see it but can't vote on it.</P>
 
         <H3>Staff override &amp; safeguards</H3>
         <P>Letters staff can add or remove board members <B>directly, without a vote</B> — they seat initial boards, resolve disputes, and break deadlocks. And a forum can never be left empty-handed: the <B>last remaining board member cannot be removed</B>.</P>
+
+        <H2>Topics &amp; Hashtags</H2>
+        <P>When you write, type <B>#</B> to tag your piece. A menu suggests <B>trending topics</B> and the forums you're able to publish into. Published tags become tappable gold tokens, and every tag has its own <B>topic page</B> that gathers everything written under it — so a well-chosen hashtag is a doorway into a conversation, not just decoration.</P>
+
+        <H2>Your Inbox</H2>
+        <P>The <B>Inbox</B> keeps you on top of the things that need you. It collects the <B>board votes</B> you're asked to weigh in on — with <B>Approve</B> and <B>Reject</B> right there — along with <B>board decisions</B> once they're settled, and <B>verification</B> grants when a forum makes you a contributor. A badge in the navigation counts anything unread.</P>
 
         <H2>Roles at a Glance</H2>
         <div style={{ overflowX:"auto" }}>
           <table style={{ width:"100%", borderCollapse:"collapse" }}>
             <thead>
               <tr style={{ borderBottom:"2px solid #141414" }}>
-                {["Role","Read","Join","Publish longform","Grant verification","Manage board"].map(h => (
+                {["Role","Read","Join","Publish in forum","Grant verification","Manage board"].map(h => (
                   <th key={h} style={{ textAlign:"left", padding:"8px 10px 8px 0", fontSize:9, letterSpacing:"0.06em", textTransform:"uppercase", color:"#888", fontFamily:"'DM Mono', monospace", fontWeight:500 }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {[
-                ["Member","yes","yes","—","—","—"],
+                ["Member","yes","yes","open forums only","—","—"],
                 ["Verified contributor","yes","yes","that forum","—","—"],
-                ["Board member","yes","yes","yes","yes","add direct · remove by vote"],
+                ["Board member","yes","yes","yes","yes","add & remove by vote"],
                 ["Letters staff","yes","yes","yes","yes","direct"],
               ].map((row, ri) => (
                 <tr key={ri} style={{ borderBottom:"1px solid #EEE8DA" }}>
@@ -5255,7 +5262,7 @@ function GuidePage({ session, onNavigate }) {
         </div>
 
         <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:13.5, color:"#A99F86", margin:"32px 0 0", textAlign:"center" }}>
-          Sections for the Feed, Read, and Write experiences will join this guide as they're finalized.
+          The Feed, Read, and Write sections of this guide will grow over time.
         </p>
       </main>
     </div>
