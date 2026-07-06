@@ -29,6 +29,43 @@ function BroadsheetRule({ left, center, right }) {
 }
 
 // ── Shared: Top Bar ───────────────────────────────────────────────────────────
+// Wrap #tags found in text nodes with tappable links to their topic pages.
+// Walks text nodes only, so hex colors in style attributes etc. are never touched.
+function linkifyTags(html) {
+  if (typeof window === "undefined" || !html || html.indexOf("#") === -1) return html || "";
+  try {
+    const doc = new DOMParser().parseFromString("<div>" + html + "</div>", "text/html");
+    const root = doc.body.firstChild;
+    const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    const re = /#([a-zA-Z0-9_-]+)/g;
+    nodes.forEach(node => {
+      const val = node.nodeValue || "";
+      if (val.indexOf("#") === -1) return;
+      if (node.parentNode && node.parentNode.closest && node.parentNode.closest("a")) return;
+      re.lastIndex = 0;
+      let m, last = 0, changed = false;
+      const frag = doc.createDocumentFragment();
+      while ((m = re.exec(val))) {
+        changed = true;
+        if (m.index > last) frag.appendChild(doc.createTextNode(val.slice(last, m.index)));
+        const a = doc.createElement("a");
+        a.setAttribute("data-topic", m[1].toLowerCase());
+        a.setAttribute("class", "letters-tag");
+        a.textContent = "#" + m[1];
+        frag.appendChild(a);
+        last = m.index + m[0].length;
+      }
+      if (changed) {
+        if (last < val.length) frag.appendChild(doc.createTextNode(val.slice(last)));
+        node.parentNode.replaceChild(frag, node);
+      }
+    });
+    return root.innerHTML;
+  } catch (e) { return html; }
+}
+
 // ── Brand image placeholders (shown when an image is missing or fails) ──
 function LMark({ size = 24 }) {
   return (
@@ -116,7 +153,7 @@ function TopBar({ title, onSignOut, rightAction, maxWidth = 680, onLogoClick }) 
 }
 
 // ── Shared: Bottom Tab Bar ────────────────────────────────────────────────────
-function BottomNav({ active, onNavigate }) {
+function BottomNav({ active, onNavigate, unread = 0 }) {
   const tabs = [
     {
       id: "feed",
@@ -170,6 +207,15 @@ function BottomNav({ active, onNavigate }) {
         </svg>
       )
     },
+    {
+      id: "inbox",
+      label: "Inbox",
+      icon: (active) => (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active ? "#111" : "#999"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+      )
+    },
   ];
 
   return (
@@ -193,7 +239,12 @@ function BottomNav({ active, onNavigate }) {
             fontSize:10, fontWeight: active === tab.id ? 600 : 400,
             letterSpacing:"0.02em",
           }}>
-          {tab.icon(active === tab.id)}
+          <span style={{ position:"relative", display:"flex" }}>
+            {tab.icon(active === tab.id)}
+            {tab.id === "inbox" && unread > 0 && (
+              <span style={{ position:"absolute", top:-4, right:-7, background:"#C0392B", color:"#fff", fontSize:8, fontWeight:700, minWidth:14, height:14, borderRadius:7, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 3px", fontFamily:"'DM Sans', sans-serif" }}>{unread > 9 ? "9+" : unread}</span>
+            )}
+          </span>
           {tab.label}
         </button>
       ))}
@@ -202,13 +253,14 @@ function BottomNav({ active, onNavigate }) {
 }
 
 // ── Right Nav (desktop only) ──────────────────────────────────────────────────
-function RightNav({ active, onNavigate }) {
+function RightNav({ active, onNavigate, unread = 0 }) {
   const tabs = [
     { id:"feed",   label:"Feed",   icon: (isActive) => <svg width="20" height="20" viewBox="0 0 24 24" fill={isActive?"#111":"none"} stroke={isActive?"#111":"#999"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
     { id:"read",   label:"Read",   icon: (isActive) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={isActive?"#111":"#999"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg> },
     { id:"write",  label:"Write",  icon: (isActive) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={isActive?"#111":"#999"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> },
     { id:"forums", label:"Forums", icon: (isActive) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={isActive?"#111":"#999"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
     { id:"you",    label:"You",    icon: (isActive) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={isActive?"#111":"#999"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
+    { id:"inbox",  label:"Inbox",  icon: (isActive) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={isActive?"#111":"#999"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> },
   ];
 
   return (
@@ -222,7 +274,7 @@ function RightNav({ active, onNavigate }) {
             background: active===t.id ? "#F9F6F0" : "none",
             border:"none", cursor:"pointer",
             display:"flex", alignItems:"center", gap:10,
-            padding:"12px 16px", margin:"1px 8px",
+            padding:"12px 16px", margin:"1px 8px", width:"calc(100% - 16px)", boxSizing:"border-box",
             borderRadius:10,
             color: active===t.id ? "#111" : "#999",
             fontFamily:"'DM Sans', sans-serif", fontSize:13.5,
@@ -235,6 +287,7 @@ function RightNav({ active, onNavigate }) {
         >
           <span style={{ color: active===t.id ? "#C8A96E" : "#CCC", display:"flex", flexShrink:0 }}>{t.icon(active===t.id)}</span>
           {t.label}
+          {t.id === "inbox" && unread > 0 && <span style={{ marginLeft:"auto", background:"#C0392B", color:"#fff", fontSize:9.5, fontWeight:700, minWidth:16, height:16, borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 4px", fontFamily:"'DM Sans', sans-serif" }}>{unread > 9 ? "9+" : unread}</span>}
         </button>
       ))}
     </div>
@@ -1054,9 +1107,35 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
   // Minimal derivation needed early — full combinedFeed-based lookup happens
   // later once republishEntries/mockFeed are in scope; this covers the most
   // common case (a real letter) for the likes/replies effect below.
+  const [fetchedLetter, setFetchedLetter] = useState(null);
   const openLetterEarly = letterId
-    ? realLetters.find(item => item.dbId === letterId) || null
+    ? realLetters.find(item => item.dbId === letterId) || fetchedLetter || null
     : null;
+
+  // Deep-link fallback: fetch a letter by id when it is not in the loaded feed
+  // (e.g. opening a forum post, or a bookmarked/shared letter link).
+  useEffect(() => {
+    if (!letterId || realLetters.some(l => l.dbId === letterId)) { setFetchedLetter(null); return; }
+    let cancelled = false;
+    (async () => {
+      const { data: letter } = await supabase.from("letters").select("*, profiles:user_id (username, full_name, status)").eq("id", letterId).maybeSingle();
+      if (cancelled) return;
+      if (!letter) { setFetchedLetter(null); return; }
+      const profile = letter.profiles || {};
+      const plainBody = stripHtml(letter.body);
+      setFetchedLetter({
+        id: `real-${letter.id}`, dbId: letter.id, type: "letter", kind: letter.kind || "letter", isReal: true,
+        userId: letter.user_id, author: profile.full_name || profile.username || "Anonymous", username: profile.username || "user",
+        status: profile.status || "contributor", initial: (profile.full_name || profile.username || "A")[0].toUpperCase(),
+        color: colorForId(letter.user_id), timeAgo: timeAgo(letter.created_at), createdAt: letter.created_at,
+        section: letter.source_publication ? "" : "General", publication: letter.source_publication || "",
+        headline: letter.source_title || "", title: letter.title,
+        preview: plainBody.length > 280 ? plainBody.slice(0, 280) + "…" : plainBody, fullBody: letter.body,
+        replies: 0, likes: 0,
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [letterId, realLetters]);
 
   // Fetch likes + replies whenever a real letter is opened
   useEffect(() => {
@@ -1234,6 +1313,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
   const openLetter = letterId
     ? combinedFeed.find(item => item.dbId === letterId) ||
       realLetters.find(item => item.dbId === letterId) ||
+      fetchedLetter ||
       combinedFeed.find(item => `mock-${item.id}` === letterId && !item.isReal) ||
       null
     : null;
@@ -1510,7 +1590,8 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
                     </div>
                   ) : (
                     <div style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:17, lineHeight:1.85, color:"#222", marginBottom:24 }}
-                      dangerouslySetInnerHTML={{ __html: openLetter.fullBody || "" }}/>
+                      onClick={(e) => { const a = e.target.closest && e.target.closest("[data-topic]"); if (a) { e.preventDefault(); navigate(`/topic/${a.getAttribute("data-topic")}`); } }}
+                      dangerouslySetInnerHTML={{ __html: linkifyTags(openLetter.fullBody || "") }}/>
                   )
                 ) : (
                   <div style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:17, lineHeight:1.85, color:"#222", marginBottom:24 }}>
@@ -2498,6 +2579,16 @@ function QuoteSourceModal({ sourceTitle, sourcePublication, onInsert, onClose })
 
 function WritePage({ session, onNavigate }) {
   const draftKey = `letters-draft-${session?.user?.id || "anon"}`;
+  const location = useLocation();
+
+  // Preselect a forum destination when arriving via "Write in [Forum]"
+  useEffect(() => {
+    const tf = location.state && location.state.targetForum;
+    if (tf && tf.id) {
+      setForm(f => ({ ...f, forumId: tf.id, forumName: tf.name }));
+      setKind("letter");
+    }
+  }, [location.state]);
 
   const [form, setForm] = useState(() => {
     try {
@@ -2526,6 +2617,7 @@ function WritePage({ session, onNavigate }) {
   const [eligibleForums, setEligibleForums] = useState([]);
   const [hashMenu, setHashMenu] = useState(null);   // { query, x, y } while a #token is active
   const [hashIndex, setHashIndex] = useState(0);
+  const [topics, setTopics] = useState([]);
 
   // Forums this writer may publish into (verified in, or editor/staff of)
   useEffect(() => {
@@ -2537,17 +2629,32 @@ function WritePage({ session, onNavigate }) {
         if (!cancelled) setEligibleForums(data || []);
         return;
       }
-      const [{ data: v }, { data: ed }] = await Promise.all([
+      const [{ data: v }, { data: ed }, { data: mem }] = await Promise.all([
         supabase.from("forum_verified").select("forum_id").eq("user_id", writerUserId),
         supabase.from("forum_editors").select("forum_id").eq("user_id", writerUserId),
+        supabase.from("forum_members").select("forum_id").eq("user_id", writerUserId),
       ]);
-      const ids = [...new Set([...(v || []).map(r => r.forum_id), ...(ed || []).map(r => r.forum_id)])];
-      if (!ids.length) { if (!cancelled) setEligibleForums([]); return; }
-      const { data } = await supabase.from("forums").select("id, name, slug, color, verified").in("id", ids);
-      if (!cancelled) setEligibleForums(data || []);
+      const privileged = [...new Set([...(v || []).map(r => r.forum_id), ...(ed || []).map(r => r.forum_id)])];
+      const memberIds = (mem || []).map(r => r.forum_id);
+      const allIds = [...new Set([...privileged, ...memberIds])];
+      if (!allIds.length) { if (!cancelled) setEligibleForums([]); return; }
+      const { data } = await supabase.from("forums").select("id, name, slug, color, verified, post_policy").in("id", allIds);
+      // Verified/editor forums always qualify; member-only forums qualify when open-posting.
+      const eligible = (data || []).filter(f => privileged.includes(f.id) || f.post_policy === "open");
+      if (!cancelled) setEligibleForums(eligible);
     })();
     return () => { cancelled = true; };
   }, [writerUserId, isWriterStaff]);
+
+  // Trending topics for the # menu
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.rpc("trending_topics", { lim: 40, q: null });
+      if (!cancelled) setTopics(data || []);
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Pull the 4 most recently published real articles for the source-linking panel
   useEffect(() => {
@@ -2635,12 +2742,24 @@ function WritePage({ session, onNavigate }) {
     setHashIndex(0);
   };
 
+  const cleanTag = (s) => (s || "").replace(/[^a-zA-Z0-9_-]/g, "").toLowerCase();
   const getHashItems = () => {
     if (!hashMenu) return [];
-    const q = hashMenu.query.toLowerCase();
-    const items = eligibleForums.filter(f => f.name.toLowerCase().includes(q)).slice(0, 6).map(f => ({ type: "forum", forum: f }));
-    if (hashMenu.query.trim().length >= 1) items.push({ type: "tag", tag: hashMenu.query.trim() });
-    return items;
+    const ql = hashMenu.query.trim().toLowerCase();
+    const key = cleanTag(hashMenu.query);
+    const topicItems = topics
+      .filter(t => !ql || t.tag.startsWith(key) || (t.display || "").toLowerCase().includes(ql))
+      .slice(0, 5)
+      .map(t => ({ type: "topic", topic: t }));
+    const items = [...topicItems];
+    if (key.length >= 1 && !topicItems.some(x => x.topic.tag === key)) {
+      items.push({ type: "create", tag: key });
+    }
+    const forumItems = eligibleForums
+      .filter(f => !ql || f.name.toLowerCase().includes(ql))
+      .slice(0, 5)
+      .map(f => ({ type: "forum", forum: f }));
+    return [...items, ...forumItems];
   };
 
   const removeHashToken = () => {
@@ -2668,8 +2787,9 @@ function WritePage({ session, onNavigate }) {
     if (editorRef.current) editorRef.current.focus();
   };
 
-  const pickTag = () => {
-    document.execCommand("insertText", false, " ");   // confirm the typed #tag with a trailing space
+  const insertTag = (tagStr) => {
+    removeHashToken();
+    document.execCommand("insertText", false, "#" + tagStr + " ");
     if (editorRef.current) set("body", editorRef.current.innerHTML);
     setHashMenu(null);
     if (editorRef.current) editorRef.current.focus();
@@ -2677,7 +2797,9 @@ function WritePage({ session, onNavigate }) {
 
   const selectHashItem = (item) => {
     if (!item) return;
-    if (item.type === "forum") pickForum(item.forum); else pickTag();
+    if (item.type === "forum") pickForum(item.forum);
+    else if (item.type === "topic") insertTag(item.topic.tag);
+    else insertTag(cleanTag(item.tag));
   };
 
   const handleEditorInput = () => {
@@ -2807,7 +2929,7 @@ function WritePage({ session, onNavigate }) {
     }
     setLoading(true);
     setError(null);
-    const { error } = await supabase.from("letters").insert(
+    const { data: inserted, error } = await supabase.from("letters").insert(
       isPost
         ? {
             user_id: session.user.id,
@@ -2828,8 +2950,13 @@ function WritePage({ session, onNavigate }) {
             kind: "letter",
             forum_id: form.forumId || null,
           }
-    );
+    ).select("id").single();
     if (error) { setError(error.message); setLoading(false); return; }
+    if (!isPost && inserted && inserted.id) {
+      const plain = (form.body || "").replace(/<[^>]*>/g, " ");
+      const tags = [...new Set((plain.match(/#[a-zA-Z0-9_-]+/g) || []).map(s => s.slice(1)))];
+      if (tags.length) { try { await supabase.rpc("tag_letter", { p_letter: inserted.id, p_tags: tags }); } catch (e) {} }
+    }
     if (!isPost) { try { localStorage.removeItem(draftKey); } catch {} }
     setSuccess(true);
     setLoading(false);
@@ -2991,14 +3118,16 @@ function WritePage({ session, onNavigate }) {
             <div style={{ position:"fixed", left:hashMenu.x, top:hashMenu.y, zIndex:300, width:300, background:"#fff", border:"1px solid #E0D8C8", borderRadius:12, boxShadow:"0 12px 32px rgba(0,0,0,0.15)", overflow:"hidden" }}>
               {(() => {
                 const items = getHashItems();
-                const hasForums = items.some(it => it.type === "forum");
-                return items.map((it, i) => {
-                  const active = i === hashIndex;
+                const topicItems = items.filter(it => it.type === "topic" || it.type === "create");
+                const forumItems = items.filter(it => it.type === "forum");
+                const sh = { padding:"8px 13px 4px", fontSize:8.5, letterSpacing:"0.14em", textTransform:"uppercase", color:"#B0A488", fontFamily:"'DM Mono', monospace" };
+                const renderItem = (it) => {
+                  const active = items.indexOf(it) === hashIndex;
+                  const base = { display:"flex", alignItems:"center", gap:10, width:"100%", textAlign:"left", background: active ? "#FBF8F1" : "none", border:"none", padding:"8px 13px", cursor:"pointer" };
                   if (it.type === "forum") {
                     const f = it.forum;
                     return (
-                      <button key={f.id} onMouseDown={e => { e.preventDefault(); selectHashItem(it); }} onMouseEnter={() => setHashIndex(i)}
-                        style={{ display:"flex", alignItems:"center", gap:10, width:"100%", textAlign:"left", background: active ? "#FBF8F1" : "none", border:"none", padding:"9px 13px", cursor:"pointer" }}>
+                      <button key={"f-"+f.id} onMouseDown={e => { e.preventDefault(); selectHashItem(it); }} onMouseEnter={() => setHashIndex(items.indexOf(it))} style={base}>
                         <div style={{ width:26, height:26, borderRadius:7, background:f.color || "#1A1A1A", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", color:"#F4ECD8", fontFamily:"'Playfair Display', serif", fontWeight:700, fontSize:12 }}>{(f.name||"F").replace(/^the\s+/i,"").charAt(0).toUpperCase()}</div>
                         <span style={{ flex:1, minWidth:0, fontSize:13.5, fontWeight:600, color:"#141414", fontFamily:"'DM Sans', sans-serif", overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis" }}>{f.name}</span>
                         {f.verified && <svg width="12" height="12" viewBox="0 0 24 24" fill="#C8A96E"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0 1 12 2.944a11.955 11.955 0 0 1-8.618 3.04A12.02 12.02 0 0 0 3 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>}
@@ -3006,15 +3135,32 @@ function WritePage({ session, onNavigate }) {
                       </button>
                     );
                   }
+                  if (it.type === "topic") {
+                    const t = it.topic;
+                    return (
+                      <button key={"t-"+t.id} onMouseDown={e => { e.preventDefault(); selectHashItem(it); }} onMouseEnter={() => setHashIndex(items.indexOf(it))} style={base}>
+                        <div style={{ width:26, height:26, borderRadius:7, background:"#F0EDE8", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", color:"#8A7A55", fontFamily:"'DM Mono', monospace", fontWeight:700, fontSize:15 }}>#</div>
+                        <span style={{ flex:1, minWidth:0, fontSize:13.5, fontWeight:600, color:"#141414", fontFamily:"'DM Sans', sans-serif", overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis" }}>{t.display}</span>
+                        <span style={{ fontSize:8.5, color:"#B0A488", fontFamily:"'DM Mono', monospace", flexShrink:0 }}>{t.uses} {t.uses === 1 ? "letter" : "letters"}</span>
+                      </button>
+                    );
+                  }
                   return (
-                    <button key="tag" onMouseDown={e => { e.preventDefault(); selectHashItem(it); }} onMouseEnter={() => setHashIndex(i)}
-                      style={{ display:"flex", alignItems:"center", gap:10, width:"100%", textAlign:"left", background: active ? "#FBF8F1" : "none", border:"none", borderTop: hasForums ? "1px solid #F0EDE8" : "none", padding:"9px 13px", cursor:"pointer" }}>
+                    <button key="create" onMouseDown={e => { e.preventDefault(); selectHashItem(it); }} onMouseEnter={() => setHashIndex(items.indexOf(it))} style={base}>
                       <div style={{ width:26, height:26, borderRadius:7, background:"#F0EDE8", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", color:"#8A7A55", fontFamily:"'DM Mono', monospace", fontWeight:700, fontSize:15 }}>#</div>
-                      <span style={{ flex:1, fontSize:13.5, color:"#444", fontFamily:"'DM Sans', sans-serif" }}>Add topic <strong style={{ color:"#141414" }}>#{it.tag}</strong></span>
-                      <span style={{ fontSize:8.5, letterSpacing:"0.08em", textTransform:"uppercase", color:"#B0A488", fontFamily:"'DM Mono', monospace", flexShrink:0 }}>Trending</span>
+                      <span style={{ flex:1, minWidth:0, fontSize:13.5, color:"#444", fontFamily:"'DM Sans', sans-serif" }}>Create <strong style={{ color:"#141414" }}>#{it.tag}</strong></span>
+                      <span style={{ fontSize:8.5, letterSpacing:"0.08em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", flexShrink:0 }}>New</span>
                     </button>
                   );
-                });
+                };
+                return (
+                  <>
+                    {topicItems.length > 0 && <div style={sh}>Trending topics</div>}
+                    {topicItems.map(renderItem)}
+                    {forumItems.length > 0 && <div style={{ ...sh, borderTop: topicItems.length ? "1px solid #F0EDE8" : "none", marginTop: topicItems.length ? 3 : 0, paddingTop:8 }}>Forums</div>}
+                    {forumItems.map(renderItem)}
+                  </>
+                );
               })()}
             </div>
           )}
@@ -3703,6 +3849,8 @@ function ForumsPage({ session, onSignOut, onNavigate }) {
     <div className="letters-main" style={{ minHeight:"100vh", background:"#F9F6F0", paddingBottom:80 }}>
       <style>{`
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        .forum-composer { bottom: 64px; }
+        @media (min-width: 768px) { .forum-composer { bottom: 0; } }
         .forums-suggest-grid { grid-template-columns: 1fr; }
         @media (min-width: 720px) { .forums-suggest-grid { grid-template-columns: repeat(2, 1fr); } }
         .forums-grid { display: block; }
@@ -4228,6 +4376,168 @@ function ManageContributorsModal({ forum, session, onClose }) {
   );
 }
 
+function ForumPostPage({ session, onNavigate }) {
+  const navigate = useNavigate();
+  const { slug, letterId } = useParams();
+  const userId = session?.user?.id;
+  const [forum, setForum] = useState(null);
+  const [letter, setLetter] = useState(null);
+  const [replies, setReplies] = useState([]);
+  const [likes, setLikes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [replyText, setReplyText] = useState("");
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [focused, setFocused] = useState(false);
+
+  const palette = ["#2D6A4F","#1B4F72","#6B2D8B","#7A3B1E","#B03A2E","#1F618D","#117864","#7D6608"];
+  const colorFor = (id) => palette[(id || "").split("").reduce((a, c) => a + c.charCodeAt(0), 0) % palette.length];
+  const ago = (iso) => {
+    const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (s < 60) return "just now";
+    const m = Math.floor(s / 60); if (m < 60) return m + "m ago";
+    const h = Math.floor(m / 60); if (h < 24) return h + "h ago";
+    const dd = Math.floor(h / 24); if (dd < 7) return dd + "d ago";
+    return new Date(iso).toLocaleDateString();
+  };
+  const authorOf = (r) => (r.profiles && (r.profiles.full_name || r.profiles.username)) || "Anonymous";
+  const initialOf = (r) => (((r.profiles && (r.profiles.full_name || r.profiles.username)) || "A")[0] || "A").toUpperCase();
+
+  const load = async () => {
+    const [{ data: f }, { data: l }] = await Promise.all([
+      supabase.from("forums").select("*").eq("slug", slug).maybeSingle(),
+      supabase.from("letters").select("*, profiles:user_id (username, full_name, status)").eq("id", letterId).maybeSingle(),
+    ]);
+    const [{ data: rs }, { data: lk }] = await Promise.all([
+      supabase.from("replies").select("*, profiles:user_id (username, full_name, status)").eq("letter_id", letterId).order("created_at", { ascending: true }),
+      supabase.from("likes").select("user_id").eq("letter_id", letterId),
+    ]);
+    return { f, l, rs: rs || [], lk: (lk || []).map(x => x.user_id) };
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => { setLoading(true); const { f, l, rs, lk } = await load(); if (!cancelled) { setForum(f); setLetter(l); setReplies(rs); setLikes(lk); setLoading(false); } })();
+    return () => { cancelled = true; };
+  }, [slug, letterId]);
+
+  const submitReply = async () => {
+    if (!replyText.trim() || !userId || submitting) return;
+    setSubmitting(true);
+    const { data, error } = await supabase.from("replies")
+      .insert({ letter_id: letterId, user_id: userId, body: replyText.trim(), parent_reply_id: replyingTo ? replyingTo.id : null })
+      .select("*, profiles:user_id (username, full_name, status)").single();
+    if (!error && data) { setReplies(prev => [...prev, data]); setReplyText(""); setReplyingTo(null); }
+    setSubmitting(false);
+  };
+
+  const liked = likes.includes(userId);
+  const toggleLike = async () => {
+    if (!userId) return;
+    setLikes(prev => liked ? prev.filter(x => x !== userId) : [...prev, userId]);
+    if (liked) await supabase.from("likes").delete().eq("letter_id", letterId).eq("user_id", userId);
+    else await supabase.from("likes").insert({ letter_id: letterId, user_id: userId });
+  };
+
+  const childrenOf = (pid) => replies.filter(r => (r.parent_reply_id || null) === pid);
+  const renderReply = (r, depth) => (
+    <div key={r.id} style={{ marginTop:14, marginLeft: depth > 0 ? 16 : 0, paddingLeft: depth > 0 ? 13 : 0, borderLeft: depth > 0 ? "2px solid #EDE6D6" : "none" }}>
+      <div style={{ display:"flex", gap:11 }}>
+        <Avatar initial={initialOf(r)} color={colorFor(r.user_id)} size={32}/>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:3 }}>
+            <span style={{ fontSize:13, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}>{authorOf(r)}</span>
+            <span style={{ fontSize:10, color:"#BBB", fontFamily:"'DM Mono', monospace" }}>{ago(r.created_at)}</span>
+          </div>
+          <p style={{ margin:0, fontSize:14.5, lineHeight:1.65, color:"#444", fontFamily:"'EB Garamond', Georgia, serif" }}>{r.body}</p>
+          {userId && (
+            <button onClick={() => setReplyingTo({ id: r.id, author: authorOf(r) })} style={{ background:"none", border:"none", padding:"4px 0 0", color:"#B0A488", fontFamily:"'DM Mono', monospace", fontSize:10.5, letterSpacing:"0.04em", cursor:"pointer" }}>Reply</button>
+          )}
+        </div>
+      </div>
+      {childrenOf(r.id).map(c => renderReply(c, Math.min(depth + 1, 4)))}
+    </div>
+  );
+
+  const shell = (children) => (
+    <div className="letters-main" style={{ minHeight:"100vh", background:"#F9F6F0", paddingBottom:110 }}>
+      <TopBar title={<span>Forums<span style={{ color:"#C8A96E" }}>.</span></span>} maxWidth={1040} onLogoClick={() => navigate("/forums")}/>
+      {children}
+    </div>
+  );
+
+  if (loading) return shell(<div style={{ textAlign:"center", padding:"80px 0", fontFamily:"'DM Mono', monospace", fontSize:11, color:"#CCC", letterSpacing:"0.1em" }}>Loading…</div>);
+  if (!letter) return shell(
+    <main style={{ maxWidth:560, margin:"0 auto", padding:"70px 20px", textAlign:"center" }}>
+      <div style={{ fontFamily:"'Playfair Display', serif", fontSize:24, fontWeight:900, color:"#141414", marginBottom:16 }}>Post not found</div>
+      <button onClick={() => navigate(forum ? `/forums/${forum.slug}` : "/forums")} style={{ background:"#111", color:"#F0EAD8", border:"none", borderRadius:20, padding:"9px 20px", fontSize:13, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:"pointer" }}>← Back</button>
+    </main>
+  );
+
+  return shell(
+    <>
+    <main style={{ maxWidth:680, margin:"0 auto", padding:"16px 20px 0" }}>
+      <button onClick={() => navigate(forum ? `/forums/${forum.slug}` : "/forums")}
+        style={{ display:"inline-flex", alignItems:"center", gap:8, background:"#fff", border:"1px solid #E8E0D0", borderRadius:20, padding:"6px 14px 6px 8px", cursor:"pointer", marginBottom:18 }}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#B0A488" strokeWidth="2" strokeLinecap="round"><path d="m15 18-6-6 6-6"/></svg>
+        <div style={{ width:22, height:22, borderRadius:6, background:(forum && forum.color) || "#1A1A1A", display:"flex", alignItems:"center", justifyContent:"center", color:"#F4ECD8", fontFamily:"'Playfair Display', serif", fontWeight:700, fontSize:12 }}>{(((forum && forum.name) || "F").replace(/^the\s+/i, "")[0] || "F").toUpperCase()}</div>
+        <span style={{ fontSize:12.5, fontWeight:600, color:"#141414", fontFamily:"'DM Sans', sans-serif" }}>{(forum && forum.name) || "Forum"}</span>
+      </button>
+
+      <article style={{ background:"#fff", border:"1px solid #EAE2D2", borderRadius:14, padding:"22px 24px", marginBottom:26 }}>
+        {letter.title && <h1 style={{ fontFamily:"'Playfair Display', serif", fontSize:26, fontWeight:900, color:"#141414", lineHeight:1.2, letterSpacing:"-0.01em", margin:"0 0 14px" }}>{letter.title}</h1>}
+        <div style={{ display:"flex", alignItems:"center", gap:11, marginBottom:18 }}>
+          <Avatar initial={(((letter.profiles && (letter.profiles.full_name || letter.profiles.username)) || "A")[0] || "A").toUpperCase()} color={colorFor(letter.user_id)} size={38}/>
+          <div>
+            <div style={{ fontSize:14, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}>{(letter.profiles && (letter.profiles.full_name || letter.profiles.username)) || "A writer"}</div>
+            <div style={{ fontSize:11, color:"#AAA", fontFamily:"'DM Mono', monospace" }}>{letter.profiles && letter.profiles.username ? "@" + letter.profiles.username + " · " : ""}{ago(letter.created_at)}</div>
+          </div>
+        </div>
+        <div style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:17, lineHeight:1.85, color:"#222" }}
+          onClick={(e) => { const a = e.target.closest && e.target.closest("[data-topic]"); if (a) { e.preventDefault(); navigate(`/topic/${a.getAttribute("data-topic")}`); } }}
+          dangerouslySetInnerHTML={{ __html: linkifyTags(letter.body || "") }}/>
+        <div style={{ display:"flex", alignItems:"center", gap:18, marginTop:18, paddingTop:16, borderTop:"1px solid #F0EDE8" }}>
+          <button onClick={toggleLike} style={{ display:"flex", alignItems:"center", gap:6, background:"none", border:"none", cursor:"pointer", color: liked ? "#C0392B" : "#999", fontFamily:"'DM Mono', monospace", fontSize:12.5 }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill={liked ? "#C0392B" : "none"} stroke={liked ? "#C0392B" : "#999"} strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            {likes.length}
+          </button>
+          <span style={{ fontSize:12.5, color:"#999", fontFamily:"'DM Mono', monospace" }}>{replies.length} {replies.length === 1 ? "reply" : "replies"}</span>
+        </div>
+      </article>
+
+      <div style={{ fontSize:9.5, letterSpacing:"0.16em", textTransform:"uppercase", color:"#A99F86", fontFamily:"'DM Mono', monospace", marginBottom:4 }}>Thread</div>
+      {replies.length === 0 ? (
+        <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", color:"#AAA", fontSize:14.5, padding:"14px 0" }}>No replies yet. Start the thread below.</p>
+      ) : (
+        childrenOf(null).map(r => renderReply(r, 0))
+      )}
+    </main>
+
+    <div className="forum-composer" style={{ position:"fixed", left:0, right:0, background:"rgba(249,246,240,0.97)", backdropFilter:"blur(10px)", borderTop:"1px solid #E8E0D0", zIndex:40 }}>
+      <div style={{ maxWidth:680, margin:"0 auto", padding:"10px 20px 14px" }}>
+        {replyingTo && (
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:7, fontSize:11.5, color:"#8A7A55", fontFamily:"'DM Mono', monospace" }}>
+            <span>Replying to {replyingTo.author}</span>
+            <button onClick={() => setReplyingTo(null)} style={{ background:"none", border:"none", color:"#B0A488", cursor:"pointer", fontSize:11 }}>Cancel</button>
+          </div>
+        )}
+        <div style={{ display:"flex", gap:10, alignItems:"flex-end" }}>
+          <div style={{ flex:1, background:"#fff", border:`1px solid ${focused ? "#111" : "#E0D8C8"}`, borderRadius:20, padding:"9px 15px", transition:"border-color 0.15s" }}>
+            <textarea placeholder={replyingTo ? "Write your reply…" : "Reply to this post…"} value={replyText} onChange={e => setReplyText(e.target.value)} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} rows={focused && replyText ? 3 : 1}
+              style={{ width:"100%", background:"none", border:"none", outline:"none", resize:"none", fontFamily:"'EB Garamond', Georgia, serif", fontSize:15, color:"#111", lineHeight:1.5 }}/>
+          </div>
+          {replyText.trim() && (
+            <button onClick={submitReply} disabled={submitting} style={{ background:"#111", border:"none", borderRadius:"50%", width:38, height:38, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0 }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F0EAD8" strokeWidth="2.5" strokeLinecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+    </>
+  );
+}
+
 function ForumDetailPage({ session, onNavigate }) {
   const navigate = useNavigate();
   const { slug } = useParams();
@@ -4239,6 +4549,7 @@ function ForumDetailPage({ session, onNavigate }) {
   const [showBoard, setShowBoard] = useState(false);
   const [showContributors, setShowContributors] = useState(false);
   const [isEditor, setIsEditor] = useState(false);
+  const [isVerified, setIsVerified] = useState(false);
   const isStaff = !!session?.user?.email && session.user.email.toLowerCase().endsWith("@tryletters.tech");
 
   useEffect(() => {
@@ -4249,14 +4560,17 @@ function ForumDetailPage({ session, onNavigate }) {
       if (!f) { if (!cancelled) { setForum(null); setLoading(false); } return; }
       let isJoined = false;
       let editor = false;
+      let verified = false;
       if (userId) {
         const { data: m } = await supabase.from("forum_members").select("forum_id").eq("forum_id", f.id).eq("user_id", userId).maybeSingle();
         isJoined = !!m;
         const { data: ed } = await supabase.from("forum_editors").select("forum_id").eq("forum_id", f.id).eq("user_id", userId).maybeSingle();
         editor = !!ed;
+        const { data: vf } = await supabase.from("forum_verified").select("forum_id").eq("forum_id", f.id).eq("user_id", userId).maybeSingle();
+        verified = !!vf;
       }
       const { data: pp } = await supabase.from("letters").select("id, title, body, created_at").eq("forum_id", f.id).order("created_at", { ascending:false }).limit(30);
-      if (!cancelled) { setForum(f); setJoined(isJoined); setIsEditor(editor); setPosts(pp || []); setLoading(false); }
+      if (!cancelled) { setForum(f); setJoined(isJoined); setIsEditor(editor); setIsVerified(verified); setPosts(pp || []); setLoading(false); }
     })();
     return () => { cancelled = true; };
   }, [slug, userId]);
@@ -4344,7 +4658,25 @@ function ForumDetailPage({ session, onNavigate }) {
       {forum.description && <p style={{ fontFamily:"'EB Garamond', serif", fontSize:16, lineHeight:1.6, color:"#555", margin:"0 0 26px" }}>{forum.description}</p>}
 
       <div style={{ borderTop:"1px solid #E8E0D0", paddingTop:22 }}>
-        <div style={{ fontSize:10, letterSpacing:"0.16em", textTransform:"uppercase", color:"#AAA", fontFamily:"'DM Mono', monospace", marginBottom:14 }}>Discussion</div>
+        {(() => {
+          const canPost = isStaff || isEditor || isVerified || (forum.post_policy === "open" && joined);
+          return (
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:10, marginBottom:14, flexWrap:"wrap" }}>
+              <div style={{ fontSize:10, letterSpacing:"0.16em", textTransform:"uppercase", color:"#AAA", fontFamily:"'DM Mono', monospace" }}>Discussion</div>
+              {canPost ? (
+                <button onClick={() => navigate("/write", { state: { targetForum: { id: forum.id, name: forum.name } } })}
+                  style={{ display:"inline-flex", alignItems:"center", gap:7, background:"#111", color:"#F0EAD8", border:"none", borderRadius:20, padding:"8px 16px", fontSize:12.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:"pointer" }}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#C8A96E" strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                  Write in {forum.name}
+                </button>
+              ) : (
+                <span style={{ fontSize:10.5, color:"#B0A488", fontFamily:"'DM Mono', monospace", fontStyle:"italic" }}>
+                  {forum.post_policy === "open" ? "Join this forum to post." : "Posting requires verified contributor status."}
+                </span>
+              )}
+            </div>
+          );
+        })()}
         {posts.length === 0 ? (
           <div style={{ textAlign:"center", padding:"40px 20px", background:"#fff", border:"1px dashed #E0D8C8", borderRadius:12 }}>
             <div style={{ fontFamily:"'Playfair Display', serif", fontSize:18, fontWeight:700, color:"#333", marginBottom:6 }}>No letters here yet</div>
@@ -4354,10 +4686,13 @@ function ForumDetailPage({ session, onNavigate }) {
           </div>
         ) : (
           posts.map(post => (
-            <article key={post.id} style={{ borderBottom:"1px solid #F0EDE8", padding:"18px 0" }}>
+            <article key={post.id} onClick={() => navigate(`/forums/${forum.slug}/post/${post.id}`)}
+              style={{ borderBottom:"1px solid #F0EDE8", padding:"18px 0", cursor:"pointer" }}
+              onMouseEnter={e => e.currentTarget.style.background="#FDFBF6"}
+              onMouseLeave={e => e.currentTarget.style.background="none"}>
               {post.title && <div style={{ fontFamily:"'Playfair Display', serif", fontSize:18, fontWeight:800, color:"#141414", lineHeight:1.25, marginBottom:6 }}>{post.title}</div>}
-              <p style={{ fontFamily:"'EB Garamond', serif", fontSize:14.5, lineHeight:1.6, color:"#555", margin:0, display:"-webkit-box", WebkitLineClamp:3, WebkitBoxOrient:"vertical", overflow:"hidden" }}>{post.body}</p>
-              <div style={{ fontSize:10, color:"#BBB", fontFamily:"'DM Mono', monospace", marginTop:8 }}>{new Date(post.created_at).toLocaleDateString()}</div>
+              <p style={{ fontFamily:"'EB Garamond', serif", fontSize:14.5, lineHeight:1.6, color:"#555", margin:0, display:"-webkit-box", WebkitLineClamp:3, WebkitBoxOrient:"vertical", overflow:"hidden" }}>{cleanNewsText(post.body)}</p>
+              <div style={{ fontSize:10, color:"#BBB", fontFamily:"'DM Mono', monospace", marginTop:8, display:"flex", alignItems:"center", gap:6 }}>{new Date(post.created_at).toLocaleDateString()} <span style={{ color:"#C8A96E" }}>· Open thread →</span></div>
             </article>
           ))
         )}
@@ -5792,6 +6127,210 @@ function InvitePage({ navigate }) {
 // old setTab("write")-style calls into real navigation, so every existing
 // page component (FeedPage, ReadPage, WritePage, ForumsPage, YouPage) keeps
 // working with minimal internal changes.
+function TopicPage({ session, onNavigate }) {
+  const navigate = useNavigate();
+  const { tag } = useParams();
+  const key = (tag || "").toLowerCase().replace(/[^a-z0-9_-]/g, "");
+  const [topic, setTopic] = useState(null);
+  const [letters, setLetters] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const { data: t } = await supabase.from("topics").select("*").eq("tag", key).maybeSingle();
+      if (!t) { if (!cancelled) { setTopic(null); setLetters([]); setLoading(false); } return; }
+      const { data: lt } = await supabase.from("letter_topics").select("letter_id").eq("topic_id", t.id);
+      const ids = (lt || []).map(r => r.letter_id);
+      let rows = [];
+      if (ids.length) {
+        const { data: ls } = await supabase.from("letters").select("id, title, body, user_id, created_at, kind").in("id", ids).order("created_at", { ascending:false }).limit(50);
+        const uids = [...new Set((ls || []).map(l => l.user_id))];
+        const { data: profs } = uids.length ? await supabase.from("profiles").select("id, username, full_name, status").in("id", uids) : { data: [] };
+        rows = (ls || []).map(l => { const pf = (profs || []).find(x => x.id === l.user_id) || {}; return { ...l, authorName: pf.full_name || pf.username || "A writer", username: pf.username }; });
+      }
+      if (!cancelled) { setTopic(t); setLetters(rows); setLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [key]);
+
+  const snippet = (l) => {
+    let txt = (l.body || "").replace(/<[^>]*>/g, " ");
+    if (typeof document !== "undefined") { const ta = document.createElement("textarea"); ta.innerHTML = txt; txt = ta.value; }
+    txt = txt.replace(/\s+/g, " ").trim();
+    return txt.length > 180 ? txt.slice(0, 180) + "…" : txt;
+  };
+  const ago = (iso) => {
+    const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (s < 3600) return Math.max(1, Math.floor(s / 60)) + "m ago";
+    if (s < 86400) return Math.floor(s / 3600) + "h ago";
+    const dd = Math.floor(s / 86400); if (dd < 7) return dd + "d ago";
+    return new Date(iso).toLocaleDateString();
+  };
+
+  const shell = (children) => (
+    <div className="letters-main" style={{ minHeight:"100vh", background:"#F9F6F0", paddingBottom:80 }}>
+      <TopBar title={<span>Topics<span style={{ color:"#C8A96E" }}>.</span></span>} maxWidth={1040} onLogoClick={() => navigate("/feed")}/>
+      {children}
+    </div>
+  );
+
+  if (loading) return shell(<div style={{ textAlign:"center", padding:"80px 0", fontFamily:"'DM Mono', monospace", fontSize:11, color:"#CCC", letterSpacing:"0.1em" }}>Loading topic…</div>);
+  if (!topic) return shell(
+    <main style={{ maxWidth:560, margin:"0 auto", padding:"70px 20px", textAlign:"center" }}>
+      <div style={{ fontFamily:"'Playfair Display', serif", fontSize:26, fontWeight:900, color:"#141414", marginBottom:8 }}>#{key}</div>
+      <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", color:"#999", marginBottom:20 }}>No one has written under this topic yet.</p>
+      <button onClick={() => navigate("/feed")} style={{ background:"#111", color:"#F0EAD8", border:"none", borderRadius:20, padding:"9px 20px", fontSize:13, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:"pointer" }}>← Back to Feed</button>
+    </main>
+  );
+
+  return shell(
+    <main style={{ maxWidth:680, margin:"0 auto", padding:"18px 20px 40px" }}>
+      <button onClick={() => navigate(-1)} style={{ background:"none", border:"none", color:"#B0A488", fontFamily:"'DM Mono', monospace", fontSize:11.5, letterSpacing:"0.06em", cursor:"pointer", marginBottom:16, display:"flex", alignItems:"center", gap:6 }}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="m15 18-6-6 6-6"/></svg> Back
+      </button>
+
+      <div style={{ borderBottom:"3px double #141414", paddingBottom:20, marginBottom:24 }}>
+        <div style={{ fontSize:9.5, letterSpacing:"0.22em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:10 }}>Topic</div>
+        <h1 style={{ fontFamily:"'Playfair Display', serif", fontSize:"clamp(30px,5vw,42px)", fontWeight:900, color:"#141414", letterSpacing:"-0.02em", margin:0 }}>
+          <span style={{ color:"#C8A96E" }}>#</span>{topic.display}
+        </h1>
+        <div style={{ fontSize:11, color:"#AAA", fontFamily:"'DM Mono', monospace", marginTop:8 }}>{letters.length} {letters.length === 1 ? "letter" : "letters"}</div>
+      </div>
+
+      {letters.length === 0 ? (
+        <p style={{ textAlign:"center", fontFamily:"'EB Garamond', serif", fontStyle:"italic", color:"#AAA", padding:"30px 0" }}>No letters under this topic yet.</p>
+      ) : (
+        letters.map(l => (
+          <article key={l.id} onClick={() => navigate(`/feed/letter/${l.id}`)}
+            style={{ borderBottom:"1px solid #F0EDE8", padding:"18px 0", cursor:"pointer" }}
+            onMouseEnter={e => e.currentTarget.style.background="#FDFBF6"}
+            onMouseLeave={e => e.currentTarget.style.background="none"}>
+            {l.title && <div style={{ fontFamily:"'Playfair Display', serif", fontSize:19, fontWeight:800, color:"#141414", lineHeight:1.25, marginBottom:6 }}>{l.title}</div>}
+            <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:15, lineHeight:1.6, color:"#555", margin:"0 0 8px", display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden" }}>{snippet(l)}</p>
+            <div style={{ fontSize:11, color:"#AAA", fontFamily:"'DM Mono', monospace" }}>{l.authorName}{l.username ? " · @" + l.username : ""} · {ago(l.created_at)}</div>
+          </article>
+        ))
+      )}
+    </main>
+  );
+}
+
+function InboxPage({ session, onNavigate }) {
+  const navigate = useNavigate();
+  const userId = session?.user?.id;
+  const [notes, setNotes] = useState([]);
+  const [forumsById, setForumsById] = useState({});
+  const [propsById, setPropsById] = useState({});
+  const [voted, setVoted] = useState(new Set());
+  const [fresh, setFresh] = useState(new Set());
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  const fmtTime = (iso) => {
+    const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (s < 60) return "just now";
+    const m = Math.floor(s / 60); if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60); if (h < 24) return `${h}h ago`;
+    const dd = Math.floor(h / 24); if (dd < 7) return `${dd}d ago`;
+    return new Date(iso).toLocaleDateString();
+  };
+
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const { data: ns } = await supabase.from("notifications").select("*").eq("user_id", userId).order("created_at", { ascending:false }).limit(60);
+      const list = ns || [];
+      const freshIds = new Set(list.filter(n => !n.read).map(n => n.id));
+      const forumIds = [...new Set(list.map(n => n.forum_id).filter(Boolean))];
+      const propIds = [...new Set(list.filter(n => n.type === "board_vote").map(n => n.proposal_id).filter(Boolean))];
+      const [{ data: fs }, { data: pr }, { data: mv }] = await Promise.all([
+        forumIds.length ? supabase.from("forums").select("id, slug, name").in("id", forumIds) : Promise.resolve({ data: [] }),
+        propIds.length ? supabase.from("forum_board_proposals").select("id, status, round").in("id", propIds) : Promise.resolve({ data: [] }),
+        propIds.length ? supabase.from("forum_board_votes").select("proposal_id, round").eq("voter", userId).in("proposal_id", propIds) : Promise.resolve({ data: [] }),
+      ]);
+      const fById = {}; (fs || []).forEach(f => fById[f.id] = f);
+      const pById = {}; (pr || []).forEach(pp => pById[pp.id] = pp);
+      const votedSet = new Set((mv || []).filter(v => { const pp = pById[v.proposal_id]; return pp && v.round === pp.round; }).map(v => v.proposal_id));
+      if (cancelled) return;
+      setNotes(list); setForumsById(fById); setPropsById(pById); setVoted(votedSet); setFresh(freshIds); setLoading(false);
+      if (freshIds.size) {
+        await supabase.from("notifications").update({ read: true }).eq("user_id", userId).eq("read", false);
+        window.dispatchEvent(new Event("inbox-updated"));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [userId]);
+
+  const vote = async (note, choice) => {
+    if (busy) return; setBusy(true);
+    await supabase.from("forum_board_votes").insert({ proposal_id: note.proposal_id, voter: userId, vote: choice });
+    setVoted(prev => new Set([...prev, note.proposal_id]));
+    setBusy(false);
+    window.dispatchEvent(new Event("inbox-updated"));
+  };
+
+  const openForum = (fid) => { const f = forumsById[fid]; if (f) navigate(`/forums/${f.slug}`); };
+
+  const noteIcon = (type) => {
+    if (type === "verified") return { bg:"#C8A96E", el: <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0 1 12 2.944a11.955 11.955 0 0 1-8.618 3.04A12.02 12.02 0 0 0 3 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg> };
+    if (type === "board_decision") return { bg:"#2E4A3F", el: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg> };
+    return { bg:"#111", el: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#F0EAD8" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> };
+  };
+
+  return (
+    <div className="letters-main" style={{ minHeight:"100vh", background:"#F9F6F0", paddingBottom:80 }}>
+      <TopBar title={<span>Inbox<span style={{ color:"#C8A96E" }}>.</span></span>} maxWidth={1040}/>
+      <main style={{ maxWidth:640, margin:"0 auto", padding:"14px 20px 0" }}>
+        {loading ? (
+          <div>{[0,1,2].map(i => <div key={i} style={{ height:74, background:"#fff", border:"1px solid #EFE9DD", borderRadius:12, marginBottom:10, opacity:0.5 }}/>)}</div>
+        ) : notes.length === 0 ? (
+          <div style={{ textAlign:"center", padding:"70px 20px" }}>
+            <div style={{ fontFamily:"'Playfair Display', serif", fontSize:22, fontWeight:900, color:"#141414", marginBottom:8 }}>You're all caught up.</div>
+            <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:15, color:"#999", margin:0 }}>Board votes, decisions, and verifications will show up here.</p>
+          </div>
+        ) : (
+          notes.map(n => {
+            const isVote = n.type === "board_vote";
+            const pr = propsById[n.proposal_id];
+            const canVote = isVote && pr && pr.status === "open" && !voted.has(n.proposal_id);
+            const ic = noteIcon(n.type);
+            const wasFresh = fresh.has(n.id);
+            return (
+              <div key={n.id} style={{ display:"flex", gap:13, background: wasFresh ? "#FFFDF8" : "#fff", border:`1px solid ${wasFresh ? "#EADFC2" : "#EFE9DD"}`, borderRadius:12, padding:"14px 16px", marginBottom:10 }}>
+                <div style={{ width:36, height:36, borderRadius:"50%", background:ic.bg, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", marginTop:1 }}>{ic.el}</div>
+                <div style={{ minWidth:0, flex:1 }}>
+                  <div style={{ display:"flex", alignItems:"baseline", gap:8, justifyContent:"space-between" }}>
+                    <div style={{ fontSize:14, fontWeight:700, color:"#141414", fontFamily:"'DM Sans', sans-serif", display:"flex", alignItems:"center", gap:7 }}>
+                      {n.title}
+                      {wasFresh && <span style={{ width:6, height:6, borderRadius:"50%", background:"#C0392B", flexShrink:0 }}/>}
+                    </div>
+                    <span style={{ fontSize:10, color:"#BBB", fontFamily:"'DM Mono', monospace", flexShrink:0 }}>{fmtTime(n.created_at)}</span>
+                  </div>
+                  {n.body && <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:14.5, lineHeight:1.55, color:"#555", margin:"3px 0 0" }}>{n.body}</p>}
+                  {canVote ? (
+                    <div style={{ display:"flex", gap:8, marginTop:11 }}>
+                      <button onClick={() => vote(n, "approve")} disabled={busy} style={{ background:"#1E8449", color:"#fff", border:"none", borderRadius:8, padding:"7px 18px", fontSize:12.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor: busy ? "default" : "pointer" }}>Approve</button>
+                      <button onClick={() => vote(n, "reject")} disabled={busy} style={{ background:"#fff", color:"#C0392B", border:"1px solid #E0C4C0", borderRadius:8, padding:"7px 18px", fontSize:12.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor: busy ? "default" : "pointer" }}>Reject</button>
+                    </div>
+                  ) : isVote ? (
+                    <div style={{ fontSize:11, color:"#B0A488", fontFamily:"'DM Mono', monospace", fontStyle:"italic", marginTop:8 }}>{voted.has(n.proposal_id) ? "You voted." : "This vote has closed."}</div>
+                  ) : n.forum_id && forumsById[n.forum_id] ? (
+                    <button onClick={() => openForum(n.forum_id)} style={{ background:"none", border:"none", padding:0, marginTop:8, color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontSize:11, letterSpacing:"0.04em", cursor:"pointer" }}>View forum →</button>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </main>
+    </div>
+  );
+}
+
 function BoardVoteAlert({ session }) {
   const userId = session?.user?.id;
   const [pending, setPending] = useState([]);
@@ -5865,10 +6404,29 @@ function AuthenticatedApp({ session, handleSignOut }) {
   // tab name into a real route change.
   const goToTab = (tabName) => navigate(`/${tabName}`);
 
+  const [unread, setUnread] = useState(0);
+  useEffect(() => {
+    const uid = session?.user?.id;
+    if (!uid) return;
+    let alive = true;
+    const fetchUnread = async () => {
+      const { count } = await supabase.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", uid).eq("read", false);
+      if (alive) setUnread(count || 0);
+    };
+    fetchUnread();
+    const iv = setInterval(fetchUnread, 45000);
+    const onUpd = () => fetchUnread();
+    window.addEventListener("inbox-updated", onUpd);
+    return () => { alive = false; clearInterval(iv); window.removeEventListener("inbox-updated", onUpd); };
+  }, [session?.user?.id]);
+
   return (
     <div>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&family=Lora:ital,wght@0,400;0,600;1,400&family=Special+Elite&family=Inter:wght@400;500&display=swap');
+        html { scrollbar-gutter: stable; }
+        .letters-tag { color:#C8A96E; font-weight:600; text-decoration:none; cursor:pointer; }
+        .letters-tag:hover { text-decoration:underline; }
         .letters-bottom-nav { display: block; }
         .letters-sidebar { display: none; }
         .letters-rightnav { display: none; }
@@ -5935,7 +6493,7 @@ function AuthenticatedApp({ session, handleSignOut }) {
       </div>
 
       {/* Global desktop right nav */}
-      <RightNav active={activeTab} onNavigate={goToTab}/>
+      <RightNav active={activeTab} onNavigate={goToTab} unread={unread}/>
 
       {/* Page content — real routes now, not state */}
       <Routes>
@@ -5948,7 +6506,10 @@ function AuthenticatedApp({ session, handleSignOut }) {
         <Route path="/write" element={<WritePage session={session} onNavigate={goToTab}/>}/>
         <Route path="/forums" element={<ForumsPage session={session} onSignOut={handleSignOut} onNavigate={goToTab}/>}/>
         <Route path="/forums/:slug" element={<ForumDetailPage session={session} onNavigate={goToTab}/>}/>
+        <Route path="/forums/:slug/post/:letterId" element={<ForumPostPage session={session} onNavigate={goToTab}/>}/>
         <Route path="/you" element={<YouPage session={session} onSignOut={handleSignOut}/>}/>
+        <Route path="/inbox" element={<InboxPage session={session} onNavigate={goToTab}/>}/>
+        <Route path="/topic/:tag" element={<TopicPage session={session} onNavigate={goToTab}/>}/>
         <Route path="/guide" element={<GuidePage session={session} onNavigate={goToTab}/>}/>
         <Route path="*" element={<Navigate to="/feed" replace/>}/>
       </Routes>
@@ -5957,7 +6518,7 @@ function AuthenticatedApp({ session, handleSignOut }) {
 
       {/* Global mobile bottom nav */}
       <div className="letters-bottom-nav">
-        <BottomNav active={activeTab} onNavigate={goToTab}/>
+        <BottomNav active={activeTab} onNavigate={goToTab} unread={unread}/>
       </div>
     </div>
   );
