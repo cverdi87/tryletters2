@@ -5172,6 +5172,222 @@ function YouPage({ session, onSignOut }) {
   );
 }
 
+function AuthorProfilePage({ session, onNavigate }) {
+  const navigate = useNavigate();
+  const { userId } = useParams();
+  const me = session?.user?.id;
+
+  const [profile, setProfile] = useState(null);
+  const [letters, setLetters] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [imgError, setImgError] = useState(false);
+  const [counts, setCounts] = useState({ letters:0, replies:0, likes:0, following:0, followers:0 });
+  const [verifiedForums, setVerifiedForums] = useState([]);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followBusy, setFollowBusy] = useState(false);
+
+  // Own profile has edit affordances — send the user to /you instead.
+  useEffect(() => {
+    if (me && userId && me === userId) navigate("/you", { replace:true });
+  }, [me, userId]);
+
+  const stripHtml = (html) => {
+    if (!html) return "";
+    if (typeof document === "undefined") return html;
+    const withSpacing = html.replace(/<\/(p|div|li|blockquote|h[1-6])>/gi, " ").replace(/<br\s*\/?>/gi, " ");
+    const div = document.createElement("div");
+    div.innerHTML = withSpacing;
+    return (div.textContent || div.innerText || "").replace(/\s+/g, " ").trim();
+  };
+
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true); setNotFound(false); setImgError(false);
+      const { data: prof } = await supabase.from("profiles").select("*").eq("id", userId).single();
+      if (cancelled) return;
+      if (!prof) { setNotFound(true); setLoading(false); return; }
+      setProfile(prof);
+
+      const [{ data: ls }, { data: v }, { data: e },
+             { count: following }, { count: followers },
+             { count: replyCount }, { data: myFollow }] = await Promise.all([
+        supabase.from("letters").select("*").eq("user_id", userId).order("created_at", { ascending:false }),
+        supabase.from("forum_verified").select("forum_id").eq("user_id", userId),
+        supabase.from("forum_editors").select("forum_id").eq("user_id", userId),
+        supabase.from("follows").select("*", { count:"exact", head:true }).eq("follower_id", userId),
+        supabase.from("follows").select("*", { count:"exact", head:true }).eq("following_id", userId),
+        supabase.from("replies").select("*", { count:"exact", head:true }).eq("user_id", userId),
+        me ? supabase.from("follows").select("following_id").eq("follower_id", me).eq("following_id", userId)
+           : Promise.resolve({ data: [] }),
+      ]);
+      if (cancelled) return;
+      const lettersData = ls || [];
+      setLetters(lettersData);
+      setIsFollowing((myFollow || []).length > 0);
+
+      const letterIds = lettersData.map(l => l.id);
+      const { count: likesRecv } = letterIds.length
+        ? await supabase.from("likes").select("*", { count:"exact", head:true }).in("letter_id", letterIds)
+        : { count: 0 };
+
+      const fids = [...new Set([...(v||[]).map(r=>r.forum_id), ...(e||[]).map(r=>r.forum_id)])];
+      let vForums = [];
+      if (fids.length) {
+        const { data: forums } = await supabase.from("forums").select("id, name, slug").in("id", fids).order("name");
+        vForums = forums || [];
+      }
+      if (cancelled) return;
+      setVerifiedForums(vForums);
+      setCounts({ letters: lettersData.length, replies: replyCount || 0, likes: likesRecv || 0, following: following || 0, followers: followers || 0 });
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [userId, me]);
+
+  const toggleFollow = async () => {
+    if (!me || !userId || me === userId || followBusy) return;
+    setFollowBusy(true);
+    if (isFollowing) {
+      setIsFollowing(false);
+      setCounts(c => ({ ...c, followers: Math.max(c.followers - 1, 0) }));
+      const { error } = await supabase.from("follows").delete().eq("follower_id", me).eq("following_id", userId);
+      if (error) { setIsFollowing(true); setCounts(c => ({ ...c, followers: c.followers + 1 })); console.error("Unfollow failed:", error); }
+    } else {
+      setIsFollowing(true);
+      setCounts(c => ({ ...c, followers: c.followers + 1 }));
+      const { error } = await supabase.from("follows").insert({ follower_id: me, following_id: userId });
+      if (error) { setIsFollowing(false); setCounts(c => ({ ...c, followers: Math.max(c.followers - 1, 0) })); console.error("Follow failed:", error); }
+    }
+    setFollowBusy(false);
+  };
+
+  if (notFound) {
+    return (
+      <div className="letters-main" style={{ minHeight:"100vh", background:"#F9F6F0" }}>
+        <TopBar title={<span>Profile<span style={{ color:"#C8A96E" }}>.</span></span>} maxWidth={1040} onLogoClick={() => navigate("/feed")}/>
+        <div style={{ textAlign:"center", padding:"80px 20px" }}>
+          <div style={{ fontFamily:"'Playfair Display', serif", fontSize:22, fontWeight:900, color:"#141414", marginBottom:8 }}>Profile not found.</div>
+          <button onClick={() => navigate("/feed")} style={{ background:"none", border:"none", color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontSize:12, cursor:"pointer" }}>← Back to feed</button>
+        </div>
+      </div>
+    );
+  }
+
+  const displayName = profile?.full_name || profile?.username || "Reader";
+  const username = profile?.username || "reader";
+  const initial = (displayName[0] || "?").toUpperCase();
+  const status = profile?.status || "contributor";
+  const photoSeed = `user-${(userId || "").slice(0,8)}`;
+  const bio = profile?.bio || "";
+  const location = profile?.location || "";
+  const isSelf = me && me === userId;
+
+  return (
+    <div className="letters-main" style={{ minHeight:"100vh", background:"#F9F6F0", paddingBottom:80 }}>
+      <TopBar title={<span>Profile<span style={{ color:"#C8A96E" }}>.</span></span>} maxWidth={1040} onLogoClick={() => navigate("/feed")}/>
+      <main style={{ maxWidth:680, margin:"0 auto" }}>
+        <button onClick={() => navigate(-1)} style={{ background:"none", border:"none", color:"#B0A488", fontFamily:"'DM Mono', monospace", fontSize:11.5, letterSpacing:"0.06em", cursor:"pointer", margin:"14px 0 2px 20px", display:"flex", alignItems:"center", gap:6 }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="m15 18-6-6 6-6"/></svg> Back
+        </button>
+
+        <div style={{ background:"#fff", borderBottom:"1px solid #E8E0D0", padding:"18px 20px 0" }}>
+          <div style={{ display:"flex", alignItems:"flex-start", gap:16, marginBottom:16 }}>
+            <div style={{ position:"relative", flexShrink:0 }}>
+              {!imgError ? (
+                <img src={`https://picsum.photos/seed/${photoSeed}/120/120`} alt={displayName} onError={() => setImgError(true)}
+                  style={{ width:72, height:72, borderRadius:"50%", objectFit:"cover", border:"3px solid #fff", boxShadow:"0 0 0 1.5px #E8E0D0" }}/>
+              ) : (
+                <div style={{ width:72, height:72, borderRadius:"50%", background:"#111", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'Playfair Display', serif", fontSize:28, fontWeight:900, color:"#F0EAD8", border:"3px solid #fff", boxShadow:"0 0 0 1.5px #E8E0D0" }}>{initial}</div>
+              )}
+            </div>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontFamily:"'Playfair Display', serif", fontSize:22, fontWeight:900, color:"#111", lineHeight:1.1, marginBottom:3 }}>{displayName}</div>
+              <div style={{ fontSize:10.5, fontFamily:"'DM Mono', monospace", marginBottom:6, letterSpacing:"0.04em" }}>
+                <span style={{ color:"#BBB" }}>by </span>
+                <span style={{ color:"#777" }}>{username}</span>
+                <span style={{ color: statusColors[status] || "#AAA", marginLeft:6 }}>{contributorStatuses[status] || contributorStatuses["contributor"]}</span>
+              </div>
+              {location ? (
+                <div style={{ display:"flex", alignItems:"center", gap:5 }}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#AAA" strokeWidth="2" strokeLinecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                  <span style={{ fontSize:12, color:"#AAA", fontFamily:"'DM Sans', sans-serif" }}>{location}</span>
+                </div>
+              ) : null}
+            </div>
+            {!isSelf && me ? (
+              <button onClick={toggleFollow} disabled={followBusy}
+                style={{ flexShrink:0, background: isFollowing ? "#F0EDE8" : "#111", color: isFollowing ? "#888" : "#F0EAD8", border: isFollowing ? "1px solid #E0D8CC" : "none", borderRadius:20, padding:"7px 20px", fontSize:12.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor: followBusy ? "default" : "pointer" }}>
+                {isFollowing ? "Following" : "Follow"}
+              </button>
+            ) : null}
+          </div>
+
+          {bio ? (
+            <div style={{ padding:"12px 0 16px", borderTop:"1px solid #F0EDE8" }}>
+              <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:14.5, lineHeight:1.65, color:"#555", margin:0 }}>{bio}</p>
+            </div>
+          ) : null}
+
+          {verifiedForums.length > 0 && (
+            <div style={{ padding:"12px 0 14px", borderTop:"1px solid #F0EDE8", fontSize:14, lineHeight:1.85 }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="#C8A96E" style={{ verticalAlign:"-2px", marginRight:7 }}><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0 1 12 2.944a11.955 11.955 0 0 1-8.618 3.04A12.02 12.02 0 0 0 3 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+              <span style={{ fontFamily:"'EB Garamond', Georgia, serif", fontStyle:"italic", fontSize:14.5, color:"#9A8E76", marginRight:6 }}>Verified in</span>
+              {verifiedForums.map((f, i) => (
+                <span key={f.id}>
+                  <button onClick={() => navigate(`/forums/${f.slug}`)} style={{ background:"none", border:"none", padding:0, cursor:"pointer", fontFamily:"'DM Sans', sans-serif", fontSize:13.5, fontWeight:600, color:"#2E2A22" }}>{f.name}</button>{i < verifiedForums.length - 1 ? <span style={{ color:"#B0A488" }}>, </span> : ""}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div style={{ display:"flex", gap:0, borderTop:"1px solid #F0EDE8" }}>
+            {[
+              { label:"Letters", value:counts.letters },
+              { label:"Replies", value:counts.replies },
+              { label:"Likes", value:counts.likes },
+              { label:"Following", value:counts.following },
+              { label:"Followers", value:counts.followers },
+            ].map((stat, i) => (
+              <div key={stat.label} style={{ flex:1, textAlign:"center", padding:"12px 4px", borderRight: i < 4 ? "1px solid #F0EDE8" : "none" }}>
+                <div style={{ fontFamily:"'Playfair Display', serif", fontSize:18, fontWeight:700, color:"#111", lineHeight:1 }}>{stat.value}</div>
+                <div style={{ fontSize:9, letterSpacing:"0.1em", textTransform:"uppercase", color:"#AAA", fontFamily:"'DM Mono', monospace", marginTop:3 }}>{stat.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ padding:"20px 20px 0" }}>
+          <div style={{ fontSize:10, letterSpacing:"0.14em", textTransform:"uppercase", color:"#AAA", fontFamily:"'DM Mono', monospace", marginBottom:6 }}>Letters</div>
+          {loading ? (
+            <div style={{ textAlign:"center", padding:"40px 0", fontSize:11, color:"#AAA", fontFamily:"'DM Mono', monospace", letterSpacing:"0.1em" }}>Loading...</div>
+          ) : letters.length === 0 ? (
+            <div style={{ textAlign:"center", padding:"48px 20px" }}>
+              <div style={{ fontSize:10, letterSpacing:"0.18em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:12 }}>Nothing yet</div>
+              <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:16, color:"#888", margin:0 }}>{displayName} hasn't published any letters yet.</p>
+            </div>
+          ) : letters.map(letter => (
+            <button key={letter.id} onClick={() => navigate(`/feed/letter/${letter.id}`)}
+              style={{ display:"block", width:"100%", textAlign:"left", background:"none", border:"none", borderBottom:"1px solid #F0EDE8", padding:"18px 0", cursor:"pointer" }}>
+              {letter.source_publication && (
+                <div style={{ fontSize:9.5, letterSpacing:"0.1em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:5 }}>
+                  {letter.source_publication}{letter.source_title ? ` \u00b7 ${letter.source_title}` : ""}
+                </div>
+              )}
+              {letter.title && (<div style={{ fontFamily:"'Playfair Display', serif", fontSize:17, fontWeight:700, color:"#111", marginBottom:6 }}>{letter.title}</div>)}
+              <p style={{ fontFamily:"'EB Garamond', serif", fontSize:15, lineHeight:1.65, color:"#444", margin:"0 0 8px", display:"-webkit-box", WebkitLineClamp:3, WebkitBoxOrient:"vertical", overflow:"hidden" }}>{stripHtml(letter.body)}</p>
+              <div style={{ fontSize:10, color:"#BBB", fontFamily:"'DM Mono', monospace" }}>{new Date(letter.created_at).toLocaleDateString("en-US", { month:"long", day:"numeric", year:"numeric" })}</div>
+            </button>
+          ))}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+
 function GuidePage({ session, onNavigate }) {
   const navigate = useNavigate();
   const H2 = ({ children }) => <h2 style={{ fontFamily:"'Playfair Display', serif", fontSize:26, fontWeight:900, color:"#141414", letterSpacing:"-0.01em", margin:"0 0 14px", paddingTop:28, borderTop:"1px solid #E8E0D0" }}>{children}</h2>;
@@ -6304,9 +6520,18 @@ function InboxPage({ session, onNavigate }) {
 
   const openForum = (fid) => { const f = forumsById[fid]; if (f) navigate(`/forums/${f.slug}`); };
 
+  const openReply = (n) => {
+    if (!n.letter_id) return;
+    const f = n.forum_id && forumsById[n.forum_id];
+    if (f) navigate(`/forums/${f.slug}/post/${n.letter_id}`);
+    else navigate(`/feed/letter/${n.letter_id}`);
+  };
+
   const noteIcon = (type) => {
     if (type === "verified") return { bg:"#C8A96E", el: <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0 1 12 2.944a11.955 11.955 0 0 1-8.618 3.04A12.02 12.02 0 0 0 3 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg> };
     if (type === "board_decision") return { bg:"#2E4A3F", el: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg> };
+    if (type === "reply") return { bg:"#2980B9", el: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 17l-5-5 5-5"/><path d="M4 12h11a4 4 0 0 1 4 4v2"/></svg> };
+    if (type === "follower") return { bg:"#8E44AD", el: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="8" r="3.4"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/><path d="M19 8v6M22 11h-6"/></svg> };
     return { bg:"#111", el: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#F0EAD8" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> };
   };
 
@@ -6319,7 +6544,7 @@ function InboxPage({ session, onNavigate }) {
         ) : notes.length === 0 ? (
           <div style={{ textAlign:"center", padding:"70px 20px" }}>
             <div style={{ fontFamily:"'Playfair Display', serif", fontSize:22, fontWeight:900, color:"#141414", marginBottom:8 }}>You're all caught up.</div>
-            <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:15, color:"#999", margin:0 }}>Board votes, decisions, and verifications will show up here.</p>
+            <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:15, color:"#999", margin:0 }}>Replies, follows, board votes, and decisions will show up here.</p>
           </div>
         ) : (
           notes.map(n => {
@@ -6347,6 +6572,10 @@ function InboxPage({ session, onNavigate }) {
                     </div>
                   ) : isVote ? (
                     <div style={{ fontSize:11, color:"#B0A488", fontFamily:"'DM Mono', monospace", fontStyle:"italic", marginTop:8 }}>{voted.has(n.proposal_id) ? "You voted." : "This vote has closed."}</div>
+                  ) : n.type === "reply" && n.letter_id ? (
+                    <button onClick={() => openReply(n)} style={{ background:"none", border:"none", padding:0, marginTop:8, color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontSize:11, letterSpacing:"0.04em", cursor:"pointer" }}>View letter →</button>
+                  ) : n.type === "follower" && n.actor_id ? (
+                    <button onClick={() => navigate(`/u/${n.actor_id}`)} style={{ background:"none", border:"none", padding:0, marginTop:8, color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontSize:11, letterSpacing:"0.04em", cursor:"pointer" }}>View profile →</button>
                   ) : n.forum_id && forumsById[n.forum_id] ? (
                     <button onClick={() => openForum(n.forum_id)} style={{ background:"none", border:"none", padding:0, marginTop:8, color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontSize:11, letterSpacing:"0.04em", cursor:"pointer" }}>View forum →</button>
                   ) : null}
@@ -6537,6 +6766,7 @@ function AuthenticatedApp({ session, handleSignOut }) {
         <Route path="/forums/:slug" element={<ForumDetailPage session={session} onNavigate={goToTab}/>}/>
         <Route path="/forums/:slug/post/:letterId" element={<ForumPostPage session={session} onNavigate={goToTab}/>}/>
         <Route path="/you" element={<YouPage session={session} onSignOut={handleSignOut}/>}/>
+        <Route path="/u/:userId" element={<AuthorProfilePage session={session} onNavigate={goToTab}/>}/>
         <Route path="/inbox" element={<InboxPage session={session} onNavigate={goToTab}/>}/>
         <Route path="/topic/:tag" element={<TopicPage session={session} onNavigate={goToTab}/>}/>
         <Route path="/guide" element={<GuidePage session={session} onNavigate={goToTab}/>}/>
