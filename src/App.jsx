@@ -5473,7 +5473,7 @@ function NotificationSettingsPage({ session, onNavigate }) {
             <div style={{ fontSize:10, letterSpacing:"0.14em", textTransform:"uppercase", color:"#B0A488", fontFamily:"'DM Mono', monospace", marginBottom:2, marginTop:6 }}>In your inbox</div>
             <Row title="Replies" desc="When someone replies to your letter or comment." pkey="reply_inapp"/>
             <Row title="New followers" desc="When someone follows you." pkey="follower_inapp"/>
-            <Row title="Board activity" desc="Votes you need to cast, board decisions, and verification \u2014 always on." fixedOn={true} disabled/>
+            <Row title="Board activity" desc="Votes you need to cast, board decisions, and verification — always on." fixedOn={true} disabled/>
 
             <div style={{ fontSize:10, letterSpacing:"0.14em", textTransform:"uppercase", color:"#B0A488", fontFamily:"'DM Mono', monospace", marginBottom:2, marginTop:26 }}>Email</div>
             <Row title="Board decisions" desc="Email me when a board proposal I'm involved in is decided." pkey="board_email"/>
@@ -5590,13 +5590,13 @@ function EditProfilePage({ session, onNavigate }) {
 
             <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:34 }}>
               <button onClick={save} disabled={saving} style={{ background:"#111", color:"#F0EAD8", border:"none", borderRadius:22, padding:"10px 24px", fontSize:13.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>{saving ? "Saving\u2026" : "Save changes"}</button>
-              {saved && <span style={{ fontFamily:"'DM Mono', monospace", fontSize:11, color:"#5A8C6A", letterSpacing:"0.04em" }}>Saved \u2713</span>}
+              {saved && <span style={{ fontFamily:"'DM Mono', monospace", fontSize:11, color:"#5A8C6A", letterSpacing:"0.04em" }}>Saved ✓</span>}
             </div>
 
             <div style={{ borderTop:"1px solid #F0EDE8", paddingTop:20 }}>
               <span style={label}>Membership</span>
               <div style={{ background:"#fff", border:"1px solid #EDE6D8", borderRadius:10, padding:"14px 16px" }}>
-                <div style={{ fontFamily:"'DM Sans', sans-serif", fontSize:14, fontWeight:600, color:"#1a1a1a", marginBottom:4 }}>Free \u00b7 Founding member</div>
+                <div style={{ fontFamily:"'DM Sans', sans-serif", fontSize:14, fontWeight:600, color:"#1a1a1a", marginBottom:4 }}>Free · Founding member</div>
                 <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:13.5, color:"#8A8170", lineHeight:1.55, margin:0 }}>Paid tiers and payment methods will live here once they launch.</p>
               </div>
             </div>
@@ -5608,7 +5608,7 @@ function EditProfilePage({ session, onNavigate }) {
             <div onClick={(e) => e.stopPropagation()} style={{ background:"#fff", borderRadius:16, maxWidth:400, width:"100%", padding:"26px 24px", boxShadow:"0 20px 60px rgba(0,0,0,0.3)" }}>
               <div style={{ fontFamily:"'Playfair Display', serif", fontSize:22, fontWeight:900, color:"#141414", marginBottom:10 }}>Delete your account?</div>
               <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:15, lineHeight:1.6, color:"#555", margin:"0 0 8px" }}>This permanently removes your account and profile, and signs you out. You won't be able to log back in.</p>
-              <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:15, lineHeight:1.6, color:"#555", margin:"0 0 20px" }}>Your letters and replies stay part of the conversations they belong to, but will no longer carry your name \u2014 they'll appear as <em>&ldquo;[deleted user].&rdquo;</em></p>
+              <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:15, lineHeight:1.6, color:"#555", margin:"0 0 20px" }}>Your letters and replies stay part of the conversations they belong to, but will no longer carry your name — they'll appear as <em>&ldquo;[deleted user].&rdquo;</em></p>
               <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
                 <button onClick={() => setShowDelete(false)} disabled={deleting} style={{ background:"none", border:"1px solid #E0D8CC", borderRadius:22, padding:"9px 18px", fontSize:13, fontFamily:"'DM Sans', sans-serif", color:"#777", cursor: deleting ? "default" : "pointer" }}>Cancel</button>
                 <button onClick={handleDeleteAccount} disabled={deleting} style={{ background:"#B03A2E", border:"none", borderRadius:22, padding:"9px 20px", fontSize:13, fontFamily:"'DM Sans', sans-serif", fontWeight:600, color:"#fff", cursor: deleting ? "default" : "pointer", opacity: deleting ? 0.7 : 1 }}>{deleting ? "Deleting\u2026" : "Delete account"}</button>
