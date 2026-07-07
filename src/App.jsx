@@ -5597,7 +5597,7 @@ function EditProfilePage({ session, onNavigate }) {
               <span style={label}>Membership</span>
               <div style={{ background:"#fff", border:"1px solid #EDE6D8", borderRadius:10, padding:"14px 16px" }}>
                 <div style={{ fontFamily:"'DM Sans', sans-serif", fontSize:14, fontWeight:600, color:"#1a1a1a", marginBottom:4 }}>Free · Founding member</div>
-                <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:13.5, color:"#8A8170", lineHeight:1.55, margin:0 }}>Paid tiers and payment methods will live here once they launch.</p>
+                <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:13.5, color:"#8A8170", lineHeight:1.55, margin:0 }}>Premium and Creator tiers coming soon!</p>
               </div>
             </div>
           </>
