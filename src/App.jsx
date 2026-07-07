@@ -339,6 +339,23 @@ const mockReplies = [
   { id:3, author:"Sam K.", initial:"S", color:"#6E2F8C", timeAgo:"3h ago", body:"Agreed with the core argument. What's your take on the role of remote work in reversing some of these trends? We're seeing unusual migration patterns that complicate the narrative." },
 ];
 
+// ── Shared: AuthorLink ────────────────────────────────────
+// Renders a byline name as a tap target to that author's profile (/u/:id) when a
+// real user id is present; otherwise plain text (mock/demo bylines carry no id).
+// stopPropagation lets the name win over a surrounding card's open-on-click.
+function AuthorLink({ userId, children, style }) {
+  const navigate = useNavigate();
+  if (!userId) return <span style={style}>{children}</span>;
+  return (
+    <span
+      onClick={(e) => { e.stopPropagation(); navigate(`/u/${userId}`); }}
+      onMouseEnter={(e) => { e.currentTarget.style.textDecoration = "underline"; e.currentTarget.style.textDecorationColor = "#C8A96E"; e.currentTarget.style.textUnderlineOffset = "2px"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.textDecoration = "none"; }}
+      style={{ cursor:"pointer", ...style }}
+    >{children}</span>
+  );
+}
+
 function LetterDetailView({ item, onBack, session }) {
   const [liked, setLiked] = useState(false);
   const [likes, setLikes] = useState(item.likes);
@@ -514,7 +531,7 @@ function LetterCard({ item, onOpen, selected, onToggleLike, isLiked, onToggleRep
         <div style={{ flex:1, minWidth:0 }}>
           <div style={{ marginBottom:8 }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-              <span style={{ fontSize:13, fontWeight:600, color:"#1a1a1a", fontFamily:"'DM Sans', sans-serif" }}>{item.author}</span>
+              <AuthorLink userId={item.userId} style={{ fontSize:13, fontWeight:600, color:"#1a1a1a", fontFamily:"'DM Sans', sans-serif" }}>{item.author}</AuthorLink>
               <span style={{ fontSize:10, color:"#bbb", fontFamily:"'DM Mono', monospace", flexShrink:0 }}>{item.timeAgo}</span>
             </div>
             <div style={{ fontSize:10, fontFamily:"'DM Mono', monospace", marginTop:2, letterSpacing:"0.04em" }}>
@@ -599,7 +616,7 @@ function PostCard({ item, onOpen, selected, onToggleLike, isLiked, onToggleRepub
         <div style={{ flex:1, minWidth:0 }}>
           <div style={{ marginBottom:8 }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-              <span style={{ fontSize:13, fontWeight:600, color:"#1a1a1a", fontFamily:"'DM Sans', sans-serif" }}>{item.author}</span>
+              <AuthorLink userId={item.userId} style={{ fontSize:13, fontWeight:600, color:"#1a1a1a", fontFamily:"'DM Sans', sans-serif" }}>{item.author}</AuthorLink>
               <span style={{ fontSize:10, color:"#bbb", fontFamily:"'DM Mono', monospace", flexShrink:0 }}>{item.timeAgo}</span>
             </div>
             <div style={{ fontSize:10, fontFamily:"'DM Mono', monospace", marginTop:2, letterSpacing:"0.04em" }}>
@@ -1153,6 +1170,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
       setLetterLikes((likesData || []).map(l => l.user_id));
       setLetterReplies((repliesData || []).map(r => ({
         id: r.id,
+        userId: r.user_id,
         author: r.profiles?.full_name || r.profiles?.username || "Anonymous",
         initial: (r.profiles?.full_name || r.profiles?.username || "A")[0].toUpperCase(),
         color: colorForId(r.user_id),
@@ -1553,7 +1571,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
                 <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:18 }}>
                   <Avatar initial={openLetter.initial} color={openLetter.color} size={44}/>
                   <div>
-                    <div style={{ fontSize:15, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}>{openLetter.author}</div>
+                    <div style={{ fontSize:15, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}><AuthorLink userId={openLetter.userId}>{openLetter.author}</AuthorLink></div>
                     <div style={{ fontSize:10, fontFamily:"'DM Mono', monospace", marginTop:2 }}>
                       <span style={{ color:"#BBB" }}>by </span>
                       <span style={{ color:"#777" }}>{openLetter.username}</span>
@@ -1629,7 +1647,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
                       <Avatar initial={reply.initial} color={reply.color} size={30}/>
                       <div style={{ flex:1 }}>
                         <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
-                          <span style={{ fontSize:12.5, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}>{reply.author}</span>
+                          <AuthorLink userId={reply.userId} style={{ fontSize:12.5, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}>{reply.author}</AuthorLink>
                           <span style={{ fontSize:9.5, color:"#BBB", fontFamily:"'DM Mono', monospace" }}>{reply.timeAgo}</span>
                         </div>
                         <p style={{ margin:0, fontSize:14, lineHeight:1.65, color:"#555", fontFamily:"'EB Garamond', serif" }}>{reply.body}</p>
@@ -1646,7 +1664,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
                       <Avatar initial={reply.initial} color={reply.color} size={30}/>
                       <div style={{ flex:1 }}>
                         <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
-                          <span style={{ fontSize:12.5, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}>{reply.author}</span>
+                          <AuthorLink userId={reply.userId} style={{ fontSize:12.5, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}>{reply.author}</AuthorLink>
                           <span style={{ fontSize:9.5, color:"#BBB", fontFamily:"'DM Mono', monospace" }}>{reply.timeAgo}</span>
                         </div>
                         <p style={{ margin:0, fontSize:14, lineHeight:1.65, color:"#555", fontFamily:"'EB Garamond', serif" }}>{reply.body}</p>
@@ -2206,7 +2224,7 @@ function ReadPage({ onNavigate, session }) {
                 <div style={{ display:"flex", alignItems:"center", gap:8, paddingTop:10, borderTop:"1px solid #F0EDE8" }}>
                   <div style={{ width:28, height:28, borderRadius:"50%", background:displayLetters[0].color, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:12, fontFamily:"'Playfair Display', serif", fontWeight:700, flexShrink:0 }}>{displayLetters[0].initial}</div>
                   <div style={{ minWidth:0 }}>
-                    <div style={{ fontSize:12, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif", overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis" }}>{displayLetters[0].author}</div>
+                    <div style={{ fontSize:12, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif", overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis" }}><AuthorLink userId={displayLetters[0].userId}>{displayLetters[0].author}</AuthorLink></div>
                     <div style={{ fontSize:8.5, color: statusColors[displayLetters[0].status] || "#AAA", fontFamily:"'DM Mono', monospace" }}>{contributorStatuses[displayLetters[0].status] || contributorStatuses["contributor"]}</div>
                   </div>
                   <span style={{ marginLeft:"auto", fontSize:8.5, color:"#BBB", fontFamily:"'DM Mono', monospace", flexShrink:0 }}>{displayLetters[0].timeAgo}</span>
@@ -2233,7 +2251,7 @@ function ReadPage({ onNavigate, session }) {
                   </p>
                   <div style={{ display:"flex", alignItems:"center", gap:7 }}>
                     <div style={{ width:22, height:22, borderRadius:"50%", background:letter.color, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:10, fontFamily:"'Playfair Display', serif", fontWeight:700, flexShrink:0 }}>{letter.initial}</div>
-                    <div style={{ fontSize:11, fontWeight:600, color:"#333", fontFamily:"'DM Sans', sans-serif", overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis" }}>{letter.author}</div>
+                    <div style={{ fontSize:11, fontWeight:600, color:"#333", fontFamily:"'DM Sans', sans-serif", overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis" }}><AuthorLink userId={letter.userId}>{letter.author}</AuthorLink></div>
                   </div>
                 </div>
               ))}
@@ -3582,7 +3600,7 @@ function ForumFeedCard({ item }) {
         <div style={{ width:34, height:34, borderRadius:"50%", background:item.color, display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontSize:13, fontFamily:"'Playfair Display', serif", fontWeight:500, flexShrink:0 }}>{item.initial}</div>
         <div style={{ flex:1, minWidth:0 }}>
           <div style={{ display:"flex", justifyContent:"space-between", marginBottom:5 }}>
-            <span style={{ fontSize:13, fontWeight:600, color:"#1a1a1a", fontFamily:"'DM Sans', sans-serif" }}>{item.author}</span>
+            <AuthorLink userId={item.userId} style={{ fontSize:13, fontWeight:600, color:"#1a1a1a", fontFamily:"'DM Sans', sans-serif" }}>{item.author}</AuthorLink>
             <span style={{ fontSize:10, color:"#bbb", fontFamily:"'DM Mono', monospace" }}>{item.timeAgo}</span>
           </div>
           <p style={{ margin:0, fontSize:14.5, lineHeight:1.65, color:"#444", fontFamily:"'EB Garamond', serif", display:"-webkit-box", WebkitLineClamp:3, WebkitBoxOrient:"vertical", overflow:"hidden" }}>{item.preview}</p>
@@ -4456,7 +4474,7 @@ function ForumPostPage({ session, onNavigate }) {
         <Avatar initial={initialOf(r)} color={colorFor(r.user_id)} size={32}/>
         <div style={{ flex:1, minWidth:0 }}>
           <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:3 }}>
-            <span style={{ fontSize:13, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}>{authorOf(r)}</span>
+            <AuthorLink userId={r.user_id} style={{ fontSize:13, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}>{authorOf(r)}</AuthorLink>
             <span style={{ fontSize:10, color:"#BBB", fontFamily:"'DM Mono', monospace" }}>{ago(r.created_at)}</span>
           </div>
           <p style={{ margin:0, fontSize:14.5, lineHeight:1.65, color:"#444", fontFamily:"'EB Garamond', Georgia, serif" }}>{r.body}</p>
@@ -4499,7 +4517,7 @@ function ForumPostPage({ session, onNavigate }) {
         <div style={{ display:"flex", alignItems:"center", gap:11, marginBottom:18 }}>
           <Avatar initial={(((letter.profiles && (letter.profiles.full_name || letter.profiles.username)) || "A")[0] || "A").toUpperCase()} color={colorFor(letter.user_id)} size={38}/>
           <div>
-            <div style={{ fontSize:14, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}>{(letter.profiles && (letter.profiles.full_name || letter.profiles.username)) || "A writer"}</div>
+            <div style={{ fontSize:14, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}><AuthorLink userId={letter.user_id}>{(letter.profiles && (letter.profiles.full_name || letter.profiles.username)) || "A writer"}</AuthorLink></div>
             <div style={{ fontSize:11, color:"#AAA", fontFamily:"'DM Mono', monospace" }}>{letter.profiles && letter.profiles.username ? "@" + letter.profiles.username + " · " : ""}{ago(letter.created_at)}</div>
           </div>
         </div>
@@ -5387,6 +5405,88 @@ function AuthorProfilePage({ session, onNavigate }) {
   );
 }
 
+
+function NotificationSettingsPage({ session, onNavigate }) {
+  const navigate = useNavigate();
+  const me = session?.user?.id;
+  const [prefs, setPrefs] = useState({ reply_inapp:true, follower_inapp:true, board_email:true });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!me) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const { data } = await supabase.from("notification_prefs").select("*").eq("user_id", me).limit(1);
+      if (cancelled) return;
+      const row = data && data[0];
+      if (row) setPrefs({ reply_inapp: row.reply_inapp, follower_inapp: row.follower_inapp, board_email: row.board_email });
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [me]);
+
+  const setPref = async (key, value) => {
+    if (!me || saving) return;
+    const prev = prefs;
+    const next = { ...prefs, [key]: value };
+    setPrefs(next);
+    setSaving(true);
+    const { error } = await supabase.from("notification_prefs")
+      .upsert({ user_id: me, ...next, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+    if (error) { setPrefs(prev); console.error("Save prefs failed:", error); }
+    setSaving(false);
+  };
+
+  const Toggle = ({ on, onToggle, disabled }) => (
+    <button onClick={() => { if (!disabled) onToggle(!on); }} disabled={disabled}
+      style={{ width:44, height:26, borderRadius:14, border:"none", background: disabled ? "#E8E2D6" : (on ? "#111" : "#D8D0C2"), position:"relative", cursor: disabled ? "default" : "pointer", flexShrink:0, transition:"background 0.15s", padding:0 }}>
+      <span style={{ position:"absolute", top:3, left: on ? 21 : 3, width:20, height:20, borderRadius:"50%", background:"#fff", transition:"left 0.15s", boxShadow:"0 1px 2px rgba(0,0,0,0.2)" }}/>
+    </button>
+  );
+
+  const Row = ({ title, desc, pkey, disabled, fixedOn }) => (
+    <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:16, padding:"16px 0", borderBottom:"1px solid #F0EDE8" }}>
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ fontFamily:"'DM Sans', sans-serif", fontSize:14.5, fontWeight:600, color:"#1a1a1a", marginBottom:3 }}>{title}</div>
+        <div style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:14, color:"#8A8170", lineHeight:1.5 }}>{desc}</div>
+      </div>
+      <Toggle on={fixedOn != null ? fixedOn : prefs[pkey]} onToggle={(v) => setPref(pkey, v)} disabled={disabled}/>
+    </div>
+  );
+
+  return (
+    <div className="letters-main" style={{ minHeight:"100vh", background:"#F9F6F0", paddingBottom:80 }}>
+      <TopBar title={<span>Settings<span style={{ color:"#C8A96E" }}>.</span></span>} maxWidth={1040} onLogoClick={() => navigate("/feed")}/>
+      <main style={{ maxWidth:560, margin:"0 auto", padding:"14px 20px 0" }}>
+        <button onClick={() => navigate(-1)} style={{ background:"none", border:"none", color:"#B0A488", fontFamily:"'DM Mono', monospace", fontSize:11.5, letterSpacing:"0.06em", cursor:"pointer", margin:"0 0 8px", display:"flex", alignItems:"center", gap:6, padding:0 }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="m15 18-6-6 6-6"/></svg> Back
+        </button>
+
+        <h1 style={{ fontFamily:"'Playfair Display', serif", fontSize:26, fontWeight:900, color:"#111", margin:"4px 0 18px" }}>Notifications</h1>
+
+        {loading ? (
+          <div style={{ textAlign:"center", padding:"40px 0", fontSize:11, color:"#AAA", fontFamily:"'DM Mono', monospace", letterSpacing:"0.1em" }}>Loading...</div>
+        ) : (
+          <>
+            <div style={{ fontSize:10, letterSpacing:"0.14em", textTransform:"uppercase", color:"#B0A488", fontFamily:"'DM Mono', monospace", marginBottom:2, marginTop:6 }}>In your inbox</div>
+            <Row title="Replies" desc="When someone replies to your letter or comment." pkey="reply_inapp"/>
+            <Row title="New followers" desc="When someone follows you." pkey="follower_inapp"/>
+            <Row title="Board activity" desc="Votes you need to cast, board decisions, and verification \u2014 always on." fixedOn={true} disabled/>
+
+            <div style={{ fontSize:10, letterSpacing:"0.14em", textTransform:"uppercase", color:"#B0A488", fontFamily:"'DM Mono', monospace", marginBottom:2, marginTop:26 }}>Email</div>
+            <Row title="Board decisions" desc="Email me when a board proposal I'm involved in is decided." pkey="board_email"/>
+
+            <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontStyle:"italic", fontSize:13.5, color:"#A99F86", margin:"22px 0 0", lineHeight:1.6 }}>
+              More email options will arrive as we expand notifications. Changes save automatically.
+            </p>
+          </>
+        )}
+      </main>
+    </div>
+  );
+}
 
 function GuidePage({ session, onNavigate }) {
   const navigate = useNavigate();
@@ -6539,6 +6639,12 @@ function InboxPage({ session, onNavigate }) {
     <div className="letters-main" style={{ minHeight:"100vh", background:"#F9F6F0", paddingBottom:80 }}>
       <TopBar title={<span>Inbox<span style={{ color:"#C8A96E" }}>.</span></span>} maxWidth={1040}/>
       <main style={{ maxWidth:640, margin:"0 auto", padding:"14px 20px 0" }}>
+        <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:10 }}>
+          <button onClick={() => navigate("/settings/notifications")} style={{ display:"flex", alignItems:"center", gap:6, background:"none", border:"none", color:"#B0A488", fontFamily:"'DM Mono', monospace", fontSize:11, letterSpacing:"0.05em", cursor:"pointer", padding:"2px 0" }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            Settings
+          </button>
+        </div>
         {loading ? (
           <div>{[0,1,2].map(i => <div key={i} style={{ height:74, background:"#fff", border:"1px solid #EFE9DD", borderRadius:12, marginBottom:10, opacity:0.5 }}/>)}</div>
         ) : notes.length === 0 ? (
@@ -6767,6 +6873,7 @@ function AuthenticatedApp({ session, handleSignOut }) {
         <Route path="/forums/:slug/post/:letterId" element={<ForumPostPage session={session} onNavigate={goToTab}/>}/>
         <Route path="/you" element={<YouPage session={session} onSignOut={handleSignOut}/>}/>
         <Route path="/u/:userId" element={<AuthorProfilePage session={session} onNavigate={goToTab}/>}/>
+        <Route path="/settings/notifications" element={<NotificationSettingsPage session={session} onNavigate={goToTab}/>}/>
         <Route path="/inbox" element={<InboxPage session={session} onNavigate={goToTab}/>}/>
         <Route path="/topic/:tag" element={<TopicPage session={session} onNavigate={goToTab}/>}/>
         <Route path="/guide" element={<GuidePage session={session} onNavigate={goToTab}/>}/>
