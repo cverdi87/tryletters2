@@ -5204,6 +5204,9 @@ function AuthorProfilePage({ session, onNavigate }) {
   const [verifiedForums, setVerifiedForums] = useState([]);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [blockBusy, setBlockBusy] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   // Own profile has edit affordances — send the user to /you instead.
   useEffect(() => {
@@ -5231,7 +5234,7 @@ function AuthorProfilePage({ session, onNavigate }) {
 
       const [{ data: ls }, { data: v }, { data: e },
              { count: following }, { count: followers },
-             { count: replyCount }, { data: myFollow }] = await Promise.all([
+             { count: replyCount }, { data: myFollow }, { data: myBlock }] = await Promise.all([
         supabase.from("letters").select("*").eq("user_id", userId).order("created_at", { ascending:false }),
         supabase.from("forum_verified").select("forum_id").eq("user_id", userId),
         supabase.from("forum_editors").select("forum_id").eq("user_id", userId),
@@ -5240,11 +5243,14 @@ function AuthorProfilePage({ session, onNavigate }) {
         supabase.from("replies").select("*", { count:"exact", head:true }).eq("user_id", userId),
         me ? supabase.from("follows").select("following_id").eq("follower_id", me).eq("following_id", userId)
            : Promise.resolve({ data: [] }),
+        me ? supabase.from("blocks").select("blocked_id").eq("blocker_id", me).eq("blocked_id", userId)
+           : Promise.resolve({ data: [] }),
       ]);
       if (cancelled) return;
       const lettersData = ls || [];
       setLetters(lettersData);
       setIsFollowing((myFollow || []).length > 0);
+      setIsBlocked((myBlock || []).length > 0);
 
       const letterIds = lettersData.map(l => l.id);
       const { count: likesRecv } = letterIds.length
@@ -5263,7 +5269,7 @@ function AuthorProfilePage({ session, onNavigate }) {
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [userId, me]);
+  }, [userId, me, reloadKey]);
 
   const toggleFollow = async () => {
     if (!me || !userId || me === userId || followBusy) return;
@@ -5280,6 +5286,26 @@ function AuthorProfilePage({ session, onNavigate }) {
       if (error) { setIsFollowing(false); setCounts(c => ({ ...c, followers: Math.max(c.followers - 1, 0) })); console.error("Follow failed:", error); }
     }
     setFollowBusy(false);
+  };
+
+  const toggleBlock = async () => {
+    if (!me || !userId || me === userId || blockBusy) return;
+    setBlockBusy(true);
+    if (isBlocked) {
+      const { error } = await supabase.from("blocks").delete().eq("blocker_id", me).eq("blocked_id", userId);
+      if (error) { console.error("Unblock failed:", error); setBlockBusy(false); return; }
+      setIsBlocked(false);
+      setReloadKey(k => k + 1);
+    } else {
+      const { error } = await supabase.from("blocks").insert({ blocker_id: me, blocked_id: userId });
+      if (error) { console.error("Block failed:", error); setBlockBusy(false); return; }
+      await supabase.from("follows").delete().eq("follower_id", me).eq("following_id", userId);
+      await supabase.from("follows").delete().eq("follower_id", userId).eq("following_id", me);
+      setIsBlocked(true);
+      setIsFollowing(false);
+      setLetters([]);
+    }
+    setBlockBusy(false);
   };
 
   if (notFound) {
@@ -5336,10 +5362,25 @@ function AuthorProfilePage({ session, onNavigate }) {
               ) : null}
             </div>
             {!isSelf && me ? (
-              <button onClick={toggleFollow} disabled={followBusy}
-                style={{ flexShrink:0, background: isFollowing ? "#F0EDE8" : "#111", color: isFollowing ? "#888" : "#F0EAD8", border: isFollowing ? "1px solid #E0D8CC" : "none", borderRadius:20, padding:"7px 20px", fontSize:12.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor: followBusy ? "default" : "pointer" }}>
-                {isFollowing ? "Following" : "Follow"}
-              </button>
+              <div style={{ flexShrink:0, display:"flex", flexDirection:"column", alignItems:"flex-end", gap:7 }}>
+                {isBlocked ? (
+                  <button onClick={toggleBlock} disabled={blockBusy}
+                    style={{ background:"#F0EDE8", color:"#B03A2E", border:"1px solid #E5CFC9", borderRadius:20, padding:"7px 20px", fontSize:12.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor: blockBusy ? "default" : "pointer" }}>
+                    Unblock
+                  </button>
+                ) : (
+                  <>
+                    <button onClick={toggleFollow} disabled={followBusy}
+                      style={{ background: isFollowing ? "#F0EDE8" : "#111", color: isFollowing ? "#888" : "#F0EAD8", border: isFollowing ? "1px solid #E0D8CC" : "none", borderRadius:20, padding:"7px 20px", fontSize:12.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor: followBusy ? "default" : "pointer" }}>
+                      {isFollowing ? "Following" : "Follow"}
+                    </button>
+                    <button onClick={toggleBlock} disabled={blockBusy}
+                      style={{ background:"none", border:"none", color:"#B9756B", fontFamily:"'DM Mono', monospace", fontSize:10.5, letterSpacing:"0.04em", cursor: blockBusy ? "default" : "pointer", padding:0 }}>
+                      Block
+                    </button>
+                  </>
+                )}
+              </div>
             ) : null}
           </div>
 
@@ -5379,7 +5420,12 @@ function AuthorProfilePage({ session, onNavigate }) {
 
         <div style={{ padding:"20px 20px 0" }}>
           <div style={{ fontSize:10, letterSpacing:"0.14em", textTransform:"uppercase", color:"#AAA", fontFamily:"'DM Mono', monospace", marginBottom:6 }}>Letters</div>
-          {loading ? (
+          {isBlocked ? (
+            <div style={{ textAlign:"center", padding:"48px 20px" }}>
+              <div style={{ fontSize:10, letterSpacing:"0.18em", textTransform:"uppercase", color:"#B9756B", fontFamily:"'DM Mono', monospace", marginBottom:12 }}>Blocked</div>
+              <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:16, color:"#888", margin:0 }}>You've blocked this person. Their letters and replies are hidden from you across Letters. Use Unblock above to restore them.</p>
+            </div>
+          ) : loading ? (
             <div style={{ textAlign:"center", padding:"40px 0", fontSize:11, color:"#AAA", fontFamily:"'DM Mono', monospace", letterSpacing:"0.1em" }}>Loading...</div>
           ) : letters.length === 0 ? (
             <div style={{ textAlign:"center", padding:"48px 20px" }}>
@@ -5500,6 +5546,7 @@ function EditProfilePage({ session, onNavigate }) {
   const [saved, setSaved] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [blocked, setBlocked] = useState([]);
 
   useEffect(() => {
     if (!me) return;
@@ -5541,6 +5588,25 @@ function EditProfilePage({ session, onNavigate }) {
     }
     await supabase.auth.signOut();
     window.location.href = "/";
+  };
+
+  useEffect(() => {
+    if (!me) return;
+    let cancelled = false;
+    (async () => {
+      const { data: b } = await supabase.from("blocks").select("blocked_id").eq("blocker_id", me);
+      const ids = (b || []).map(r => r.blocked_id);
+      if (!ids.length) { if (!cancelled) setBlocked([]); return; }
+      const { data: profs } = await supabase.from("profiles").select("id, full_name, username").in("id", ids);
+      if (!cancelled) setBlocked(profs || []);
+    })();
+    return () => { cancelled = true; };
+  }, [me]);
+
+  const unblock = async (id) => {
+    const { error } = await supabase.from("blocks").delete().eq("blocker_id", me).eq("blocked_id", id);
+    if (error) { console.error("Unblock failed:", error); return; }
+    setBlocked(prev => prev.filter(u => u.id !== id));
   };
 
   const photoSeed = `user-${(me || "").slice(0,8)}`;
@@ -5599,6 +5665,21 @@ function EditProfilePage({ session, onNavigate }) {
                 <div style={{ fontFamily:"'DM Sans', sans-serif", fontSize:14, fontWeight:600, color:"#1a1a1a", marginBottom:4 }}>Free · Founding member</div>
                 <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:13.5, color:"#8A8170", lineHeight:1.55, margin:0 }}>Premium and Creator tiers coming soon!</p>
               </div>
+            </div>
+
+            <div style={{ borderTop:"1px solid #F0EDE8", paddingTop:20, marginTop:26 }}>
+              <span style={label}>Blocked accounts</span>
+              {blocked.length === 0 ? (
+                <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:14, color:"#8A8170", margin:0 }}>You haven't blocked anyone.</p>
+              ) : blocked.map(u => (
+                <div key={u.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:12, padding:"12px 0", borderBottom:"1px solid #F0EDE8" }}>
+                  <div style={{ fontFamily:"'DM Sans', sans-serif", fontSize:14, color:"#1a1a1a" }}>
+                    {u.full_name || u.username || "Someone"}
+                    {u.username ? <span style={{ color:"#AAA", fontFamily:"'DM Mono', monospace", fontSize:11, marginLeft:6 }}>@{u.username}</span> : null}
+                  </div>
+                  <button onClick={() => unblock(u.id)} style={{ flexShrink:0, background:"none", border:"1px solid #E0D8CC", borderRadius:20, padding:"5px 14px", fontSize:12, fontFamily:"'DM Sans', sans-serif", color:"#777", cursor:"pointer" }}>Unblock</button>
+                </div>
+              ))}
             </div>
           </>
         )}
