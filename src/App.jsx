@@ -4938,7 +4938,7 @@ function YouPage({ session, onSignOut }) {
         title={<span>You<span style={{ color:"#C8A96E" }}>.</span></span>}
         onSignOut={onSignOut}
         rightAction={
-          <button style={{ background:"none", border:"1px solid #E0D8CC", borderRadius:20, padding:"5px 14px", fontSize:12, color:"#888", fontFamily:"'DM Sans', sans-serif", cursor:"pointer" }}>
+          <button onClick={() => navigate("/edit-profile")} style={{ background:"none", border:"1px solid #E0D8CC", borderRadius:20, padding:"5px 14px", fontSize:12, color:"#888", fontFamily:"'DM Sans', sans-serif", cursor:"pointer" }}>
             Edit profile
           </button>
         }
@@ -5482,6 +5482,139 @@ function NotificationSettingsPage({ session, onNavigate }) {
               More email options will arrive as we expand notifications. Changes save automatically.
             </p>
           </>
+        )}
+      </main>
+    </div>
+  );
+}
+
+function EditProfilePage({ session, onNavigate }) {
+  const navigate = useNavigate();
+  const me = session?.user?.id;
+  const [loading, setLoading] = useState(true);
+  const [name, setName] = useState("");
+  const [location, setLocation] = useState("");
+  const [bio, setBio] = useState("");
+  const [imgError, setImgError] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    if (!me) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const { data } = await supabase.from("profiles").select("*").eq("id", me).single();
+      if (cancelled) return;
+      if (data) {
+        setName(data.full_name || data.username || "");
+        setLocation(data.location || "");
+        setBio(data.bio || "");
+      }
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [me]);
+
+  const save = async () => {
+    if (!me || saving) return;
+    setSaving(true); setSaved(false);
+    const { error } = await supabase.from("profiles")
+      .update({ location: location.trim(), bio: bio.trim() }).eq("id", me);
+    setSaving(false);
+    if (error) { console.error("Save profile failed:", error); alert(`Couldn't save: ${error.message}`); return; }
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2200);
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleting) return;
+    setDeleting(true);
+    const { error } = await supabase.rpc("delete_my_account");
+    if (error) {
+      setDeleting(false);
+      console.error("delete_my_account failed:", error);
+      alert("Something went wrong deleting your account. Please try again, or contact support if it persists.");
+      return;
+    }
+    await supabase.auth.signOut();
+    window.location.href = "/";
+  };
+
+  const photoSeed = `user-${(me || "").slice(0,8)}`;
+  const initial = ((name || "?")[0] || "?").toUpperCase();
+
+  const label = { fontSize:10, letterSpacing:"0.14em", textTransform:"uppercase", color:"#B0A488", fontFamily:"'DM Mono', monospace", marginBottom:8, display:"block" };
+  const field = { width:"100%", boxSizing:"border-box", border:"1px solid #E2DAC9", borderRadius:8, padding:"11px 13px", fontSize:14.5, fontFamily:"'EB Garamond', Georgia, serif", color:"#2E2A22", background:"#fff", outline:"none" };
+
+  return (
+    <div className="letters-main" style={{ minHeight:"100vh", background:"#F9F6F0", paddingBottom:80 }}>
+      <TopBar title={<span>Edit Profile<span style={{ color:"#C8A96E" }}>.</span></span>} maxWidth={1040} onLogoClick={() => navigate("/you")}/>
+      <main style={{ maxWidth:560, margin:"0 auto", padding:"14px 20px 0" }}>
+        <button onClick={() => navigate("/you")} style={{ background:"none", border:"none", color:"#B0A488", fontFamily:"'DM Mono', monospace", fontSize:11.5, letterSpacing:"0.06em", cursor:"pointer", margin:"0 0 14px", display:"flex", alignItems:"center", gap:6, padding:0 }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="m15 18-6-6 6-6"/></svg> Back to profile
+        </button>
+
+        {loading ? (
+          <div style={{ textAlign:"center", padding:"40px 0", fontSize:11, color:"#AAA", fontFamily:"'DM Mono', monospace", letterSpacing:"0.1em" }}>Loading...</div>
+        ) : (
+          <>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:12, background:"#FBF3F1", border:"1px solid #EBD5CF", borderRadius:10, padding:"12px 14px", marginBottom:26 }}>
+              <div style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:13.5, color:"#8A5A50" }}>Permanently delete your account.</div>
+              <button onClick={() => setShowDelete(true)} style={{ flexShrink:0, background:"none", border:"1px solid #D8A99F", borderRadius:20, padding:"6px 14px", fontSize:12, fontFamily:"'DM Sans', sans-serif", fontWeight:600, color:"#B03A2E", cursor:"pointer" }}>Delete account</button>
+            </div>
+
+            <div style={{ marginBottom:26 }}>
+              <span style={label}>Profile photo</span>
+              <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+                {!imgError ? (
+                  <img src={`https://picsum.photos/seed/${photoSeed}/120/120`} alt="" onError={() => setImgError(true)} style={{ width:64, height:64, borderRadius:"50%", objectFit:"cover", border:"3px solid #fff", boxShadow:"0 0 0 1.5px #E8E0D0" }}/>
+                ) : (
+                  <div style={{ width:64, height:64, borderRadius:"50%", background:"#111", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'Playfair Display', serif", fontSize:24, fontWeight:900, color:"#F0EAD8" }}>{initial}</div>
+                )}
+                <div style={{ fontFamily:"'EB Garamond', Georgia, serif", fontStyle:"italic", fontSize:13.5, color:"#A99F86", lineHeight:1.5 }}>Photo uploads are coming soon.</div>
+              </div>
+            </div>
+
+            <div style={{ marginBottom:22 }}>
+              <span style={label}>Location</span>
+              <input value={location} onChange={e => setLocation(e.target.value)} placeholder="e.g. Cleveland, Ohio" style={field}/>
+            </div>
+
+            <div style={{ marginBottom:22 }}>
+              <span style={label}>Bio</span>
+              <textarea value={bio} onChange={e => setBio(e.target.value)} rows={4} placeholder="A sentence or two about you." style={{ ...field, resize:"vertical", lineHeight:1.5 }}/>
+            </div>
+
+            <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:34 }}>
+              <button onClick={save} disabled={saving} style={{ background:"#111", color:"#F0EAD8", border:"none", borderRadius:22, padding:"10px 24px", fontSize:13.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>{saving ? "Saving\u2026" : "Save changes"}</button>
+              {saved && <span style={{ fontFamily:"'DM Mono', monospace", fontSize:11, color:"#5A8C6A", letterSpacing:"0.04em" }}>Saved \u2713</span>}
+            </div>
+
+            <div style={{ borderTop:"1px solid #F0EDE8", paddingTop:20 }}>
+              <span style={label}>Membership</span>
+              <div style={{ background:"#fff", border:"1px solid #EDE6D8", borderRadius:10, padding:"14px 16px" }}>
+                <div style={{ fontFamily:"'DM Sans', sans-serif", fontSize:14, fontWeight:600, color:"#1a1a1a", marginBottom:4 }}>Free \u00b7 Founding member</div>
+                <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:13.5, color:"#8A8170", lineHeight:1.55, margin:0 }}>Paid tiers and payment methods will live here once they launch.</p>
+              </div>
+            </div>
+          </>
+        )}
+
+        {showDelete && (
+          <div onClick={() => { if (!deleting) setShowDelete(false); }} style={{ position:"fixed", inset:0, background:"rgba(20,18,14,0.55)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000, padding:20 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ background:"#fff", borderRadius:16, maxWidth:400, width:"100%", padding:"26px 24px", boxShadow:"0 20px 60px rgba(0,0,0,0.3)" }}>
+              <div style={{ fontFamily:"'Playfair Display', serif", fontSize:22, fontWeight:900, color:"#141414", marginBottom:10 }}>Delete your account?</div>
+              <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:15, lineHeight:1.6, color:"#555", margin:"0 0 8px" }}>This permanently removes your account and profile, and signs you out. You won't be able to log back in.</p>
+              <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:15, lineHeight:1.6, color:"#555", margin:"0 0 20px" }}>Your letters and replies stay part of the conversations they belong to, but will no longer carry your name \u2014 they'll appear as <em>&ldquo;[deleted user].&rdquo;</em></p>
+              <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+                <button onClick={() => setShowDelete(false)} disabled={deleting} style={{ background:"none", border:"1px solid #E0D8CC", borderRadius:22, padding:"9px 18px", fontSize:13, fontFamily:"'DM Sans', sans-serif", color:"#777", cursor: deleting ? "default" : "pointer" }}>Cancel</button>
+                <button onClick={handleDeleteAccount} disabled={deleting} style={{ background:"#B03A2E", border:"none", borderRadius:22, padding:"9px 20px", fontSize:13, fontFamily:"'DM Sans', sans-serif", fontWeight:600, color:"#fff", cursor: deleting ? "default" : "pointer", opacity: deleting ? 0.7 : 1 }}>{deleting ? "Deleting\u2026" : "Delete account"}</button>
+              </div>
+            </div>
+          </div>
         )}
       </main>
     </div>
@@ -6874,6 +7007,7 @@ function AuthenticatedApp({ session, handleSignOut }) {
         <Route path="/you" element={<YouPage session={session} onSignOut={handleSignOut}/>}/>
         <Route path="/u/:userId" element={<AuthorProfilePage session={session} onNavigate={goToTab}/>}/>
         <Route path="/settings/notifications" element={<NotificationSettingsPage session={session} onNavigate={goToTab}/>}/>
+        <Route path="/edit-profile" element={<EditProfilePage session={session} onNavigate={goToTab}/>}/>
         <Route path="/inbox" element={<InboxPage session={session} onNavigate={goToTab}/>}/>
         <Route path="/topic/:tag" element={<TopicPage session={session} onNavigate={goToTab}/>}/>
         <Route path="/guide" element={<GuidePage session={session} onNavigate={goToTab}/>}/>
