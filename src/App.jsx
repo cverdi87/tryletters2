@@ -603,6 +603,12 @@ function LetterCard({ item, onOpen, selected, onToggleLike, isLiked, onToggleRep
       style={{ borderBottom:"1px solid #F0EDE8", padding:"20px 0", cursor:"pointer", background: selected ? "#FDFAF4" : "#fff", borderLeft: selected ? "3px solid #C8A96E" : "3px solid transparent", paddingLeft: selected ? 12 : 0, transition:"all 0.15s" }}
       onMouseEnter={e => { if (selected) return; const s = e.currentTarget.style; s.margin = "0 -12px"; s.padding = "20px 12px"; s.background = "#FDFBF6"; s.boxShadow = "inset 0 0 0 1px #E5DBC8"; s.borderRadius = "12px"; s.borderBottomColor = "transparent"; }}
       onMouseLeave={e => { if (selected) return; const s = e.currentTarget.style; s.margin = "0"; s.padding = "20px 0"; s.background = "#fff"; s.boxShadow = "none"; s.borderRadius = "0"; s.borderBottomColor = "#F0EDE8"; }}>
+      {item.removed && (
+        <div style={{ display:"inline-flex", alignItems:"center", gap:5, background:"#F5E1DC", border:"1px solid #E3B8AE", color:"#B03A2E", fontFamily:"'DM Mono', monospace", fontSize:10, letterSpacing:"0.08em", textTransform:"uppercase", fontWeight:600, padding:"3px 9px", borderRadius:12, marginBottom:10 }}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="10"/><path d="M4.9 4.9l14.2 14.2"/></svg>
+          Removed post
+        </div>
+      )}
 
       {/* Republished banner — shown above the Letter label when this card is a republish */}
       {item.republishedBy && (
@@ -690,6 +696,12 @@ function PostCard({ item, onOpen, selected, onToggleLike, isLiked, onToggleRepub
       style={{ borderBottom:"1px solid #F0EDE8", padding:"18px 0", cursor:"pointer", background: selected ? "#FDFAF4" : "#fff", borderLeft: selected ? "3px solid #C8A96E" : "3px solid transparent", paddingLeft: selected ? 12 : 0, transition:"all 0.15s" }}
       onMouseEnter={e => { if (selected) return; const s = e.currentTarget.style; s.margin = "0 -12px"; s.padding = "18px 12px"; s.background = "#FDFBF6"; s.boxShadow = "inset 0 0 0 1px #E5DBC8"; s.borderRadius = "12px"; s.borderBottomColor = "transparent"; }}
       onMouseLeave={e => { if (selected) return; const s = e.currentTarget.style; s.margin = "0"; s.padding = "18px 0"; s.background = "#fff"; s.boxShadow = "none"; s.borderRadius = "0"; s.borderBottomColor = "#F0EDE8"; }}>
+      {item.removed && (
+        <div style={{ display:"inline-flex", alignItems:"center", gap:5, background:"#F5E1DC", border:"1px solid #E3B8AE", color:"#B03A2E", fontFamily:"'DM Mono', monospace", fontSize:10, letterSpacing:"0.08em", textTransform:"uppercase", fontWeight:600, padding:"3px 9px", borderRadius:12, marginBottom:10 }}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="10"/><path d="M4.9 4.9l14.2 14.2"/></svg>
+          Removed post
+        </div>
+      )}
 
       {/* Republished banner — same treatment as LetterCard */}
       {item.republishedBy && (
@@ -1162,6 +1174,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
           return {
             id: `real-${letter.id}`,
             dbId: letter.id,
+            removed: letter.removed,
             type: "letter",
             kind: letter.kind || "letter", // "letter" (long) or "post" (short) — drives which feed card renders
             isReal: true,
@@ -1235,7 +1248,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
       const profile = letter.profiles || {};
       const plainBody = stripHtml(letter.body);
       setFetchedLetter({
-        id: `real-${letter.id}`, dbId: letter.id, type: "letter", kind: letter.kind || "letter", isReal: true,
+        id: `real-${letter.id}`, dbId: letter.id, removed: letter.removed, type: "letter", kind: letter.kind || "letter", isReal: true,
         userId: letter.user_id, author: profile.full_name || profile.username || "Anonymous", username: profile.username || "user",
         status: profile.status || "contributor", initial: (profile.full_name || profile.username || "A")[0].toUpperCase(),
         color: colorForId(letter.user_id), timeAgo: timeAgo(letter.created_at), createdAt: letter.created_at,
@@ -1691,6 +1704,12 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
                 </div>
 
                 {/* Title, if present */}
+                {openLetter.removed && (
+                  <div style={{ display:"inline-flex", alignItems:"center", gap:5, background:"#F5E1DC", border:"1px solid #E3B8AE", color:"#B03A2E", fontFamily:"'DM Mono', monospace", fontSize:10.5, letterSpacing:"0.08em", textTransform:"uppercase", fontWeight:600, padding:"4px 10px", borderRadius:12, marginBottom:14 }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="10"/><path d="M4.9 4.9l14.2 14.2"/></svg>
+                    Removed post
+                  </div>
+                )}
                 {openLetter.title && (
                   <h2 style={{ fontFamily:"'Playfair Display', serif", fontSize:24, fontWeight:800, color:"#111", margin:"0 0 14px", lineHeight:1.2 }}>{openLetter.title}</h2>
                 )}
@@ -5826,6 +5845,7 @@ function StaffReportsPage({ session, onNavigate }) {
   const [view, setView] = useState("list");       // "list" | "case" | "user"
   const [activeKey, setActiveKey] = useState(null);
   const [activeUser, setActiveUser] = useState(null);
+  const [suspended, setSuspended] = useState({});
   const [filter, setFilter] = useState("open");
 
   const [decision, setDecision] = useState("");
@@ -5857,16 +5877,16 @@ function StaffReportsPage({ session, onNavigate }) {
       ...dlist.flatMap(d => [d.decided_by, d.target_author_id]),
     ].filter(Boolean))];
     const [{ data: ls }, { data: rs }, { data: ps }] = await Promise.all([
-      letterIds.length ? supabase.from("letters").select("id, title, body, user_id").in("id", letterIds) : Promise.resolve({ data: [] }),
-      replyIds.length  ? supabase.from("replies").select("id, body, user_id, letter_id").in("id", replyIds) : Promise.resolve({ data: [] }),
-      userIds.length   ? supabase.from("profiles").select("id, full_name, username").in("id", userIds) : Promise.resolve({ data: [] }),
+      letterIds.length ? supabase.from("letters").select("id, title, body, user_id, removed").in("id", letterIds) : Promise.resolve({ data: [] }),
+      replyIds.length  ? supabase.from("replies").select("id, body, user_id, letter_id, removed").in("id", replyIds) : Promise.resolve({ data: [] }),
+      userIds.length   ? supabase.from("profiles").select("id, full_name, username, suspended").in("id", userIds) : Promise.resolve({ data: [] }),
     ]);
     const cmap = {};
-    (ls || []).forEach(l => { cmap["letter:" + l.id] = { title: l.title, body: strip(l.body), letterId: l.id }; });
-    (rs || []).forEach(r => { cmap["reply:" + r.id] = { title: null, body: strip(r.body), letterId: r.letter_id }; });
-    const nmap = {};
-    (ps || []).forEach(p => { nmap[p.id] = p.full_name || p.username || "Someone"; });
-    setReports(rlist); setDecisions(dlist); setContent(cmap); setNames(nmap); setLoading(false);
+    (ls || []).forEach(l => { cmap["letter:" + l.id] = { title: l.title, body: strip(l.body), letterId: l.id, removed: l.removed }; });
+    (rs || []).forEach(r => { cmap["reply:" + r.id] = { title: null, body: strip(r.body), letterId: r.letter_id, removed: r.removed }; });
+    const nmap = {}, smap = {};
+    (ps || []).forEach(p => { nmap[p.id] = p.full_name || p.username || "Someone"; smap[p.id] = !!p.suspended; });
+    setReports(rlist); setDecisions(dlist); setContent(cmap); setNames(nmap); setSuspended(smap); setLoading(false);
   };
 
   useEffect(() => { if (!isStaff) { setLoading(false); return; } load(); }, [isStaff]);
@@ -5914,6 +5934,19 @@ function StaffReportsPage({ session, onNavigate }) {
     setSaving(false);
     if (error) { console.error("Decision failed:", error); alert(`Couldn't save decision: ${error.message}`); return; }
     setDecision(""); setNote("");
+    await load();
+  };
+
+  const toggleRemove = async (c) => {
+    const cur = content[c.key];
+    const { error } = await supabase.rpc("mod_remove_content", { p_type: c.target_type, p_id: c.target_id, p_removed: !(cur && cur.removed) });
+    if (error) { console.error("Remove failed:", error); alert(`Couldn't update content: ${error.message}`); return; }
+    await load();
+  };
+  const toggleSuspend = async (uid) => {
+    if (!uid) return;
+    const { error } = await supabase.rpc("mod_set_suspended", { p_user: uid, p_suspended: !suspended[uid] });
+    if (error) { console.error("Suspend failed:", error); alert(`Couldn't update user: ${error.message}`); return; }
     await load();
   };
 
@@ -5996,6 +6029,8 @@ function StaffReportsPage({ session, onNavigate }) {
               <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:14, flexWrap:"wrap" }}>
                 <span style={{ background: (statusColor[c.status] || "#999") + "1A", color: statusColor[c.status] || "#999", fontFamily:"'DM Mono', monospace", fontSize:9.5, letterSpacing:"0.1em", textTransform:"uppercase", padding:"3px 9px", borderRadius:12, fontWeight:600 }}>{c.status}</span>
                 <span style={{ fontFamily:"'Playfair Display', serif", fontSize:20, fontWeight:900, color:"#141414" }}>Reported {c.reports.length}×</span>
+                {ct && ct.removed && <span style={{ background:"#F5E9E6", color:"#B03A2E", fontFamily:"'DM Mono', monospace", fontSize:9.5, letterSpacing:"0.1em", textTransform:"uppercase", padding:"3px 9px", borderRadius:12, fontWeight:600 }}>Removed</span>}
+                {suspended[c.author] && <span style={{ background:"#F5E9E6", color:"#B03A2E", fontFamily:"'DM Mono', monospace", fontSize:9.5, letterSpacing:"0.1em", textTransform:"uppercase", padding:"3px 9px", borderRadius:12, fontWeight:600 }}>Author suspended</span>}
               </div>
 
               <div style={{ background:"#fff", border:"1px solid #EAE2D2", borderRadius:12, padding:"16px 18px", marginBottom:16 }}>
@@ -6010,6 +6045,10 @@ function StaffReportsPage({ session, onNavigate }) {
                   <span style={{ color:"#999" }}>Author: </span>
                   <button onClick={() => openUser(c.author)} style={{ background:"none", border:"none", padding:0, color:"#2E2A22", fontWeight:600, fontFamily:"'DM Sans', sans-serif", fontSize:13, cursor:"pointer", textDecoration:"underline", textDecorationColor:"#C8A96E" }}>{nameOf(c.author)}</button>
                   <span style={{ color:"#C8A96E", marginLeft:6, fontFamily:"'DM Mono', monospace", fontSize:11 }}>see history →</span>
+                </div>
+                <div style={{ marginTop:12, display:"flex", gap:8, flexWrap:"wrap" }}>
+                  <button onClick={() => toggleRemove(c)} style={{ background: ct && ct.removed ? "#F0F5EF" : "#fff", border:"1px solid " + (ct && ct.removed ? "#B7D9C0" : "#D8A99F"), borderRadius:18, padding:"7px 14px", fontSize:12, fontFamily:"'DM Sans', sans-serif", fontWeight:600, color: ct && ct.removed ? "#27AE60" : "#B03A2E", cursor:"pointer" }}>{ct && ct.removed ? "Restore content" : "Remove content"}</button>
+                  <button onClick={() => toggleSuspend(c.author)} style={{ background: suspended[c.author] ? "#F0F5EF" : "#fff", border:"1px solid " + (suspended[c.author] ? "#B7D9C0" : "#D8A99F"), borderRadius:18, padding:"7px 14px", fontSize:12, fontFamily:"'DM Sans', sans-serif", fontWeight:600, color: suspended[c.author] ? "#27AE60" : "#B03A2E", cursor:"pointer" }}>{suspended[c.author] ? "Unsuspend author" : "Suspend author"}</button>
                 </div>
               </div>
 
@@ -6064,6 +6103,10 @@ function StaffReportsPage({ session, onNavigate }) {
               <div style={{ fontFamily:"'Playfair Display', serif", fontSize:24, fontWeight:900, color:"#111", marginBottom:4 }}>{nameOf(activeUser)}</div>
               <div style={{ fontFamily:"'DM Mono', monospace", fontSize:11, color:"#999", letterSpacing:"0.04em", marginBottom:20 }}>
                 Reported {h.total}× across {h.distinct} {h.distinct === 1 ? "item" : "items"} · {h.decisions.length} {h.decisions.length === 1 ? "decision" : "decisions"}
+              </div>
+              <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:22 }}>
+                {suspended[activeUser] && <span style={{ background:"#F5E9E6", color:"#B03A2E", fontFamily:"'DM Mono', monospace", fontSize:9.5, letterSpacing:"0.1em", textTransform:"uppercase", padding:"3px 9px", borderRadius:12, fontWeight:600 }}>Suspended</span>}
+                <button onClick={() => toggleSuspend(activeUser)} style={{ background: suspended[activeUser] ? "#F0F5EF" : "#fff", border:"1px solid " + (suspended[activeUser] ? "#B7D9C0" : "#D8A99F"), borderRadius:18, padding:"7px 16px", fontSize:12.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, color: suspended[activeUser] ? "#27AE60" : "#B03A2E", cursor:"pointer" }}>{suspended[activeUser] ? "Unsuspend user" : "Suspend user"}</button>
               </div>
 
               <div style={{ fontSize:10, letterSpacing:"0.14em", textTransform:"uppercase", color:"#B0A488", fontFamily:"'DM Mono', monospace", marginBottom:10 }}>Reports against this user</div>
@@ -7243,6 +7286,7 @@ function InboxPage({ session, onNavigate }) {
     if (type === "board_decision") return { bg:"#2E4A3F", el: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg> };
     if (type === "reply") return { bg:"#2980B9", el: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 17l-5-5 5-5"/><path d="M4 12h11a4 4 0 0 1 4 4v2"/></svg> };
     if (type === "follower") return { bg:"#8E44AD", el: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="8" r="3.4"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/><path d="M19 8v6M22 11h-6"/></svg> };
+    if (type === "removed") return { bg:"#B03A2E", el: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg> };
     return { bg:"#111", el: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#F0EAD8" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> };
   };
 
