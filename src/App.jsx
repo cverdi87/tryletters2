@@ -339,6 +339,100 @@ const mockReplies = [
   { id:3, author:"Sam K.", initial:"S", color:"#6E2F8C", timeAgo:"3h ago", body:"Agreed with the core argument. What's your take on the role of remote work in reversing some of these trends? We're seeing unusual migration patterns that complicate the narrative." },
 ];
 
+function ContentMenu({ me, targetType, targetId, authorId, authorName }) {
+  const [open, setOpen] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [reason, setReason] = useState("");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState("");
+
+  // No menu on your own content, on non-user content (news), or when signed out.
+  if (!me || !authorId || authorId === me || !targetId) return null;
+
+  const reasons = ["Spam", "Harassment", "Hate speech", "Misinformation", "Other"];
+
+  const submitReport = async () => {
+    if (!reason || busy) return;
+    setBusy(true);
+    const { error } = await supabase.from("reports").insert({
+      reporter_id: me, target_type: targetType, target_id: targetId,
+      target_author_id: authorId, reason, note: note.trim() || null,
+    });
+    setBusy(false);
+    setShowReport(false);
+    if (error) {
+      if (error.code === "23505") { setDone("already"); }
+      else { console.error("Report failed:", error); alert(`Couldn't submit report: ${error.message}`); return; }
+    } else {
+      setDone("reported");
+    }
+    setReason(""); setNote("");
+    setTimeout(() => setDone(""), 2800);
+  };
+
+  const blockAuthor = async () => {
+    if (busy) return;
+    setBusy(true);
+    const { error } = await supabase.from("blocks").insert({ blocker_id: me, blocked_id: authorId });
+    if (!error || error.code === "23505") {
+      await supabase.from("follows").delete().eq("follower_id", me).eq("following_id", authorId);
+      await supabase.from("follows").delete().eq("follower_id", authorId).eq("following_id", me);
+    }
+    setBusy(false);
+    setOpen(false);
+    if (error && error.code !== "23505") { console.error("Block failed:", error); alert(`Couldn't block: ${error.message}`); return; }
+    setDone("blocked");
+    setTimeout(() => setDone(""), 2800);
+  };
+
+  return (
+    <div style={{ position:"relative", flexShrink:0 }}>
+      <button onClick={(e) => { e.stopPropagation(); setOpen(o => !o); }} aria-label="More options"
+        style={{ background:"none", border:"none", cursor:"pointer", padding:"0 4px", color:"#B0A488", fontSize:17, lineHeight:1, letterSpacing:"0.05em" }}>⋯</button>
+
+      {done && (
+        <div style={{ position:"absolute", top:"100%", right:0, marginTop:5, background:"#2E2A22", color:"#F0EAD8", fontFamily:"'DM Sans', sans-serif", fontSize:11.5, padding:"7px 11px", borderRadius:8, whiteSpace:"nowrap", zIndex:1100, boxShadow:"0 6px 20px rgba(0,0,0,0.2)" }}>
+          {done === "reported" ? "Report submitted — thank you." : done === "already" ? "You've already reported this." : "Blocked. Hidden on refresh."}
+        </div>
+      )}
+
+      {open && (
+        <>
+          <div onClick={(e) => { e.stopPropagation(); setOpen(false); }} style={{ position:"fixed", inset:0, zIndex:900 }}/>
+          <div onClick={(e) => e.stopPropagation()} style={{ position:"absolute", top:"100%", right:0, marginTop:5, background:"#fff", border:"1px solid #E8E0D0", borderRadius:10, boxShadow:"0 10px 30px rgba(0,0,0,0.15)", zIndex:950, minWidth:158, overflow:"hidden" }}>
+            <button onClick={(e) => { e.stopPropagation(); setOpen(false); setShowReport(true); }}
+              style={{ display:"block", width:"100%", textAlign:"left", background:"none", border:"none", padding:"11px 14px", fontSize:13, fontFamily:"'DM Sans', sans-serif", color:"#2E2A22", cursor:"pointer" }}>Report</button>
+            <button onClick={(e) => { e.stopPropagation(); blockAuthor(); }}
+              style={{ display:"block", width:"100%", textAlign:"left", background:"none", border:"none", borderTop:"1px solid #F0EDE8", padding:"11px 14px", fontSize:13, fontFamily:"'DM Sans', sans-serif", color:"#B03A2E", cursor:"pointer" }}>Block {authorName || "author"}</button>
+          </div>
+        </>
+      )}
+
+      {showReport && (
+        <div onClick={(e) => { e.stopPropagation(); setShowReport(false); }} style={{ position:"fixed", inset:0, background:"rgba(20,18,14,0.55)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:2000, padding:20 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background:"#fff", borderRadius:16, maxWidth:410, width:"100%", padding:"24px", boxShadow:"0 20px 60px rgba(0,0,0,0.3)", textAlign:"left" }}>
+            <div style={{ fontFamily:"'Playfair Display', serif", fontSize:21, fontWeight:900, color:"#141414", marginBottom:4 }}>Report this {targetType === "reply" ? "reply" : "letter"}</div>
+            <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:14, color:"#8A8170", margin:"0 0 16px", lineHeight:1.5 }}>Tell us what's wrong. Reports are reviewed by the Letters team.</p>
+            <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginBottom:14 }}>
+              {reasons.map(rz => (
+                <button key={rz} onClick={() => setReason(rz)}
+                  style={{ background: reason === rz ? "#111" : "#F5F1E8", color: reason === rz ? "#F0EAD8" : "#555", border:"1px solid " + (reason === rz ? "#111" : "#E2DAC9"), borderRadius:18, padding:"6px 13px", fontSize:12.5, fontFamily:"'DM Sans', sans-serif", cursor:"pointer" }}>{rz}</button>
+              ))}
+            </div>
+            <textarea value={note} onChange={e => setNote(e.target.value)} rows={3} placeholder="Add a note (optional)"
+              style={{ width:"100%", boxSizing:"border-box", border:"1px solid #E2DAC9", borderRadius:8, padding:"10px 12px", fontSize:14, fontFamily:"'EB Garamond', Georgia, serif", color:"#2E2A22", resize:"vertical", outline:"none", marginBottom:16 }}/>
+            <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
+              <button onClick={() => setShowReport(false)} disabled={busy} style={{ background:"none", border:"1px solid #E0D8CC", borderRadius:22, padding:"9px 18px", fontSize:13, fontFamily:"'DM Sans', sans-serif", color:"#777", cursor:"pointer" }}>Cancel</button>
+              <button onClick={submitReport} disabled={!reason || busy} style={{ background: reason ? "#B03A2E" : "#D8C6C0", border:"none", borderRadius:22, padding:"9px 20px", fontSize:13, fontFamily:"'DM Sans', sans-serif", fontWeight:600, color:"#fff", cursor: reason && !busy ? "pointer" : "default" }}>{busy ? "Submitting…" : "Submit report"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Shared: AuthorLink ────────────────────────────────────
 // Renders a byline name as a tap target to that author's profile (/u/:id) when a
 // real user id is present; otherwise plain text (mock/demo bylines carry no id).
@@ -1592,6 +1686,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
                       </button>
                     )}
                     <span style={{ fontSize:10, color:"#BBB", fontFamily:"'DM Mono', monospace" }}>{openLetter.timeAgo}</span>
+                    <ContentMenu me={session?.user?.id} targetType="letter" targetId={openLetter.dbId} authorId={openLetter.userId} authorName={openLetter.author}/>
                   </div>
                 </div>
 
@@ -1646,9 +1741,12 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
                     <div key={reply.id} style={{ display:"flex", gap:10, paddingBottom:16, marginBottom: i<arr.length-1?16:0, borderBottom: i<arr.length-1?"1px solid #F0EDE8":"none" }}>
                       <Avatar initial={reply.initial} color={reply.color} size={30}/>
                       <div style={{ flex:1 }}>
-                        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
                           <AuthorLink userId={reply.userId} style={{ fontSize:12.5, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}>{reply.author}</AuthorLink>
-                          <span style={{ fontSize:9.5, color:"#BBB", fontFamily:"'DM Mono', monospace" }}>{reply.timeAgo}</span>
+                          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                            <span style={{ fontSize:9.5, color:"#BBB", fontFamily:"'DM Mono', monospace" }}>{reply.timeAgo}</span>
+                            <ContentMenu me={session?.user?.id} targetType="reply" targetId={reply.id} authorId={reply.userId} authorName={reply.author}/>
+                          </div>
                         </div>
                         <p style={{ margin:0, fontSize:14, lineHeight:1.65, color:"#555", fontFamily:"'EB Garamond', serif" }}>{reply.body}</p>
                       </div>
@@ -1663,9 +1761,12 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
                     <div key={reply.id} style={{ display:"flex", gap:10, paddingBottom:16, marginBottom: i<arr.length-1?16:0, borderBottom: i<arr.length-1?"1px solid #F0EDE8":"none" }}>
                       <Avatar initial={reply.initial} color={reply.color} size={30}/>
                       <div style={{ flex:1 }}>
-                        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
                           <AuthorLink userId={reply.userId} style={{ fontSize:12.5, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}>{reply.author}</AuthorLink>
-                          <span style={{ fontSize:9.5, color:"#BBB", fontFamily:"'DM Mono', monospace" }}>{reply.timeAgo}</span>
+                          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                            <span style={{ fontSize:9.5, color:"#BBB", fontFamily:"'DM Mono', monospace" }}>{reply.timeAgo}</span>
+                            <ContentMenu me={session?.user?.id} targetType="reply" targetId={reply.id} authorId={reply.userId} authorName={reply.author}/>
+                          </div>
                         </div>
                         <p style={{ margin:0, fontSize:14, lineHeight:1.65, color:"#555", fontFamily:"'EB Garamond', serif" }}>{reply.body}</p>
                       </div>
@@ -4476,6 +4577,7 @@ function ForumPostPage({ session, onNavigate }) {
           <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:3 }}>
             <AuthorLink userId={r.user_id} style={{ fontSize:13, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}>{authorOf(r)}</AuthorLink>
             <span style={{ fontSize:10, color:"#BBB", fontFamily:"'DM Mono', monospace" }}>{ago(r.created_at)}</span>
+            <div style={{ marginLeft:"auto" }}><ContentMenu me={userId} targetType="reply" targetId={r.id} authorId={r.user_id} authorName={authorOf(r)}/></div>
           </div>
           <p style={{ margin:0, fontSize:14.5, lineHeight:1.65, color:"#444", fontFamily:"'EB Garamond', Georgia, serif" }}>{r.body}</p>
           {userId && (
@@ -4520,6 +4622,7 @@ function ForumPostPage({ session, onNavigate }) {
             <div style={{ fontSize:14, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}><AuthorLink userId={letter.user_id}>{(letter.profiles && (letter.profiles.full_name || letter.profiles.username)) || "A writer"}</AuthorLink></div>
             <div style={{ fontSize:11, color:"#AAA", fontFamily:"'DM Mono', monospace" }}>{letter.profiles && letter.profiles.username ? "@" + letter.profiles.username + " · " : ""}{ago(letter.created_at)}</div>
           </div>
+          <div style={{ marginLeft:"auto" }}><ContentMenu me={userId} targetType="letter" targetId={letter.id} authorId={letter.user_id} authorName={(letter.profiles && (letter.profiles.full_name || letter.profiles.username)) || "author"}/></div>
         </div>
         <div style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:17, lineHeight:1.85, color:"#222" }}
           onClick={(e) => { const a = e.target.closest && e.target.closest("[data-topic]"); if (a) { e.preventDefault(); navigate(`/topic/${a.getAttribute("data-topic")}`); } }}
@@ -5185,6 +5288,13 @@ function YouPage({ session, onSignOut }) {
             Read the User Guide →
           </button>
         </div>
+        {session?.user?.email && session.user.email.toLowerCase().endsWith("@tryletters.tech") && (
+          <div style={{ marginTop:12, textAlign:"center" }}>
+            <button onClick={() => navigate("/staff/reports")} style={{ background:"none", border:"none", color:"#B03A2E", fontFamily:"'DM Mono', monospace", fontSize:11, letterSpacing:"0.05em", cursor:"pointer" }}>
+              Moderation reports →
+            </button>
+          </div>
+        )}
       </main>
     </div>
   );
@@ -5697,6 +5807,293 @@ function EditProfilePage({ session, onNavigate }) {
             </div>
           </div>
         )}
+      </main>
+    </div>
+  );
+}
+
+function StaffReportsPage({ session, onNavigate }) {
+  const navigate = useNavigate();
+  const email = session?.user?.email || "";
+  const isStaff = !!email && email.toLowerCase().endsWith("@tryletters.tech");
+
+  const [reports, setReports] = useState([]);
+  const [decisions, setDecisions] = useState([]);
+  const [content, setContent] = useState({});
+  const [names, setNames] = useState({});
+  const [loading, setLoading] = useState(true);
+
+  const [view, setView] = useState("list");       // "list" | "case" | "user"
+  const [activeKey, setActiveKey] = useState(null);
+  const [activeUser, setActiveUser] = useState(null);
+  const [filter, setFilter] = useState("open");
+
+  const [decision, setDecision] = useState("");
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const strip = (html) => {
+    if (!html) return "";
+    if (typeof document === "undefined") return html;
+    const d = document.createElement("div");
+    d.innerHTML = html.replace(/<\/(p|div|li|blockquote|h[1-6])>/gi, " ").replace(/<br\s*\/?>/gi, " ");
+    return (d.textContent || d.innerText || "").replace(/\s+/g, " ").trim();
+  };
+  const nameOf = (id) => names[id] || "Unknown";
+  const fmtDate = (iso) => new Date(iso).toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric" });
+
+  const load = async () => {
+    setLoading(true);
+    const [{ data: reps }, { data: decs }] = await Promise.all([
+      supabase.from("reports").select("*").order("created_at", { ascending:false }),
+      supabase.from("moderation_decisions").select("*").order("created_at", { ascending:false }),
+    ]);
+    const rlist = reps || [], dlist = decs || [];
+    const both = [...rlist, ...dlist];
+    const letterIds = [...new Set(both.filter(x => x.target_type === "letter").map(x => x.target_id))];
+    const replyIds  = [...new Set(both.filter(x => x.target_type === "reply").map(x => x.target_id))];
+    const userIds   = [...new Set([
+      ...rlist.flatMap(r => [r.reporter_id, r.target_author_id]),
+      ...dlist.flatMap(d => [d.decided_by, d.target_author_id]),
+    ].filter(Boolean))];
+    const [{ data: ls }, { data: rs }, { data: ps }] = await Promise.all([
+      letterIds.length ? supabase.from("letters").select("id, title, body, user_id").in("id", letterIds) : Promise.resolve({ data: [] }),
+      replyIds.length  ? supabase.from("replies").select("id, body, user_id, letter_id").in("id", replyIds) : Promise.resolve({ data: [] }),
+      userIds.length   ? supabase.from("profiles").select("id, full_name, username").in("id", userIds) : Promise.resolve({ data: [] }),
+    ]);
+    const cmap = {};
+    (ls || []).forEach(l => { cmap["letter:" + l.id] = { title: l.title, body: strip(l.body), letterId: l.id }; });
+    (rs || []).forEach(r => { cmap["reply:" + r.id] = { title: null, body: strip(r.body), letterId: r.letter_id }; });
+    const nmap = {};
+    (ps || []).forEach(p => { nmap[p.id] = p.full_name || p.username || "Someone"; });
+    setReports(rlist); setDecisions(dlist); setContent(cmap); setNames(nmap); setLoading(false);
+  };
+
+  useEffect(() => { if (!isStaff) { setLoading(false); return; } load(); }, [isStaff]);
+
+  // ---- Aggregations (computed inline; small volumes at beta scale) ----
+  const buildCases = () => {
+    const map = {};
+    reports.forEach(r => {
+      const key = r.target_type + ":" + r.target_id;
+      if (!map[key]) map[key] = { key, target_type: r.target_type, target_id: r.target_id, author: r.target_author_id, reports: [], reasons: {}, newestReport: 0 };
+      map[key].reports.push(r);
+      map[key].reasons[r.reason] = (map[key].reasons[r.reason] || 0) + 1;
+      const t = new Date(r.created_at).getTime();
+      if (t > map[key].newestReport) map[key].newestReport = t;
+    });
+    Object.values(map).forEach(c => {
+      const ds = decisions.filter(d => d.target_type === c.target_type && d.target_id === c.target_id);
+      c.decisions = ds;
+      c.newestDecision = ds[0] || null;
+      const decAt = ds[0] ? new Date(ds[0].created_at).getTime() : 0;
+      c.status = !c.newestDecision ? "open" : (c.newestReport > decAt ? "open" : c.newestDecision.decision);
+    });
+    return Object.values(map).sort((a, b) => b.newestReport - a.newestReport);
+  };
+
+  const userHistory = (uid) => {
+    const rs = reports.filter(r => r.target_author_id === uid);
+    const reasons = {};
+    rs.forEach(r => { reasons[r.reason] = (reasons[r.reason] || 0) + 1; });
+    const ds = decisions.filter(d => d.target_author_id === uid);
+    const distinct = new Set(rs.map(r => r.target_type + ":" + r.target_id)).size;
+    return { reports: rs, reasons, decisions: ds, total: rs.length, distinct };
+  };
+
+  const openCase = (key) => { setActiveKey(key); setDecision(""); setNote(""); setView("case"); };
+  const openUser = (uid) => { setActiveUser(uid); setView("user"); };
+
+  const submitDecision = async (c) => {
+    if (!decision || saving) return;
+    setSaving(true);
+    const { error } = await supabase.from("moderation_decisions").insert({
+      target_type: c.target_type, target_id: c.target_id, target_author_id: c.author,
+      decision, note: note.trim() || null, decided_by: session.user.id,
+    });
+    setSaving(false);
+    if (error) { console.error("Decision failed:", error); alert(`Couldn't save decision: ${error.message}`); return; }
+    setDecision(""); setNote("");
+    await load();
+  };
+
+  const statusColor = { open:"#C0392B", dismissed:"#999", actioned:"#27AE60" };
+  const ReasonChips = ({ reasons }) => (
+    <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+      {Object.entries(reasons).sort((a,b) => b[1]-a[1]).map(([r, n]) => (
+        <span key={r} style={{ background:"#F5EEDD", color:"#8A6D2F", fontFamily:"'DM Sans', sans-serif", fontSize:11.5, padding:"3px 9px", borderRadius:12 }}>{r} <b style={{ color:"#5A4A1E" }}>×{n}</b></span>
+      ))}
+    </div>
+  );
+  const back = (label, onClick) => (
+    <button onClick={onClick} style={{ background:"none", border:"none", color:"#B0A488", fontFamily:"'DM Mono', monospace", fontSize:11.5, letterSpacing:"0.06em", cursor:"pointer", margin:"0 0 14px", display:"flex", alignItems:"center", gap:6, padding:0 }}>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="m15 18-6-6 6-6"/></svg> {label}
+    </button>
+  );
+
+  if (!isStaff) {
+    return (
+      <div className="letters-main" style={{ minHeight:"100vh", background:"#F9F6F0" }}>
+        <TopBar title={<span>Reports<span style={{ color:"#C8A96E" }}>.</span></span>} maxWidth={1040} onLogoClick={() => navigate("/feed")}/>
+        <div style={{ textAlign:"center", padding:"80px 20px" }}>
+          <div style={{ fontFamily:"'Playfair Display', serif", fontSize:22, fontWeight:900, color:"#141414", marginBottom:8 }}>Staff only.</div>
+          <button onClick={() => navigate("/feed")} style={{ background:"none", border:"none", color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontSize:12, cursor:"pointer" }}>← Back to feed</button>
+        </div>
+      </div>
+    );
+  }
+
+  const cases = buildCases();
+
+  return (
+    <div className="letters-main" style={{ minHeight:"100vh", background:"#F9F6F0", paddingBottom:80 }}>
+      <TopBar title={<span>Moderation<span style={{ color:"#C8A96E" }}>.</span></span>} maxWidth={1040} onLogoClick={() => navigate("/feed")}/>
+      <main style={{ maxWidth:640, margin:"0 auto", padding:"14px 20px 0" }}>
+
+        {loading ? (
+          <div style={{ textAlign:"center", padding:"50px 0", fontSize:11, color:"#AAA", fontFamily:"'DM Mono', monospace", letterSpacing:"0.1em" }}>Loading...</div>
+        ) : view === "list" ? (
+          <>
+            <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:18 }}>
+              {["open","all"].map(f => (
+                <button key={f} onClick={() => setFilter(f)}
+                  style={{ background: filter === f ? "#111" : "#F5F1E8", color: filter === f ? "#F0EAD8" : "#666", border:"1px solid " + (filter === f ? "#111" : "#E2DAC9"), borderRadius:18, padding:"6px 16px", fontSize:12, fontFamily:"'DM Mono', monospace", letterSpacing:"0.04em", cursor:"pointer", textTransform:"capitalize" }}>{f === "open" ? "Needs review" : "All cases"}</button>
+              ))}
+            </div>
+            {(() => {
+              const shown = cases.filter(c => filter === "all" ? true : c.status === "open");
+              if (shown.length === 0) return (
+                <div style={{ textAlign:"center", padding:"56px 20px" }}>
+                  <div style={{ fontSize:10, letterSpacing:"0.18em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:12 }}>Clear</div>
+                  <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:16, color:"#888", margin:0 }}>No cases {filter === "open" ? "need review" : "yet"}.</p>
+                </div>
+              );
+              return shown.map(c => {
+                const ct = content[c.key];
+                return (
+                  <button key={c.key} onClick={() => openCase(c.key)} style={{ display:"block", width:"100%", textAlign:"left", background:"#fff", border:"1px solid #EAE2D2", borderRadius:12, padding:"15px 17px", marginBottom:12, cursor:"pointer" }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:9, flexWrap:"wrap" }}>
+                      <span style={{ background: (statusColor[c.status] || "#999") + "1A", color: statusColor[c.status] || "#999", fontFamily:"'DM Mono', monospace", fontSize:9.5, letterSpacing:"0.1em", textTransform:"uppercase", padding:"3px 9px", borderRadius:12, fontWeight:600 }}>{c.status}</span>
+                      <span style={{ fontFamily:"'DM Sans', sans-serif", fontSize:13, fontWeight:700, color:"#141414" }}>Reported {c.reports.length}×</span>
+                      <span style={{ fontFamily:"'DM Mono', monospace", fontSize:10, color:"#AAA" }}>{c.target_type}</span>
+                    </div>
+                    <div style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:14, color:"#555", lineHeight:1.5, marginBottom:9, display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden" }}>
+                      {ct ? (ct.title ? ct.title + " — " : "") + (ct.body || "(no text)") : "Content unavailable"}
+                    </div>
+                    <ReasonChips reasons={c.reasons}/>
+                  </button>
+                );
+              });
+            })()}
+          </>
+        ) : view === "case" ? (() => {
+          const c = cases.find(x => x.key === activeKey);
+          if (!c) return <>{back("Back to cases", () => setView("list"))}<p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", color:"#888" }}>This case is no longer available.</p></>;
+          const ct = content[c.key];
+          return (
+            <>
+              {back("Back to cases", () => setView("list"))}
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:14, flexWrap:"wrap" }}>
+                <span style={{ background: (statusColor[c.status] || "#999") + "1A", color: statusColor[c.status] || "#999", fontFamily:"'DM Mono', monospace", fontSize:9.5, letterSpacing:"0.1em", textTransform:"uppercase", padding:"3px 9px", borderRadius:12, fontWeight:600 }}>{c.status}</span>
+                <span style={{ fontFamily:"'Playfair Display', serif", fontSize:20, fontWeight:900, color:"#141414" }}>Reported {c.reports.length}×</span>
+              </div>
+
+              <div style={{ background:"#fff", border:"1px solid #EAE2D2", borderRadius:12, padding:"16px 18px", marginBottom:16 }}>
+                {ct ? (
+                  <>
+                    {ct.title && <div style={{ fontFamily:"'Playfair Display', serif", fontSize:16, fontWeight:700, color:"#111", marginBottom:5 }}>{ct.title}</div>}
+                    <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:14.5, lineHeight:1.6, color:"#444", margin:0 }}>{ct.body || "(no text)"}</p>
+                    {ct.letterId && <button onClick={() => navigate(`/feed/letter/${ct.letterId}`)} style={{ background:"none", border:"none", padding:"8px 0 0", color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontSize:10.5, letterSpacing:"0.04em", cursor:"pointer" }}>View in context →</button>}
+                  </>
+                ) : <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", color:"#B0A488", margin:0 }}>Content unavailable (may have been deleted).</p>}
+                <div style={{ marginTop:12, paddingTop:12, borderTop:"1px solid #F0EDE8", fontFamily:"'DM Sans', sans-serif", fontSize:13, color:"#666" }}>
+                  <span style={{ color:"#999" }}>Author: </span>
+                  <button onClick={() => openUser(c.author)} style={{ background:"none", border:"none", padding:0, color:"#2E2A22", fontWeight:600, fontFamily:"'DM Sans', sans-serif", fontSize:13, cursor:"pointer", textDecoration:"underline", textDecorationColor:"#C8A96E" }}>{nameOf(c.author)}</button>
+                  <span style={{ color:"#C8A96E", marginLeft:6, fontFamily:"'DM Mono', monospace", fontSize:11 }}>see history →</span>
+                </div>
+              </div>
+
+              <div style={{ fontSize:10, letterSpacing:"0.14em", textTransform:"uppercase", color:"#B0A488", fontFamily:"'DM Mono', monospace", marginBottom:10 }}>Reasons</div>
+              <div style={{ marginBottom:18 }}><ReasonChips reasons={c.reasons}/></div>
+
+              <div style={{ fontSize:10, letterSpacing:"0.14em", textTransform:"uppercase", color:"#B0A488", fontFamily:"'DM Mono', monospace", marginBottom:10 }}>Individual reports</div>
+              {c.reports.map(r => (
+                <div key={r.id} style={{ borderBottom:"1px solid #F0EDE8", padding:"10px 0" }}>
+                  <div style={{ fontFamily:"'DM Sans', sans-serif", fontSize:12.5, color:"#444" }}>
+                    <b style={{ color:"#B03A2E" }}>{r.reason}</b>
+                    <span style={{ color:"#999" }}> · by {nameOf(r.reporter_id)} · {fmtDate(r.created_at)}</span>
+                  </div>
+                  {r.note && <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontStyle:"italic", fontSize:13, color:"#666", margin:"3px 0 0" }}>"{r.note}"</p>}
+                </div>
+              ))}
+
+              {c.decisions.length > 0 && (
+                <>
+                  <div style={{ fontSize:10, letterSpacing:"0.14em", textTransform:"uppercase", color:"#B0A488", fontFamily:"'DM Mono', monospace", margin:"20px 0 10px" }}>Past decisions</div>
+                  {c.decisions.map(d => (
+                    <div key={d.id} style={{ borderBottom:"1px solid #F0EDE8", padding:"10px 0" }}>
+                      <div style={{ fontFamily:"'DM Sans', sans-serif", fontSize:12.5, color: statusColor[d.decision] || "#444", fontWeight:600, textTransform:"capitalize" }}>{d.decision}
+                        <span style={{ color:"#999", fontWeight:400 }}> · {nameOf(d.decided_by)} · {fmtDate(d.created_at)}</span>
+                      </div>
+                      {d.note && <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontStyle:"italic", fontSize:13, color:"#666", margin:"3px 0 0" }}>"{d.note}"</p>}
+                    </div>
+                  ))}
+                </>
+              )}
+
+              <div style={{ background:"#fff", border:"1px solid #EAE2D2", borderRadius:12, padding:"16px 18px", marginTop:20 }}>
+                <div style={{ fontSize:10, letterSpacing:"0.14em", textTransform:"uppercase", color:"#B0A488", fontFamily:"'DM Mono', monospace", marginBottom:12 }}>Record a decision</div>
+                <div style={{ display:"flex", gap:8, marginBottom:12 }}>
+                  {["dismissed","actioned"].map(d => (
+                    <button key={d} onClick={() => setDecision(d)}
+                      style={{ background: decision === d ? (d === "actioned" ? "#27AE60" : "#111") : "#F5F1E8", color: decision === d ? "#fff" : "#555", border:"1px solid " + (decision === d ? "transparent" : "#E2DAC9"), borderRadius:18, padding:"7px 16px", fontSize:12.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:"pointer", textTransform:"capitalize" }}>{d === "dismissed" ? "Dismiss" : "Action"}</button>
+                  ))}
+                </div>
+                <textarea value={note} onChange={e => setNote(e.target.value)} rows={3} placeholder="Add a note explaining this decision (optional)"
+                  style={{ width:"100%", boxSizing:"border-box", border:"1px solid #E2DAC9", borderRadius:8, padding:"10px 12px", fontSize:14, fontFamily:"'EB Garamond', Georgia, serif", color:"#2E2A22", resize:"vertical", outline:"none", marginBottom:12 }}/>
+                <button onClick={() => submitDecision(c)} disabled={!decision || saving}
+                  style={{ background: decision ? "#111" : "#D8D0C2", color:"#F0EAD8", border:"none", borderRadius:22, padding:"9px 22px", fontSize:13, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor: decision && !saving ? "pointer" : "default" }}>{saving ? "Saving…" : "Record decision"}</button>
+              </div>
+            </>
+          );
+        })() : (() => {
+          const h = userHistory(activeUser);
+          return (
+            <>
+              {back("Back", () => setView(activeKey ? "case" : "list"))}
+              <div style={{ fontFamily:"'Playfair Display', serif", fontSize:24, fontWeight:900, color:"#111", marginBottom:4 }}>{nameOf(activeUser)}</div>
+              <div style={{ fontFamily:"'DM Mono', monospace", fontSize:11, color:"#999", letterSpacing:"0.04em", marginBottom:20 }}>
+                Reported {h.total}× across {h.distinct} {h.distinct === 1 ? "item" : "items"} · {h.decisions.length} {h.decisions.length === 1 ? "decision" : "decisions"}
+              </div>
+
+              <div style={{ fontSize:10, letterSpacing:"0.14em", textTransform:"uppercase", color:"#B0A488", fontFamily:"'DM Mono', monospace", marginBottom:10 }}>Reports against this user</div>
+              {h.total === 0 ? (
+                <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:15, color:"#888" }}>No reports on record.</p>
+              ) : (
+                <div style={{ background:"#fff", border:"1px solid #EAE2D2", borderRadius:12, padding:"14px 18px", marginBottom:22 }}>
+                  {Object.entries(h.reasons).sort((a,b) => b[1]-a[1]).map(([r, n]) => (
+                    <div key={r} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"7px 0", borderBottom:"1px solid #F5F1E8" }}>
+                      <span style={{ fontFamily:"'DM Sans', sans-serif", fontSize:14, color:"#333" }}>{r}</span>
+                      <span style={{ fontFamily:"'Playfair Display', serif", fontSize:17, fontWeight:700, color:"#B03A2E" }}>{n}×</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div style={{ fontSize:10, letterSpacing:"0.14em", textTransform:"uppercase", color:"#B0A488", fontFamily:"'DM Mono', monospace", marginBottom:10 }}>Decision history</div>
+              {h.decisions.length === 0 ? (
+                <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:15, color:"#888" }}>No decisions recorded yet.</p>
+              ) : h.decisions.map(d => (
+                <div key={d.id} style={{ background:"#fff", border:"1px solid #EFE9DD", borderRadius:10, padding:"12px 15px", marginBottom:10 }}>
+                  <div style={{ fontFamily:"'DM Sans', sans-serif", fontSize:13, fontWeight:600, color: statusColor[d.decision] || "#444", textTransform:"capitalize", marginBottom: d.note ? 4 : 0 }}>{d.decision}
+                    <span style={{ color:"#999", fontWeight:400, fontSize:11.5 }}> · {nameOf(d.decided_by)} · {fmtDate(d.created_at)}</span>
+                  </div>
+                  {d.note && <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontStyle:"italic", fontSize:13.5, color:"#555", margin:0, lineHeight:1.5 }}>"{d.note}"</p>}
+                </div>
+              ))}
+            </>
+          );
+        })()}
       </main>
     </div>
   );
@@ -7089,6 +7486,7 @@ function AuthenticatedApp({ session, handleSignOut }) {
         <Route path="/u/:userId" element={<AuthorProfilePage session={session} onNavigate={goToTab}/>}/>
         <Route path="/settings/notifications" element={<NotificationSettingsPage session={session} onNavigate={goToTab}/>}/>
         <Route path="/edit-profile" element={<EditProfilePage session={session} onNavigate={goToTab}/>}/>
+        <Route path="/staff/reports" element={<StaffReportsPage session={session} onNavigate={goToTab}/>}/>
         <Route path="/inbox" element={<InboxPage session={session} onNavigate={goToTab}/>}/>
         <Route path="/topic/:tag" element={<TopicPage session={session} onNavigate={goToTab}/>}/>
         <Route path="/guide" element={<GuidePage session={session} onNavigate={goToTab}/>}/>
