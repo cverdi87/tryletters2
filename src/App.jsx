@@ -1106,6 +1106,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
   const [letterReplies, setLetterReplies] = useState([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [replyText, setReplyText] = useState("");
+  const [replyingTo, setReplyingTo] = useState(null);
   const [replyFocused, setReplyFocused] = useState(false);
   const [submittingReply, setSubmittingReply] = useState(false);
 
@@ -1278,6 +1279,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
       setLetterReplies((repliesData || []).map(r => ({
         id: r.id,
         userId: r.user_id,
+        parentId: r.parent_reply_id || null,
         author: r.profiles?.full_name || r.profiles?.username || "Anonymous",
         initial: (r.profiles?.full_name || r.profiles?.username || "A")[0].toUpperCase(),
         color: colorForId(r.user_id),
@@ -1351,7 +1353,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
     const myName = myProfile?.full_name || myProfile?.username || session.user.email?.split("@")[0] || "You";
     const { data, error } = await supabase
       .from("replies")
-      .insert({ letter_id: openLetter.dbId, user_id: session.user.id, body: replyText.trim() })
+      .insert({ letter_id: openLetter.dbId, user_id: session.user.id, body: replyText.trim(), parent_reply_id: replyingTo ? replyingTo.id : null })
       .select()
       .single();
     if (error) {
@@ -1360,6 +1362,8 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
     } else if (data) {
       setLetterReplies(prev => [...prev, {
         id: data.id,
+        userId: session.user.id,
+        parentId: data.parent_reply_id || null,
         author: myName,
         initial: myName[0].toUpperCase(),
         color: colorForId(session.user.id),
@@ -1367,6 +1371,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
         body: data.body,
       }]);
       setReplyText("");
+      setReplyingTo(null);
       setRealLetters(prev => prev.map(l => l.dbId === openLetter.dbId ? { ...l, replies: l.replies + 1 } : l));
     }
     setSubmittingReply(false);
@@ -1756,21 +1761,31 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
                     <div style={{ textAlign:"center", padding:"20px 0", fontSize:11, color:"#CCC", fontFamily:"'DM Mono', monospace" }}>Loading replies...</div>
                   ) : letterReplies.length === 0 ? (
                     <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:14, color:"#CCC", margin:"0 0 16px" }}>No replies yet — be the first to respond.</p>
-                  ) : letterReplies.map((reply, i, arr) => (
-                    <div key={reply.id} style={{ display:"flex", gap:10, paddingBottom:16, marginBottom: i<arr.length-1?16:0, borderBottom: i<arr.length-1?"1px solid #F0EDE8":"none" }}>
-                      <Avatar initial={reply.initial} color={reply.color} size={30}/>
-                      <div style={{ flex:1 }}>
-                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
-                          <AuthorLink userId={reply.userId} style={{ fontSize:12.5, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}>{reply.author}</AuthorLink>
-                          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                            <span style={{ fontSize:9.5, color:"#BBB", fontFamily:"'DM Mono', monospace" }}>{reply.timeAgo}</span>
-                            <ContentMenu me={session?.user?.id} targetType="reply" targetId={reply.id} authorId={reply.userId} authorName={reply.author}/>
+                  ) : (() => {
+                    const kidsOf = (pid) => letterReplies.filter(x => (x.parentId || null) === pid);
+                    const renderThread = (reply, depth) => (
+                      <div key={reply.id} style={{ marginTop: depth > 0 ? 12 : 0, marginBottom: depth === 0 ? 16 : 0, marginLeft: depth > 0 ? 14 : 0, paddingLeft: depth > 0 ? 12 : 0, borderLeft: depth > 0 ? "2px solid #EDE6D6" : "none" }}>
+                        <div style={{ display:"flex", gap:10 }}>
+                          <Avatar initial={reply.initial} color={reply.color} size={30}/>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
+                              <AuthorLink userId={reply.userId} style={{ fontSize:12.5, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}>{reply.author}</AuthorLink>
+                              <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                                <span style={{ fontSize:9.5, color:"#BBB", fontFamily:"'DM Mono', monospace" }}>{reply.timeAgo}</span>
+                                <ContentMenu me={session?.user?.id} targetType="reply" targetId={reply.id} authorId={reply.userId} authorName={reply.author}/>
+                              </div>
+                            </div>
+                            <p style={{ margin:0, fontSize:14, lineHeight:1.65, color:"#555", fontFamily:"'EB Garamond', serif" }}>{reply.body}</p>
+                            {session?.user?.id && (
+                              <button onClick={() => { setReplyingTo({ id: reply.id, author: reply.author }); setReplyFocused(true); }} style={{ background:"none", border:"none", padding:"4px 0 0", color:"#B0A488", fontFamily:"'DM Mono', monospace", fontSize:10.5, letterSpacing:"0.04em", cursor:"pointer" }}>Reply</button>
+                            )}
                           </div>
                         </div>
-                        <p style={{ margin:0, fontSize:14, lineHeight:1.65, color:"#555", fontFamily:"'EB Garamond', serif" }}>{reply.body}</p>
+                        {kidsOf(reply.id).map(c => renderThread(c, Math.min(depth + 1, 4)))}
                       </div>
-                    </div>
-                  ))
+                    );
+                    return kidsOf(null).map(r => renderThread(r, 0));
+                  })()
                 ) : (
                   [
                     { id:1, author:"Thomas R.", initial:"T", color:"#1B4F72", timeAgo:"1h ago", body:"This is exactly the nuanced take missing from mainstream coverage. The distinction between structural and cyclical factors is crucial." },
@@ -1794,8 +1809,14 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
                 )}
 
                 {/* Reply box */}
+                {openLetter.isReal && replyingTo && (
+                  <div style={{ marginTop:20, display:"flex", alignItems:"center", justifyContent:"space-between", gap:10, padding:"8px 12px", background:"#F7F3E9", border:"1px solid #EDE3CE", borderRadius:10, fontFamily:"'DM Mono', monospace", fontSize:11, color:"#8A7A55" }}>
+                    <span>Replying to {replyingTo.author}</span>
+                    <button onClick={() => setReplyingTo(null)} style={{ background:"none", border:"none", color:"#B0A488", cursor:"pointer", fontFamily:"'DM Mono', monospace", fontSize:11 }}>Cancel</button>
+                  </div>
+                )}
                 {openLetter.isReal && (
-                  <div style={{ marginTop:20, display:"flex", gap:10, alignItems:"flex-end", padding:"14px 0", borderTop:"1px solid #F0EDE8" }}>
+                  <div style={{ marginTop: replyingTo ? 8 : 20, display:"flex", gap:10, alignItems:"flex-end", padding:"14px 0", borderTop: replyingTo ? "none" : "1px solid #F0EDE8" }}>
                     <Avatar initial={(session?.user?.email?.[0] || "Y").toUpperCase()} color="#C8A96E" size={30}/>
                     <div style={{ flex:1, background:"#F0EDE8", border:`1px solid ${replyFocused ? "#C8A96E" : "transparent"}`, borderRadius:18, padding:"9px 16px", transition:"border-color 0.15s" }}>
                       <textarea
@@ -5877,13 +5898,13 @@ function StaffReportsPage({ session, onNavigate }) {
       ...dlist.flatMap(d => [d.decided_by, d.target_author_id]),
     ].filter(Boolean))];
     const [{ data: ls }, { data: rs }, { data: ps }] = await Promise.all([
-      letterIds.length ? supabase.from("letters").select("id, title, body, user_id, removed").in("id", letterIds) : Promise.resolve({ data: [] }),
-      replyIds.length  ? supabase.from("replies").select("id, body, user_id, letter_id, removed").in("id", replyIds) : Promise.resolve({ data: [] }),
+      letterIds.length ? supabase.from("letters").select("id, title, body, user_id, removed, deleted_by_author").in("id", letterIds) : Promise.resolve({ data: [] }),
+      replyIds.length  ? supabase.from("replies").select("id, body, user_id, letter_id, removed, deleted_by_author").in("id", replyIds) : Promise.resolve({ data: [] }),
       userIds.length   ? supabase.from("profiles").select("id, full_name, username, suspended").in("id", userIds) : Promise.resolve({ data: [] }),
     ]);
     const cmap = {};
-    (ls || []).forEach(l => { cmap["letter:" + l.id] = { title: l.title, body: strip(l.body), letterId: l.id, removed: l.removed }; });
-    (rs || []).forEach(r => { cmap["reply:" + r.id] = { title: null, body: strip(r.body), letterId: r.letter_id, removed: r.removed }; });
+    (ls || []).forEach(l => { cmap["letter:" + l.id] = { title: l.title, body: strip(l.body), letterId: l.id, removed: l.removed, authorDeleted: l.deleted_by_author }; });
+    (rs || []).forEach(r => { cmap["reply:" + r.id] = { title: null, body: strip(r.body), letterId: r.letter_id, removed: r.removed, authorDeleted: r.deleted_by_author }; });
     const nmap = {}, smap = {};
     (ps || []).forEach(p => { nmap[p.id] = p.full_name || p.username || "Someone"; smap[p.id] = !!p.suspended; });
     setReports(rlist); setDecisions(dlist); setContent(cmap); setNames(nmap); setSuspended(smap); setLoading(false);
@@ -6030,6 +6051,7 @@ function StaffReportsPage({ session, onNavigate }) {
                 <span style={{ background: (statusColor[c.status] || "#999") + "1A", color: statusColor[c.status] || "#999", fontFamily:"'DM Mono', monospace", fontSize:9.5, letterSpacing:"0.1em", textTransform:"uppercase", padding:"3px 9px", borderRadius:12, fontWeight:600 }}>{c.status}</span>
                 <span style={{ fontFamily:"'Playfair Display', serif", fontSize:20, fontWeight:900, color:"#141414" }}>Reported {c.reports.length}×</span>
                 {ct && ct.removed && <span style={{ background:"#F5E9E6", color:"#B03A2E", fontFamily:"'DM Mono', monospace", fontSize:9.5, letterSpacing:"0.1em", textTransform:"uppercase", padding:"3px 9px", borderRadius:12, fontWeight:600 }}>Removed</span>}
+                {ct && ct.authorDeleted && <span style={{ background:"#F2EDE2", color:"#8A6D2F", fontFamily:"'DM Mono', monospace", fontSize:9.5, letterSpacing:"0.1em", textTransform:"uppercase", padding:"3px 9px", borderRadius:12, fontWeight:600 }}>Deleted by author</span>}
                 {suspended[c.author] && <span style={{ background:"#F5E9E6", color:"#B03A2E", fontFamily:"'DM Mono', monospace", fontSize:9.5, letterSpacing:"0.1em", textTransform:"uppercase", padding:"3px 9px", borderRadius:12, fontWeight:600 }}>Author suspended</span>}
               </div>
 
