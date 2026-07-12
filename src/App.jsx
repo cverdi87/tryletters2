@@ -4175,6 +4175,121 @@ function ForumsPage({ session, onSignOut, onNavigate }) {
   );
 }
 
+function ForumSettingsModal({ forum, session, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    name: forum.name || "",
+    description: forum.description || "",
+    topic: forum.topic || "",
+    color: forum.color || "#1A1A1A",
+    cover_image: forum.cover_image || "",
+    live: !!forum.live,
+    post_policy: forum.post_policy || "verified",
+  });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+  const [saved, setSaved] = useState(false);
+  const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setSaved(false); setErr(""); };
+
+  const save = async () => {
+    if (saving) return;
+    if (!form.name.trim()) { setErr("A forum needs a name."); return; }
+    setSaving(true); setErr("");
+    const payload = {
+      name: form.name.trim(),
+      description: form.description.trim() || null,
+      topic: form.topic.trim() || null,
+      color: form.color,
+      cover_image: form.cover_image.trim() || null,
+      live: form.live,
+      post_policy: form.post_policy,
+    };
+    const { error } = await supabase.from("forums").update(payload).eq("id", forum.id);
+    setSaving(false);
+    if (error) { console.error("Forum update failed:", error); setErr(error.message || "Couldn't save changes."); return; }
+    setSaved(true);
+    if (onSaved) onSaved(payload);
+    setTimeout(() => setSaved(false), 2200);
+  };
+
+  const label = { fontSize:10, letterSpacing:"0.14em", textTransform:"uppercase", color:"#B0A488", fontFamily:"'DM Mono', monospace", marginBottom:7, display:"block" };
+  const input = { width:"100%", boxSizing:"border-box", border:"1px solid #E2DAC9", borderRadius:8, padding:"10px 12px", fontSize:14.5, fontFamily:"'EB Garamond', Georgia, serif", color:"#2E2A22", background:"#fff", outline:"none" };
+  const swatches = ["#1A1A1A","#C0392B","#27AE60","#8E44AD","#2C3E50","#E67E22","#F39C12","#C8A96E"];
+
+  return (
+    <div onClick={() => { if (!saving) onClose(); }} style={{ position:"fixed", inset:0, background:"rgba(20,18,14,0.55)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1200, padding:20 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background:"#FBF8F1", borderRadius:16, maxWidth:480, width:"100%", maxHeight:"88vh", overflowY:"auto", boxShadow:"0 24px 70px rgba(0,0,0,0.32)" }}>
+        <div style={{ padding:"22px 24px 16px", borderBottom:"1px solid #EDE6D8" }}>
+          <div style={{ fontSize:10, letterSpacing:"0.16em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:6 }}>Forum settings</div>
+          <div style={{ fontFamily:"'Playfair Display', serif", fontSize:23, fontWeight:900, color:"#141414" }}>{forum.name}</div>
+        </div>
+
+        <div style={{ padding:"20px 24px" }}>
+          <div style={{ marginBottom:18 }}>
+            <span style={label}>Name</span>
+            <input value={form.name} onChange={e => set("name", e.target.value)} style={input}/>
+          </div>
+
+          <div style={{ marginBottom:18 }}>
+            <span style={label}>Description</span>
+            <textarea value={form.description} onChange={e => set("description", e.target.value)} rows={3} placeholder="What is this forum for?" style={{ ...input, resize:"vertical", lineHeight:1.5 }}/>
+          </div>
+
+          <div style={{ marginBottom:18 }}>
+            <span style={label}>Category</span>
+            <input value={form.topic} onChange={e => set("topic", e.target.value)} placeholder="e.g. Politics" style={input}/>
+          </div>
+
+          <div style={{ marginBottom:18 }}>
+            <span style={label}>Accent colour</span>
+            <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
+              {swatches.map(c => (
+                <button key={c} onClick={() => set("color", c)} aria-label={c}
+                  style={{ width:28, height:28, borderRadius:"50%", background:c, border: form.color.toLowerCase() === c.toLowerCase() ? "2px solid #141414" : "2px solid #EDE6D8", cursor:"pointer", padding:0, boxShadow: form.color.toLowerCase() === c.toLowerCase() ? "0 0 0 2px #fff inset" : "none" }}/>
+              ))}
+              <input value={form.color} onChange={e => set("color", e.target.value)} style={{ ...input, width:100, padding:"6px 9px", fontFamily:"'DM Mono', monospace", fontSize:12 }}/>
+            </div>
+          </div>
+
+          <div style={{ marginBottom:18 }}>
+            <span style={label}>Cover image URL</span>
+            <input value={form.cover_image} onChange={e => set("cover_image", e.target.value)} placeholder="Leave blank to use the accent colour" style={{ ...input, fontFamily:"'DM Mono', monospace", fontSize:12.5 }}/>
+          </div>
+
+          <div style={{ marginBottom:18 }}>
+            <span style={label}>Who can post</span>
+            <select value={form.post_policy} onChange={e => set("post_policy", e.target.value)} style={{ ...input, cursor:"pointer", fontFamily:"'DM Sans', sans-serif", fontSize:14 }}>
+              <option value="verified">Verified contributors only</option>
+              <option value="open">Any member</option>
+            </select>
+            <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:13.5, color:"#8A8170", margin:"6px 0 0", lineHeight:1.5 }}>
+              {form.post_policy === "open" ? "Any member who joins can publish letters here." : "Only verified contributors (and the board) can publish here."}
+            </p>
+          </div>
+
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:12, padding:"12px 0", borderTop:"1px solid #EDE6D8" }}>
+            <div>
+              <div style={{ fontFamily:"'DM Sans', sans-serif", fontSize:14, fontWeight:600, color:"#1a1a1a" }}>Live</div>
+              <div style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:13.5, color:"#8A8170" }}>Show an "active now" indicator on this forum.</div>
+            </div>
+            <button onClick={() => set("live", !form.live)}
+              style={{ width:44, height:26, borderRadius:14, border:"none", background: form.live ? "#111" : "#D8D0C2", position:"relative", cursor:"pointer", flexShrink:0, padding:0 }}>
+              <span style={{ position:"absolute", top:3, left: form.live ? 21 : 3, width:20, height:20, borderRadius:"50%", background:"#fff", transition:"left 0.15s", boxShadow:"0 1px 2px rgba(0,0,0,0.2)" }}/>
+            </button>
+          </div>
+
+          {err && <p style={{ fontFamily:"'DM Sans', sans-serif", fontSize:12.5, color:"#B03A2E", margin:"10px 0 0" }}>{err}</p>}
+        </div>
+
+        <div style={{ padding:"14px 24px 20px", borderTop:"1px solid #EDE6D8", display:"flex", alignItems:"center", justifyContent:"flex-end", gap:12 }}>
+          {saved && <span style={{ marginRight:"auto", fontFamily:"'DM Mono', monospace", fontSize:11, color:"#5A8C6A" }}>Saved ✓</span>}
+          <button onClick={onClose} disabled={saving} style={{ background:"none", border:"1px solid #E0D8CC", borderRadius:22, padding:"9px 18px", fontSize:13, fontFamily:"'DM Sans', sans-serif", color:"#777", cursor:"pointer" }}>Close</button>
+          <button onClick={save} disabled={saving} style={{ background:"#111", color:"#F0EAD8", border:"none", borderRadius:22, padding:"9px 22px", fontSize:13, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>{saving ? "Saving…" : "Save changes"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EditorialBoardModal({ forum, session, onClose }) {
   const userId = session?.user?.id;
   const isStaff = !!session?.user?.email && session.user.email.toLowerCase().endsWith("@tryletters.tech");
@@ -4719,6 +4834,7 @@ function ForumDetailPage({ session, onNavigate }) {
   const [loading, setLoading] = useState(true);
   const [showBoard, setShowBoard] = useState(false);
   const [showContributors, setShowContributors] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [isEditor, setIsEditor] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
   const isStaff = !!session?.user?.email && session.user.email.toLowerCase().endsWith("@tryletters.tech");
@@ -4820,6 +4936,15 @@ function ForumDetailPage({ session, onNavigate }) {
               Contributors
             </button>
           )}
+          {(isStaff || isEditor) && (
+            <button onClick={() => setShowSettings(true)}
+              style={{ display:"inline-flex", alignItems:"center", gap:6, background:"#fff", color:"#6B6250", border:"1px solid #E0D8C8", borderRadius:22, padding:"9px 16px", fontSize:13, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:"pointer", transition:"all 0.15s" }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor="#C8A96E"; e.currentTarget.style.color="#141414"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor="#E0D8C8"; e.currentTarget.style.color="#6B6250"; }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              Settings
+            </button>
+          )}
           <button onClick={toggleJoin} disabled={!userId}
             style={{ background: joined ? "#F0EDE8" : "#111", color: joined ? "#888" : "#F0EAD8", border: joined ? "1px solid #E0D8C8" : "none", borderRadius:22, padding:"9px 20px", fontSize:13, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor: userId ? "pointer" : "default", flexShrink:0, transition:"all 0.15s" }}>
             {joined ? "Joined" : "Join"}
@@ -4828,15 +4953,11 @@ function ForumDetailPage({ session, onNavigate }) {
       </div>
       {forum.description && <p style={{ fontFamily:"'EB Garamond', serif", fontSize:16, lineHeight:1.6, color:"#555", margin:"0 0 26px" }}>{forum.description}</p>}
 
-      {isStaff && (
+      {(isStaff || isEditor) && (
         <div style={{ display:"flex", alignItems:"center", gap:9, marginBottom:20, fontSize:11.5, color:"#8A7A55", fontFamily:"'DM Mono', monospace" }}>
           <span style={{ letterSpacing:"0.04em" }}>Who can post:</span>
-          <select value={forum.post_policy || "verified"}
-            onChange={async (e) => { const v = e.target.value; setForum(prev => prev ? { ...prev, post_policy: v } : prev); await supabase.from("forums").update({ post_policy: v }).eq("id", forum.id); }}
-            style={{ fontFamily:"'DM Mono', monospace", fontSize:11.5, color:"#141414", background:"#fff", border:"1px solid #E0D8C8", borderRadius:6, padding:"4px 8px", cursor:"pointer" }}>
-            <option value="verified">Verified contributors only</option>
-            <option value="open">Any member</option>
-          </select>
+          <span style={{ color:"#141414" }}>{forum.post_policy === "open" ? "Any member" : "Verified contributors only"}</span>
+          <button onClick={() => setShowSettings(true)} style={{ background:"none", border:"none", color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontSize:11.5, cursor:"pointer", padding:0 }}>Change →</button>
         </div>
       )}
 
@@ -4882,6 +5003,7 @@ function ForumDetailPage({ session, onNavigate }) {
       </div>
       {showBoard && <EditorialBoardModal forum={forum} session={session} onClose={() => setShowBoard(false)}/>}
       {showContributors && <ManageContributorsModal forum={forum} session={session} onClose={() => setShowContributors(false)}/>}
+      {showSettings && <ForumSettingsModal forum={forum} session={session} onClose={() => setShowSettings(false)} onSaved={(patch) => setForum(prev => prev ? { ...prev, ...patch } : prev)}/>}
     </main>
   );
 }
