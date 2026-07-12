@@ -129,7 +129,7 @@ function LetterCover({ height = 96, section }) {
 
 function TopBar({ title, onSignOut, rightAction, maxWidth = 680, onLogoClick }) {
   return (
-    <header style={{ position:"sticky", top:0, zIndex:50, background:"rgba(249,246,240,0.97)", backdropFilter:"blur(10px)", borderBottom:"1px solid #E8E0D0" }}>
+    <header className="letters-topbar" style={{ position:"sticky", top:0, zIndex:50, background:"rgba(249,246,240,0.97)", backdropFilter:"blur(10px)", borderBottom:"1px solid #E8E0D0" }}>
       <div style={{ maxWidth, margin:"0 auto", padding:"0 20px", height:54, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
           {onLogoClick
@@ -219,7 +219,7 @@ function BottomNav({ active, onNavigate, unread = 0 }) {
   ];
 
   return (
-    <nav style={{
+    <nav className="letters-bottomnav" style={{
       position:"fixed", bottom:0, left:0, right:0, zIndex:50,
       background:"rgba(249,246,240,0.97)", backdropFilter:"blur(10px)",
       borderTop:"1px solid #E8E0D0",
@@ -571,7 +571,7 @@ function LetterDetailView({ item, onBack, session }) {
       </main>
 
       {/* Reply compose — pinned at bottom */}
-      <div style={{ position:"fixed", bottom:64, left:0, right:0, background:"rgba(255,255,255,0.97)", backdropFilter:"blur(10px)", borderTop:"1px solid #E8E0D0", padding:"12px 20px", zIndex:40 }}>
+      <div className="letters-composer-bar" style={{ position:"fixed", bottom:64, left:0, right:0, background:"rgba(255,255,255,0.97)", backdropFilter:"blur(10px)", borderTop:"1px solid #E8E0D0", padding:"12px 20px", zIndex:40 }}>
         <div style={{ maxWidth:680, margin:"0 auto", display:"flex", gap:10, alignItems:"flex-end" }}>
           <Avatar initial={(session?.user?.email?.[0] || "Y").toUpperCase()} color="#C8A96E" size={32}/>
           <div style={{ flex:1, background:"#F9F6F0", border:`1px solid ${focused ? "#111" : "#E8E0D0"}`, borderRadius:20, padding:"8px 14px", transition:"border-color 0.15s" }}>
@@ -2080,7 +2080,7 @@ function PublicationPage({ publication, articles, onBack, onOpenArticle }) {
 
   return (
     <div style={{ minHeight:"100vh", background:"#F9F6F0" }}>
-      <header style={{ position:"sticky", top:0, zIndex:50, background:"rgba(249,246,240,0.97)", backdropFilter:"blur(10px)", borderBottom:"1px solid #E8E0D0" }}>
+      <header className="letters-topbar" style={{ position:"sticky", top:0, zIndex:50, background:"rgba(249,246,240,0.97)", backdropFilter:"blur(10px)", borderBottom:"1px solid #E8E0D0" }}>
         <div style={{ maxWidth:680, margin:"0 auto", padding:"0 20px", height:54, display:"flex", alignItems:"center" }}>
           <button onClick={onBack} style={{ background:"none", border:"none", cursor:"pointer", padding:4, color:"#888", display:"flex", alignItems:"center", gap:6, fontFamily:"'DM Sans', sans-serif", fontSize:13 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
@@ -4018,8 +4018,6 @@ function ForumsPage({ session, onSignOut, onNavigate }) {
     <div className="letters-main" style={{ minHeight:"100vh", background:"#F9F6F0", paddingBottom:80 }}>
       <style>{`
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-        .forum-composer { bottom: 64px; }
-        @media (min-width: 768px) { .forum-composer { bottom: 0; } }
         .forums-suggest-grid { grid-template-columns: 1fr; }
         @media (min-width: 720px) { .forums-suggest-grid { grid-template-columns: repeat(2, 1fr); } }
         .forums-grid { display: block; }
@@ -7725,6 +7723,74 @@ function MarketingSite({ onAuthSuccess }) {
   );
 }
 
+// ── Mobile chrome: safe-area insets, keyboard handling, touch polish ────────
+// Injected once at the app root. Two jobs:
+//  (a) CSS: keep fixed bottom UI clear of the iPhone home indicator, and the
+//      top bar clear of the notch, via env(safe-area-inset-*).
+//  (b) JS: iOS does NOT resize the layout viewport when the keyboard opens, so
+//      `position: fixed` composers get covered. We watch visualViewport and
+//      publish the keyboard height as --kb, which the composers sit above.
+function MobileChrome() {
+  useEffect(() => {
+    const vv = typeof window !== "undefined" ? window.visualViewport : null;
+    if (!vv) return;
+    const root = document.documentElement;
+    const apply = () => {
+      // How much of the layout viewport the keyboard is covering.
+      const covered = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      root.style.setProperty("--kb", `${Math.round(covered)}px`);
+      root.classList.toggle("kb-open", covered > 80);
+    };
+    apply();
+    vv.addEventListener("resize", apply);
+    vv.addEventListener("scroll", apply);
+    return () => { vv.removeEventListener("resize", apply); vv.removeEventListener("scroll", apply); };
+  }, []);
+
+  return (
+    <style>{`
+      :root { --kb: 0px; --safe-b: env(safe-area-inset-bottom, 0px); --safe-t: env(safe-area-inset-top, 0px); }
+
+      /* Fixed bottom UI clears the home indicator, and rides above the keyboard. */
+      .letters-bottomnav {
+        padding-bottom: calc(8px + var(--safe-b));
+        transform: translateY(var(--kb));
+      }
+      /* The nav slides away entirely while typing — the composer takes its place. */
+      .kb-open .letters-bottomnav { display: none !important; }
+
+      .letters-composer-bar,
+      .forum-composer {
+        bottom: calc(64px + var(--safe-b));
+        padding-bottom: 12px;
+      }
+      .kb-open .letters-composer-bar,
+      .kb-open .forum-composer {
+        bottom: var(--kb);
+        padding-bottom: 12px;
+      }
+      @media (min-width: 768px) {
+        .letters-composer-bar, .forum-composer { bottom: 0; }
+        .kb-open .letters-composer-bar, .kb-open .forum-composer { bottom: 0; }
+      }
+
+      /* Top bar clears the notch. */
+      .letters-topbar { padding-top: var(--safe-t); }
+
+      /* Touch polish */
+      * { -webkit-tap-highlight-color: transparent; }
+      input, textarea, select { font-size: 16px; }  /* <16px makes iOS zoom on focus */
+      body { overscroll-behavior-y: none; }
+
+      /* Hover-only affordances need a tap equivalent: on touch devices, show the
+         card actions and the content menu at rest rather than on hover. */
+      @media (hover: none) {
+        .letters-card-actions { opacity: 1 !important; }
+      }
+    `}</style>
+  );
+}
+
 export default function App() {
   const [session, setSession] = useState(null);
   const [loadingSession, setLoadingSession] = useState(true);
@@ -7753,6 +7819,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <MobileChrome/>
       {!session
         ? <MarketingSite onAuthSuccess={() => setSession(true)}/>
         : <AuthenticatedApp session={session} handleSignOut={handleSignOut}/>

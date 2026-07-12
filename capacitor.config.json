@@ -1,0 +1,5 @@
+{
+  "appId": "tech.tryletters.app",
+  "appName": "Letters",
+  "webDir": "dist"
+}
