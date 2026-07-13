@@ -2752,6 +2752,7 @@ function QuoteSourceModal({ sourceTitle, sourcePublication, onInsert, onClose })
 }
 
 function WritePage({ session, onNavigate }) {
+  useEffect(() => { track("composer_opened"); }, []);
   const draftKey = `letters-draft-${session?.user?.id || "anon"}`;
   const location = useLocation();
   const [clip, setClip] = useState(null);
@@ -3138,6 +3139,12 @@ function WritePage({ session, onNavigate }) {
       if (tags.length) { try { await supabase.rpc("tag_letter", { p_letter: inserted.id, p_tags: tags }); } catch (e) {} }
     }
     if (!isPost) { try { localStorage.removeItem(draftKey); } catch {} }
+    track(isPost ? "post_published" : "letter_published", {
+      has_source: !!form.sourceUrl,
+      has_clip: !!clip,
+      in_forum: !!form.forumId,
+      body_length: (form.body || "").length,
+    });
     setSuccess(true);
     setLoading(false);
   };
@@ -6375,6 +6382,7 @@ function AudioProvider({ session, children }) {
     }
     a.currentTime = start;
     a.playbackRate = rate;
+    track("episode_played", { episode_id: episode.id, show_id: show?.id, resumed: start > 0 });
     try { await a.play(); setPlaying(true); } catch (e) { console.error("Playback failed:", e); }
   };
 
@@ -6408,6 +6416,7 @@ function AudioProvider({ session, children }) {
   };
 
   const onEnded = async () => {
+    track("episode_completed", { episode_id: current?.episode?.id });
     await savePosition(duration || 0, true);
     setPlaying(false);
     playNext();
@@ -6777,7 +6786,7 @@ function ClipCreator({ episode, show, startAt, onClose, onUse }) {
 
         <div style={{ padding:"14px 24px 20px", borderTop:"1px solid #EDE6D8", display:"flex", justifyContent:"flex-end", gap:10 }}>
           <button onClick={onClose} style={{ background:"none", border:"1px solid #E0D8CC", borderRadius:22, padding:"9px 18px", fontSize:13, fontFamily:"'DM Sans', sans-serif", color:"#777", cursor:"pointer" }}>Cancel</button>
-          <button onClick={() => { const a = ref.current; if (a) a.pause(); onUse({ episode, show, start, end }); }}
+          <button onClick={() => { const a = ref.current; if (a) a.pause(); track("clip_created", { episode_id: episode.id, length_sec: end - start }); onUse({ episode, show, start, end }); }}
             style={{ background:"#111", color:"#F0EAD8", border:"none", borderRadius:22, padding:"9px 22px", fontSize:13, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:"pointer" }}>
             Write about this →
           </button>
@@ -8505,6 +8514,47 @@ function MarketingSite({ onAuthSuccess }) {
 //  (b) JS: iOS does NOT resize the layout viewport when the keyboard opens, so
 //      `position: fixed` composers get covered. We watch visualViewport and
 //      publish the keyboard height as --kb, which the composers sit above.
+// ── Analytics (Supabase-native, privacy-first) ──────────────────────────────
+// No third-party scripts, no cookies beyond the auth session, no IP or device
+// fingerprinting. We record what happened, not who you are. Fire-and-forget:
+// analytics must never block or break a user action.
+//
+// session_id is a random per-tab value — it lets us count sessions without
+// identifying a device across visits.
+const SESSION_ID = (() => {
+  try {
+    const k = "letters-session";
+    let v = sessionStorage.getItem(k);
+    if (!v) { v = Math.random().toString(36).slice(2) + Date.now().toString(36); sessionStorage.setItem(k, v); }
+    return v;
+  } catch { return null; }
+})();
+
+async function track(name, props = {}) {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const uid = data?.session?.user?.id;
+    if (!uid) return;                       // anonymous traffic isn't tracked at all
+    await supabase.from("events").insert({ user_id: uid, name, props, session_id: SESSION_ID });
+  } catch (e) {
+    // Never let telemetry break the app.
+    console.debug("track failed:", name, e);
+  }
+}
+
+function SessionTracker({ session }) {
+  useEffect(() => {
+    if (!session) return;
+    try {
+      const k = "letters-session-tracked";
+      if (sessionStorage.getItem(k)) return;
+      sessionStorage.setItem(k, "1");
+    } catch { /* private mode — fire anyway */ }
+    track("session_start");
+  }, [session]);
+  return null;
+}
+
 function MobileChrome() {
   useEffect(() => {
     const vv = typeof window !== "undefined" ? window.visualViewport : null;
@@ -8631,6 +8681,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <MobileChrome/>
+      <SessionTracker session={session}/>
       {!session
         ? <MarketingSite onAuthSuccess={() => setSession(true)}/>
         : (
