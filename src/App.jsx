@@ -6955,7 +6955,7 @@ function MarketingHomePage({ navigate }) {
   const [showModal, setShowModal] = useState(false);
   return (
     <div style={{ minHeight:"100vh", background:"#fff" }}>
-      <header style={{ position:"sticky", top:0, zIndex:50, background:"rgba(255,255,255,0.96)", backdropFilter:"blur(10px)", borderBottom:"1px solid #F0EDE8" }}>
+      <header className="letters-topbar" style={{ position:"sticky", top:0, zIndex:50, background:"rgba(255,255,255,0.96)", backdropFilter:"blur(10px)", borderBottom:"1px solid #F0EDE8" }}>
         <div style={{ maxWidth:680, margin:"0 auto", padding:"0 20px", height:54, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
             <Logo size={38}/>
@@ -7031,7 +7031,7 @@ function HowItWorksPage({ navigate }) {
 
   return (
     <div style={{ minHeight:"100vh", background:"#fff" }}>
-      <header style={{ position:"sticky", top:0, zIndex:50, background:"rgba(255,255,255,0.96)", backdropFilter:"blur(10px)", borderBottom:"1px solid #F0EDE8" }}>
+      <header className="letters-topbar" style={{ position:"sticky", top:0, zIndex:50, background:"rgba(255,255,255,0.96)", backdropFilter:"blur(10px)", borderBottom:"1px solid #F0EDE8" }}>
         <div style={{ maxWidth:680, margin:"0 auto", padding:"0 20px", height:54, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
           <button onClick={() => navigate("home")} style={{ background:"none", border:"none", cursor:"pointer", display:"flex", alignItems:"center", gap:10, padding:0 }}>
             <Logo size={34}/><span style={{ fontFamily:"'Playfair Display', serif", fontSize:18, fontWeight:900, color:"#111" }}>Letters<span style={{ color:"#C8A96E" }}>.</span></span>
@@ -7086,7 +7086,7 @@ function HowItWorksPage({ navigate }) {
 function InvestorPage({ navigate }) {
   return (
     <div style={{ minHeight:"100vh", background:"#fff" }}>
-      <header style={{ position:"sticky", top:0, zIndex:50, background:"rgba(255,255,255,0.96)", backdropFilter:"blur(10px)", borderBottom:"1px solid #F0EDE8" }}>
+      <header className="letters-topbar" style={{ position:"sticky", top:0, zIndex:50, background:"rgba(255,255,255,0.96)", backdropFilter:"blur(10px)", borderBottom:"1px solid #F0EDE8" }}>
         <div style={{ maxWidth:680, margin:"0 auto", padding:"0 20px", height:54, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
           <button onClick={() => navigate("home")} style={{ background:"none", border:"none", cursor:"pointer", display:"flex", alignItems:"center", gap:10, padding:0 }}>
             <Logo size={34}/><span style={{ fontFamily:"'Playfair Display', serif", fontSize:18, fontWeight:900, color:"#111" }}>Letters<span style={{ color:"#C8A96E" }}>.</span></span>
@@ -7751,10 +7751,12 @@ function MobileChrome() {
     <style>{`
       :root { --kb: 0px; --safe-b: env(safe-area-inset-bottom, 0px); --safe-t: env(safe-area-inset-top, 0px); }
 
-      /* Fixed bottom UI clears the home indicator, and rides above the keyboard. */
+      /* Fixed bottom UI clears the home indicator.
+         NOTE: do NOT use transform here. A transform on a fixed element creates
+         a containing block and makes iOS mis-measure the viewport — it widened
+         HTML to 440px in a 385px window and panned the page sideways. */
       .letters-bottomnav {
         padding-bottom: calc(8px + var(--safe-b));
-        transform: translateY(var(--kb));
       }
       /* The nav slides away entirely while typing — the composer takes its place. */
       .kb-open .letters-bottomnav { display: none !important; }
@@ -7774,8 +7776,31 @@ function MobileChrome() {
         .kb-open .letters-composer-bar, .kb-open .forum-composer { bottom: 0; }
       }
 
-      /* Top bar clears the notch. */
-      .letters-topbar { padding-top: var(--safe-t); }
+      /* Every page header clears the notch. Targeting the element (not a class)
+         means a header added later is covered automatically — chasing classes
+         one at a time is how the marketing + hamburger headers got missed. */
+      header { padding-top: var(--safe-t); }
+
+      /* No horizontal panning. With viewport-fit=cover, iOS pans the page
+         sideways to reveal a focused input if anything overflows.
+         NOTE: do NOT pad body left/right — fixed elements (the reader overlay)
+         anchor to the viewport, not the padded body, which shifts them. Pad the
+         fixed containers themselves instead. */
+      html, body {
+        width: 100%;
+        max-width: 100vw;
+        overflow-x: hidden;
+        position: relative;
+        left: 0;
+      }
+      .letters-detail-pane,
+      .letters-bottomnav,
+      .letters-composer-bar,
+      .forum-composer {
+        padding-left: env(safe-area-inset-left, 0px);
+        padding-right: env(safe-area-inset-right, 0px);
+        box-sizing: border-box;
+      }
 
       /* Touch polish */
       * { -webkit-tap-highlight-color: transparent; }
