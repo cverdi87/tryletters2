@@ -5484,6 +5484,11 @@ function YouPage({ session, onSignOut }) {
           <button onClick={() => navigate("/guide")} style={{ background:"none", border:"none", color:"#8A7A55", fontFamily:"'DM Mono', monospace", fontSize:11.5, letterSpacing:"0.06em", cursor:"pointer" }}>
             Read the User Guide →
           </button>
+          <div style={{ marginTop:12, display:"flex", justifyContent:"center", gap:14 }}>
+            <button onClick={() => navigate("/privacy")} style={{ background:"none", border:"none", color:"#B0A488", fontFamily:"'DM Mono', monospace", fontSize:10.5, cursor:"pointer" }}>Privacy</button>
+            <span style={{ color:"#DDD5C4", fontSize:10.5 }}>·</span>
+            <button onClick={() => navigate("/terms")} style={{ background:"none", border:"none", color:"#B0A488", fontFamily:"'DM Mono', monospace", fontSize:10.5, cursor:"pointer" }}>Terms</button>
+          </div>
         </div>
         {session?.user?.email && session.user.email.toLowerCase().endsWith("@tryletters.tech") && (
           <div style={{ marginTop:12, textAlign:"center" }}>
@@ -7067,6 +7072,144 @@ function ListenPage({ session, onSignOut, onNavigate }) {
   );
 }
 
+// ── Legal: privacy policy + terms ───────────────────────────────────────────
+// One component, two documents. Must be reachable WITHOUT signing in — Apple
+// and Google both require a publicly-resolvable privacy policy URL at
+// submission, and a link behind a login wall doesn't satisfy that.
+function LegalPage({ doc }) {
+  const navigate = useNavigate();
+  const H2 = ({ children }) => <h2 style={{ fontFamily:"'Playfair Display', serif", fontSize:22, fontWeight:900, color:"#141414", margin:"0 0 12px", paddingTop:26, borderTop:"1px solid #E8E0D0" }}>{children}</h2>;
+  const P  = ({ children }) => <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:16.5, lineHeight:1.72, color:"#40382C", margin:"0 0 14px" }}>{children}</p>;
+  const LI = ({ children }) => <li style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:16.5, lineHeight:1.7, color:"#40382C", marginBottom:8 }}>{children}</li>;
+  const UL = ({ children }) => <ul style={{ margin:"0 0 14px", paddingLeft:22 }}>{children}</ul>;
+  const B  = ({ children }) => <strong style={{ fontWeight:700, color:"#141414" }}>{children}</strong>;
+
+  const isPrivacy = doc === "privacy";
+
+  return (
+    <div className="letters-main" style={{ minHeight:"100vh", background:"#F9F6F0", paddingBottom:80 }}>
+      <TopBar title={<span>{isPrivacy ? "Privacy" : "Terms"}<span style={{ color:"#C8A96E" }}>.</span></span>} maxWidth={1040} onLogoClick={() => navigate("/")}/>
+      <main style={{ maxWidth:700, margin:"0 auto", padding:"0 22px" }}>
+        <div style={{ padding:"30px 0 8px" }}>
+          <div style={{ fontSize:10, letterSpacing:"0.18em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:10 }}>Letters</div>
+          <h1 style={{ fontFamily:"'Playfair Display', serif", fontSize:34, fontWeight:900, color:"#111", letterSpacing:"-0.02em", margin:"0 0 8px", lineHeight:1.1 }}>
+            {isPrivacy ? "Privacy Policy" : "Terms of Service"}
+          </h1>
+          <div style={{ fontFamily:"'DM Mono', monospace", fontSize:11, color:"#B0A488", marginBottom:24 }}>Last updated: 13 July 2026</div>
+        </div>
+
+        {isPrivacy ? (
+          <>
+            <div style={{ background:"#F5F1E5", border:"1px solid #E8DFC9", borderRadius:12, padding:"18px 20px", marginBottom:26 }}>
+              <div style={{ fontSize:10, letterSpacing:"0.14em", textTransform:"uppercase", color:"#8A6D2F", fontFamily:"'DM Mono', monospace", marginBottom:10 }}>The short version</div>
+              <UL>
+                <LI><B>We do not sell your data.</B> Not to advertisers, not to data brokers, not to anyone.</LI>
+                <LI><B>We do not track you across other websites.</B> No advertising pixels, no cross-site trackers, no behavioural profiles.</LI>
+                <LI><B>We use no third-party analytics.</B> Our usage data lives in our own database and is never shared.</LI>
+                <LI><B>We do not collect your IP address or fingerprint your device.</B></LI>
+              </UL>
+              <P>If we ever change any of the above, we will tell you before it takes effect.</P>
+            </div>
+
+            <H2>What we collect</H2>
+            <P><B>What you give us.</B> Your email address, so you can sign in and receive the notifications you've asked for. Your profile — username, and optionally a name, bio, location, occupation, photo. The content you publish: letters, posts, replies, the forums you join, who you follow, the podcast shows you follow and where you paused an episode. If you report content, we keep the report and your reason.</P>
+            <P><B>What we generate.</B> We record product events — that a session began, that a letter was published, that an episode was played — with your user ID and a random per-session identifier. We use this to learn whether the product works: do people return, where do they get stuck, does anyone finish what they start.</P>
+            <UL>
+              <LI>We do <B>not</B> record your IP address, device fingerprint, or precise location.</LI>
+              <LI>The session identifier is random and is not linked to your device across visits.</LI>
+              <LI>You can request a copy of your own event history at any time.</LI>
+              <LI>Raw analytics events are <B>deleted after 180 days</B>. We keep only aggregate, non-identifying totals after that.</LI>
+            </UL>
+
+            <H2>Cookies</H2>
+            <P>Only what is needed to keep you signed in. No advertising or tracking cookies.</P>
+
+            <H2>Advertising</H2>
+            <P>We do not currently run advertising. <B>If we ever do, any advertising will be contextual — based on what is being read, not on who is reading it.</B> We will not sell or share your personal data with advertisers, and we will not permit third-party ad trackers in the product. If we ever intend to depart from this, we will tell you in advance and give you a meaningful choice.</P>
+
+            <H2>Who we share it with</H2>
+            <P>Only the providers we need to run Letters: our database and authentication host, our application host, and our email provider. They process data on our behalf and may not use it for their own purposes. We may also disclose information where we are legally required to, or in good faith to prevent imminent harm. <B>We do not sell personal data.</B></P>
+
+            <H2>Public content</H2>
+            <P>Letters is a publication. What you publish — letters, posts, replies, your profile, who you follow — is visible to others. Your podcast playback positions, blocked-accounts list, notification settings, and analytics events are private to you.</P>
+
+            <H2>Deleting your account</H2>
+            <P>You can delete your account at any time in <B>Edit Profile → Delete account</B>. Your profile is anonymised, your email is scrubbed, and you can no longer sign in. <B>Your published letters and replies remain</B>, attributed to a deleted user — because conversations are threaded, and deleting one side would destroy other people's writing. If you want specific writing removed, delete it before deleting your account, or contact us.</P>
+
+            <H2>Retention</H2>
+            <UL>
+              <LI><B>Your content and account:</B> until you delete them.</LI>
+              <LI><B>Analytics events:</B> 180 days, then deleted.</LI>
+              <LI><B>Reports and moderation decisions:</B> kept as long as needed to enforce our rules, including after the reported content is removed. This is deliberate — recognising a pattern of behaviour requires remembering it.</LI>
+            </UL>
+
+            <H2>Your rights</H2>
+            <P>You may request access to, correction of, export of, or deletion of your personal data. Email <B>privacy@tryletters.tech</B> and we will respond within 30 days.</P>
+
+            <H2>Children</H2>
+            <P>Letters is not intended for anyone under 16. We do not knowingly collect data from children.</P>
+
+            <H2>Security</H2>
+            <P>We protect your data with row-level database security, encrypted connections, and staff access limited to what is needed. No system is perfectly secure, and we will not pretend otherwise — but we will tell you promptly if a breach affects you.</P>
+
+            <H2>Contact</H2>
+            <P>privacy@tryletters.tech</P>
+          </>
+        ) : (
+          <>
+            <H2>What Letters is</H2>
+            <P>Letters is a publication and a community: a place to read curated journalism, write in response, listen, and argue in good faith. By using it, you agree to these terms. If you don't agree, don't use it. You must be at least 16.</P>
+
+            <H2>Your content</H2>
+            <P><B>You own what you write.</B> Publishing here doesn't transfer ownership. You grant us a non-exclusive, royalty-free licence to host and display your content within Letters — which is simply what's required to show your writing to other readers. That licence ends when you delete the content, except where others have quoted or replied to it, or where we must retain it for the moderation reasons below.</P>
+            <P>You are responsible for what you publish. Don't publish anything you don't have the right to publish.</P>
+
+            <H2>What isn't allowed</H2>
+            <P>Letters exists for serious writing and honest disagreement. What follows is not a list of opinions you may not hold — it is a list of behaviours that destroy the thing.</P>
+            <UL>
+              <LI>Harassing, threatening, or targeting another person.</LI>
+              <LI>Hate speech, or attacking people for who they are.</LI>
+              <LI>Content that sexualises minors, or is otherwise illegal.</LI>
+              <LI>Spam, manipulation, or scams.</LI>
+              <LI>Impersonating someone else.</LI>
+              <LI>Publishing someone's private information without consent.</LI>
+              <LI>Deliberately publishing falsehoods as fact.</LI>
+              <LI>Attacking the service — scraping, exploiting, or attempting to breach it.</LI>
+            </UL>
+            <P><B>Disagreement is not a violation.</B> A view you dislike is not harassment, and reporting a post because you disagree with it wastes everyone's time.</P>
+
+            <H2>Moderation</H2>
+            <P>We may remove content and suspend accounts. Removed content is hidden from everyone, and its author is notified. A suspended account cannot publish, but can still read. Reports are reviewed by staff, and we keep a record of reports and decisions — including after content is removed — because recognising a pattern requires remembering it. Content under an open report cannot be permanently destroyed by its author.</P>
+            <P>We aim to be fair, we will not always be right, and we will not pretend to be neutral about the behaviours listed above. If you think we've made a mistake, write to <B>appeals@tryletters.tech</B>.</P>
+
+            <H2>Blocking</H2>
+            <P>You may block another user. Blocking is mutual in effect — neither of you will see the other's content — and private; the other person is not told.</P>
+
+            <H2>Podcasts and clips</H2>
+            <P>Podcast episodes in Letters are third-party content, delivered from their publishers' own feeds. We don't own, host, or control them.</P>
+            <P>An <B>audio clip</B> is a <B>reference</B> to a segment of an episode — a start and end timestamp — not a copy of the audio. Playing a clip streams the original episode from its publisher. Clips are limited to five minutes and are intended for commentary, criticism, and discussion. Podcast publishers who want their show removed may write to <B>legal@tryletters.tech</B>, and we will remove it.</P>
+
+            <H2>Your account</H2>
+            <P>You may delete your account at any time, in the app. Your published letters and replies remain, attributed to a deleted user — deleting one side of a threaded conversation would destroy other people's writing. We may suspend or terminate an account for a serious or repeated breach of these terms.</P>
+
+            <H2>No warranty</H2>
+            <P>Letters is provided "as is." We do our best, but we don't promise it will be uninterrupted or error-free, and content published by other users is theirs, not ours — we don't endorse it.</P>
+
+            <H2>Contact</H2>
+            <P>hello@tryletters.tech</P>
+          </>
+        )}
+
+        <div style={{ marginTop:34, paddingTop:20, borderTop:"1px solid #F0EDE8", textAlign:"center" }}>
+          <button onClick={() => navigate(isPrivacy ? "/terms" : "/privacy")} style={{ background:"none", border:"none", color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontSize:11.5, letterSpacing:"0.06em", cursor:"pointer" }}>
+            {isPrivacy ? "Read the Terms of Service →" : "Read the Privacy Policy →"}
+          </button>
+        </div>
+      </main>
+    </div>
+  );
+}
+
 function GuidePage({ session, onNavigate }) {
   const navigate = useNavigate();
   const H2 = ({ children }) => <h2 style={{ fontFamily:"'Playfair Display', serif", fontSize:26, fontWeight:900, color:"#141414", letterSpacing:"-0.01em", margin:"0 0 14px", paddingTop:28, borderTop:"1px solid #E8E0D0" }}>{children}</h2>;
@@ -8457,6 +8600,8 @@ function AuthenticatedApp({ session, handleSignOut }) {
         <Route path="/settings/notifications" element={<NotificationSettingsPage session={session} onNavigate={goToTab}/>}/>
         <Route path="/edit-profile" element={<EditProfilePage session={session} onNavigate={goToTab}/>}/>
         <Route path="/staff/reports" element={<StaffReportsPage session={session} onNavigate={goToTab}/>}/>
+        <Route path="/privacy" element={<LegalPage doc="privacy"/>}/>
+        <Route path="/terms" element={<LegalPage doc="terms"/>}/>
         <Route path="/inbox" element={<InboxPage session={session} onNavigate={goToTab}/>}/>
         <Route path="/topic/:tag" element={<TopicPage session={session} onNavigate={goToTab}/>}/>
         <Route path="/guide" element={<GuidePage session={session} onNavigate={goToTab}/>}/>
@@ -8491,6 +8636,8 @@ function MarketingSite({ onAuthSuccess }) {
         <Route path="/invite" element={<InvitePage navigate={goTo}/>}/>
         <Route path="/how-it-works" element={<HowItWorksPage navigate={goTo}/>}/>
         <Route path="/investor" element={<InvestorPage navigate={goTo}/>}/>
+        <Route path="/privacy" element={<LegalPage doc="privacy"/>}/>
+        <Route path="/terms" element={<LegalPage doc="terms"/>}/>
         <Route path="/signin" element={
           <div style={{ minHeight:"100vh", background:"#F9F6F0", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:20 }}>
             <button onClick={() => goTo("home")}
