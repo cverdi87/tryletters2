@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, createContext, useContext } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation, useParams } from "react-router-dom";
 import { supabase } from "./supabase";
 import Auth from "./Auth";
@@ -176,6 +176,16 @@ function BottomNav({ active, onNavigate, unread = 0 }) {
       )
     },
     {
+      id: "listen",
+      label: "Listen",
+      icon: (active) => (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active ? "#111" : "#999"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
+          <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+        </svg>
+      )
+    },
+    {
       id: "write",
       label: "Write",
       icon: (active) => (
@@ -257,6 +267,7 @@ function RightNav({ active, onNavigate, unread = 0 }) {
   const tabs = [
     { id:"feed",   label:"Feed",   icon: (isActive) => <svg width="20" height="20" viewBox="0 0 24 24" fill={isActive?"#111":"none"} stroke={isActive?"#111":"#999"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
     { id:"read",   label:"Read",   icon: (isActive) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={isActive?"#111":"#999"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg> },
+    { id:"listen", label:"Listen", icon: (isActive) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={isActive?"#111":"#999"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg> },
     { id:"write",  label:"Write",  icon: (isActive) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={isActive?"#111":"#999"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> },
     { id:"forums", label:"Forums", icon: (isActive) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={isActive?"#111":"#999"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
     { id:"you",    label:"You",    icon: (isActive) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={isActive?"#111":"#999"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
@@ -603,6 +614,7 @@ function LetterCard({ item, onOpen, selected, onToggleLike, isLiked, onToggleRep
       style={{ borderBottom:"1px solid #F0EDE8", padding:"20px 0", cursor:"pointer", background: selected ? "#FDFAF4" : "#fff", borderLeft: selected ? "3px solid #C8A96E" : "3px solid transparent", paddingLeft: selected ? 12 : 0, transition:"all 0.15s" }}
       onMouseEnter={e => { if (selected) return; const s = e.currentTarget.style; s.margin = "0 -12px"; s.padding = "20px 12px"; s.background = "#FDFBF6"; s.boxShadow = "inset 0 0 0 1px #E5DBC8"; s.borderRadius = "12px"; s.borderBottomColor = "transparent"; }}
       onMouseLeave={e => { if (selected) return; const s = e.currentTarget.style; s.margin = "0"; s.padding = "20px 0"; s.background = "#fff"; s.boxShadow = "none"; s.borderRadius = "0"; s.borderBottomColor = "#F0EDE8"; }}>
+      {item.clip && <ClipCard clip={item.clip} compact/>}
       {item.removed && (
         <div style={{ display:"inline-flex", alignItems:"center", gap:5, background:"#F5E1DC", border:"1px solid #E3B8AE", color:"#B03A2E", fontFamily:"'DM Mono', monospace", fontSize:10, letterSpacing:"0.08em", textTransform:"uppercase", fontWeight:600, padding:"3px 9px", borderRadius:12, marginBottom:10 }}>
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="10"/><path d="M4.9 4.9l14.2 14.2"/></svg>
@@ -696,6 +708,7 @@ function PostCard({ item, onOpen, selected, onToggleLike, isLiked, onToggleRepub
       style={{ borderBottom:"1px solid #F0EDE8", padding:"18px 0", cursor:"pointer", background: selected ? "#FDFAF4" : "#fff", borderLeft: selected ? "3px solid #C8A96E" : "3px solid transparent", paddingLeft: selected ? 12 : 0, transition:"all 0.15s" }}
       onMouseEnter={e => { if (selected) return; const s = e.currentTarget.style; s.margin = "0 -12px"; s.padding = "18px 12px"; s.background = "#FDFBF6"; s.boxShadow = "inset 0 0 0 1px #E5DBC8"; s.borderRadius = "12px"; s.borderBottomColor = "transparent"; }}
       onMouseLeave={e => { if (selected) return; const s = e.currentTarget.style; s.margin = "0"; s.padding = "18px 0"; s.background = "#fff"; s.boxShadow = "none"; s.borderRadius = "0"; s.borderBottomColor = "#F0EDE8"; }}>
+      {item.clip && <ClipCard clip={item.clip} compact/>}
       {item.removed && (
         <div style={{ display:"inline-flex", alignItems:"center", gap:5, background:"#F5E1DC", border:"1px solid #E3B8AE", color:"#B03A2E", fontFamily:"'DM Mono', monospace", fontSize:10, letterSpacing:"0.08em", textTransform:"uppercase", fontWeight:600, padding:"3px 9px", borderRadius:12, marginBottom:10 }}>
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="10"/><path d="M4.9 4.9l14.2 14.2"/></svg>
@@ -1144,7 +1157,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
     // Fetch letters joined with their author's profile info
     const { data, error } = await supabase
       .from("letters")
-      .select("*, profiles:user_id (username, full_name, status)")
+      .select("*, profiles:user_id (username, full_name, status), clip:clip_episode_id (id, title, audio_url, image_url, show:show_id (id, title, image_url))")
       .order("created_at", { ascending: false })
       .limit(50);
 
@@ -1176,6 +1189,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
             id: `real-${letter.id}`,
             dbId: letter.id,
             removed: letter.removed,
+            clip: letter.clip_episode_id && letter.clip ? { episode_id: letter.clip_episode_id, start: letter.clip_start, end: letter.clip_end, episode: letter.clip, show: letter.clip.show } : null,
             type: "letter",
             kind: letter.kind || "letter", // "letter" (long) or "post" (short) — drives which feed card renders
             isReal: true,
@@ -1243,13 +1257,13 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
     if (!letterId || realLetters.some(l => l.dbId === letterId)) { setFetchedLetter(null); return; }
     let cancelled = false;
     (async () => {
-      const { data: letter } = await supabase.from("letters").select("*, profiles:user_id (username, full_name, status)").eq("id", letterId).maybeSingle();
+      const { data: letter } = await supabase.from("letters").select("*, profiles:user_id (username, full_name, status), clip:clip_episode_id (id, title, audio_url, image_url, show:show_id (id, title, image_url))").eq("id", letterId).maybeSingle();
       if (cancelled) return;
       if (!letter) { setFetchedLetter(null); return; }
       const profile = letter.profiles || {};
       const plainBody = stripHtml(letter.body);
       setFetchedLetter({
-        id: `real-${letter.id}`, dbId: letter.id, removed: letter.removed, type: "letter", kind: letter.kind || "letter", isReal: true,
+        id: `real-${letter.id}`, dbId: letter.id, removed: letter.removed, clip: letter.clip_episode_id && letter.clip ? { episode_id: letter.clip_episode_id, start: letter.clip_start, end: letter.clip_end, episode: letter.clip, show: letter.clip.show } : null, type: "letter", kind: letter.kind || "letter", isReal: true,
         userId: letter.user_id, author: profile.full_name || profile.username || "Anonymous", username: profile.username || "user",
         status: profile.status || "contributor", initial: (profile.full_name || profile.username || "A")[0].toUpperCase(),
         color: colorForId(letter.user_id), timeAgo: timeAgo(letter.created_at), createdAt: letter.created_at,
@@ -1715,6 +1729,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
                     Removed post
                   </div>
                 )}
+                {openLetter.clip && <ClipCard clip={openLetter.clip}/>}
                 {openLetter.title && (
                   <h2 style={{ fontFamily:"'Playfair Display', serif", fontSize:24, fontWeight:800, color:"#111", margin:"0 0 14px", lineHeight:1.2 }}>{openLetter.title}</h2>
                 )}
@@ -2739,9 +2754,12 @@ function QuoteSourceModal({ sourceTitle, sourcePublication, onInsert, onClose })
 function WritePage({ session, onNavigate }) {
   const draftKey = `letters-draft-${session?.user?.id || "anon"}`;
   const location = useLocation();
+  const [clip, setClip] = useState(null);
 
   // Preselect a forum destination when arriving via "Write in [Forum]"
   useEffect(() => {
+    const incomingClip = location.state && location.state.clip;
+    if (incomingClip) setClip(incomingClip);
     const tf = location.state && location.state.targetForum;
     if (tf && tf.id) {
       setForm(f => ({ ...f, forumId: tf.id, forumName: tf.name }));
@@ -3108,6 +3126,9 @@ function WritePage({ session, onNavigate }) {
             source_publication: form.sourcePublication || null,
             kind: "letter",
             forum_id: form.forumId || null,
+            clip_episode_id: clip ? clip.episode_id : null,
+            clip_start: clip ? clip.start : null,
+            clip_end: clip ? clip.end : null,
           }
     ).select("id").single();
     if (error) { setError(error.message); setLoading(false); return; }
@@ -3394,6 +3415,15 @@ function WritePage({ session, onNavigate }) {
             {/* Editor */}
             <div style={{ flex:1, minWidth:0, background:"#fff", border:"1px solid #E8E0D0", borderRadius:10, overflow:"hidden" }}>
               <div style={{ padding:"14px 20px 0" }}>
+                {clip && (
+                  <div style={{ marginBottom:14 }}>
+                    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 }}>
+                      <span style={{ fontSize:10, letterSpacing:"0.14em", textTransform:"uppercase", color:"#B0A488", fontFamily:"'DM Mono', monospace" }}>Quoting a clip</span>
+                      <button onClick={() => setClip(null)} style={{ background:"none", border:"none", color:"#B9756B", fontFamily:"'DM Mono', monospace", fontSize:10.5, cursor:"pointer", padding:0 }}>Remove</button>
+                    </div>
+                    <ClipCard clip={clip} compact/>
+                  </div>
+                )}
                 <input type="text" placeholder="Give your letter a headline..." value={form.title} onChange={e=>set("title",e.target.value)} onFocus={()=>setFocused("title")} onBlur={()=>setFocused(null)}
                   style={{ width:"100%", padding:"6px 0 14px", fontSize:22, fontFamily:"'Playfair Display', serif", fontWeight:800, color:"#111", background:"none", border:"none", borderBottom:"1px solid #F0EDE8", outline:"none", boxSizing:"border-box" }}/>
               </div>
@@ -6284,6 +6314,750 @@ function StaffReportsPage({ session, onNavigate }) {
   );
 }
 
+// ── Listen: audio engine ────────────────────────────────────────────────────
+// A single <audio> element lives at the app root and is driven through this
+// context. That's the whole reason for a context rather than local state:
+// playback has to survive navigating between tabs. Mounting <audio> inside the
+// Listen page would kill the sound the moment you left it.
+//
+// Playback position is saved to `podcast_plays` every 10s (and on pause/unmount)
+// so "continue listening" works across devices. We throttle deliberately —
+// writing on every timeupdate would be ~4 writes/second per listener.
+
+const AudioContext = createContext(null);
+const useAudio = () => useContext(AudioContext);
+
+function AudioProvider({ session, children }) {
+  const audioRef = useRef(null);
+  const [current, setCurrent] = useState(null);   // { episode, show }
+  const [playing, setPlaying] = useState(false);
+  const [time, setTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [rate, setRate] = useState(1);
+  const [queue, setQueue] = useState([]);          // [{ episode, show }]
+  const lastSaved = useRef(0);
+  const me = session?.user?.id;
+
+  const savePosition = async (pos, done = false) => {
+    if (!me || !current?.episode?.id) return;
+    await supabase.from("podcast_plays").upsert({
+      user_id: me,
+      episode_id: current.episode.id,
+      position: Math.floor(pos),
+      completed: done,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id,episode_id" });
+  };
+
+  // Load an episode, resuming from a saved position if we have one.
+  const play = async (episode, show) => {
+    const a = audioRef.current;
+    if (!a) return;
+    const isSame = current?.episode?.id === episode.id;
+
+    if (isSame) {
+      if (a.paused) { a.play(); setPlaying(true); } else { a.pause(); setPlaying(false); }
+      return;
+    }
+
+    if (current) await savePosition(a.currentTime);
+
+    setCurrent({ episode, show });
+    a.src = episode.audio_url;
+
+    let start = 0;
+    if (me) {
+      const { data } = await supabase.from("podcast_plays")
+        .select("position, completed").eq("user_id", me).eq("episode_id", episode.id).limit(1);
+      const row = data && data[0];
+      // Don't resume a finished episode at the very end — start it over.
+      if (row && !row.completed && row.position > 5) start = row.position;
+    }
+    a.currentTime = start;
+    a.playbackRate = rate;
+    try { await a.play(); setPlaying(true); } catch (e) { console.error("Playback failed:", e); }
+  };
+
+  const toggle = () => {
+    const a = audioRef.current;
+    if (!a || !current) return;
+    if (a.paused) { a.play(); setPlaying(true); }
+    else { a.pause(); setPlaying(false); savePosition(a.currentTime); }
+  };
+
+  const seek = (t) => { const a = audioRef.current; if (a) { a.currentTime = t; setTime(t); } };
+  const skip = (delta) => { const a = audioRef.current; if (a) seek(Math.max(0, Math.min(a.duration || 0, a.currentTime + delta))); };
+  const setSpeed = (r) => { const a = audioRef.current; setRate(r); if (a) a.playbackRate = r; };
+
+  const close = async () => {
+    const a = audioRef.current;
+    if (a) { await savePosition(a.currentTime); a.pause(); a.src = ""; }
+    setCurrent(null); setPlaying(false); setTime(0); setDuration(0);
+  };
+
+  // Queue: play next when an episode ends.
+  const enqueue = (episode, show) => setQueue(q => q.some(x => x.episode.id === episode.id) ? q : [...q, { episode, show }]);
+  const dequeue = (id) => setQueue(q => q.filter(x => x.episode.id !== id));
+  const playNext = () => {
+    setQueue(q => {
+      if (!q.length) return q;
+      const [next, ...rest] = q;
+      play(next.episode, next.show);
+      return rest;
+    });
+  };
+
+  const onEnded = async () => {
+    await savePosition(duration || 0, true);
+    setPlaying(false);
+    playNext();
+  };
+
+  const onTimeUpdate = () => {
+    const a = audioRef.current;
+    if (!a) return;
+    setTime(a.currentTime);
+    // Throttled position save — every 10s of playback.
+    if (a.currentTime - lastSaved.current > 10) {
+      lastSaved.current = a.currentTime;
+      savePosition(a.currentTime);
+    }
+  };
+
+  useEffect(() => { lastSaved.current = 0; }, [current?.episode?.id]);
+
+  // Save on unload so closing the tab doesn't lose the position.
+  useEffect(() => {
+    const handler = () => { const a = audioRef.current; if (a && current) savePosition(a.currentTime); };
+    window.addEventListener("pagehide", handler);
+    return () => window.removeEventListener("pagehide", handler);
+  }, [current]);
+
+  const value = { current, playing, time, duration, rate, queue, play, toggle, seek, skip, setSpeed, close, enqueue, dequeue, playNext };
+
+  return (
+    <AudioContext.Provider value={value}>
+      <audio
+        ref={audioRef}
+        onTimeUpdate={onTimeUpdate}
+        onLoadedMetadata={e => setDuration(e.currentTarget.duration || 0)}
+        onEnded={onEnded}
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        preload="metadata"
+      />
+      {children}
+    </AudioContext.Provider>
+  );
+}
+
+// ── Listen: helpers ─────────────────────────────────────────────────────────
+function fmtTime(s) {
+  if (!s || isNaN(s)) return "0:00";
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = Math.floor(s % 60);
+  return h > 0 ? `${h}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}` : `${m}:${String(sec).padStart(2,"0")}`;
+}
+function fmtDuration(s) {
+  if (!s) return "";
+  const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60);
+  return h > 0 ? `${h} hr ${m} min` : `${m} min`;
+}
+function fmtDate(iso) {
+  if (!iso) return "";
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+// Show art with a branded fallback (feeds sometimes 404 their own artwork).
+function ShowArt({ src, title, size = 56, radius = 8 }) {
+  const [err, setErr] = useState(false);
+  const initial = ((title || "?")[0] || "?").toUpperCase();
+  if (!src || err) {
+    return (
+      <div style={{ width:size, height:size, borderRadius:radius, background:"#141414", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+        <span style={{ fontFamily:"'Playfair Display', serif", fontSize:size*0.42, fontWeight:900, color:"#C8A96E" }}>{initial}</span>
+      </div>
+    );
+  }
+  return <img src={src} alt="" onError={() => setErr(true)} style={{ width:size, height:size, borderRadius:radius, objectFit:"cover", flexShrink:0, background:"#EDE6D8" }}/>;
+}
+
+// ── Listen: the persistent player bar ───────────────────────────────────────
+// Sits above the bottom nav on mobile; expands to a full-screen "now playing"
+// sheet on tap. Rendered at the app root so it follows you across tabs.
+function PlayerBar() {
+  const audio = useAudio();
+  const navigate = useNavigate();
+  const [expanded, setExpanded] = useState(false);
+  const [clipping, setClipping] = useState(null);
+
+  // Give every page extra bottom room while a player is on screen, instead of
+  // editing paddingBottom on 14 separate pages.
+  const active = !!audio?.current;
+  useEffect(() => {
+    document.documentElement.classList.toggle("player-open", active);
+    return () => document.documentElement.classList.remove("player-open");
+  }, [active]);
+
+  if (!audio?.current) return null;
+
+  const { current, playing, time, duration, rate, queue, toggle, seek, skip, setSpeed, close, dequeue } = audio;
+  const { episode, show } = current;
+  const pct = duration ? (time / duration) * 100 : 0;
+  const art = episode.image_url || show?.image_url;
+
+  const IconBtn = ({ onClick, children, size = 38, bg = "transparent", color = "#141414" }) => (
+    <button onClick={(e) => { e.stopPropagation(); onClick(); }}
+      style={{ width:size, height:size, borderRadius:"50%", border:"none", background:bg, color, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0, padding:0 }}>
+      {children}
+    </button>
+  );
+  const PlayIcon = () => playing
+    ? <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+    : <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l14 8-14 8z"/></svg>;
+
+  if (expanded) {
+    return (
+      <div style={{ position:"fixed", inset:0, zIndex:1500, background:"#F9F6F0", display:"flex", flexDirection:"column", paddingTop:"env(safe-area-inset-top, 0px)", paddingBottom:"calc(24px + env(safe-area-inset-bottom, 0px))" }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 20px" }}>
+          <button onClick={() => setExpanded(false)} style={{ background:"none", border:"none", cursor:"pointer", color:"#8A8170", display:"flex", alignItems:"center", gap:6, fontFamily:"'DM Mono', monospace", fontSize:11.5, letterSpacing:"0.06em", padding:0 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="m6 9 6 6 6-6"/></svg> Close
+          </button>
+          <button onClick={close} style={{ background:"none", border:"none", cursor:"pointer", color:"#B0A488", fontFamily:"'DM Mono', monospace", fontSize:11.5, padding:0 }}>Stop</button>
+        </div>
+
+        <div style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"0 32px", gap:26, overflowY:"auto" }}>
+          <ShowArt src={art} title={show?.title} size={260} radius={16}/>
+          <div style={{ textAlign:"center", maxWidth:420 }}>
+            <div style={{ fontFamily:"'Playfair Display', serif", fontSize:22, fontWeight:800, color:"#111", lineHeight:1.25, marginBottom:7 }}>{episode.title}</div>
+            <div style={{ fontFamily:"'DM Mono', monospace", fontSize:11.5, color:"#B0A488", letterSpacing:"0.05em" }}>{show?.title}</div>
+          </div>
+
+          <div style={{ width:"100%", maxWidth:460 }}>
+            <input type="range" min={0} max={duration || 0} value={time} onChange={e => seek(Number(e.target.value))}
+              style={{ width:"100%", accentColor:"#C8A96E", cursor:"pointer" }}/>
+            <div style={{ display:"flex", justifyContent:"space-between", fontFamily:"'DM Mono', monospace", fontSize:10.5, color:"#B0A488", marginTop:2 }}>
+              <span>{fmtTime(time)}</span><span>-{fmtTime(Math.max(0, (duration||0) - time))}</span>
+            </div>
+          </div>
+
+          <div style={{ display:"flex", alignItems:"center", gap:22 }}>
+            <IconBtn onClick={() => skip(-15)} size={44}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M11 17l-5-5 5-5"/><path d="M18 17l-5-5 5-5"/></svg>
+            </IconBtn>
+            <IconBtn onClick={toggle} size={64} bg="#141414" color="#F0EAD8">
+              {playing
+                ? <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+                : <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l14 8-14 8z"/></svg>}
+            </IconBtn>
+            <IconBtn onClick={() => skip(30)} size={44}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M13 17l5-5-5-5"/><path d="M6 17l5-5-5-5"/></svg>
+            </IconBtn>
+          </div>
+
+          <div style={{ display:"flex", gap:8 }}>
+            {[1, 1.25, 1.5, 1.75, 2].map(r => (
+              <button key={r} onClick={() => setSpeed(r)}
+                style={{ background: rate === r ? "#141414" : "none", color: rate === r ? "#F0EAD8" : "#8A8170", border:"1px solid " + (rate === r ? "#141414" : "#E2DAC9"), borderRadius:14, padding:"4px 10px", fontSize:11, fontFamily:"'DM Mono', monospace", cursor:"pointer" }}>{r}×</button>
+            ))}
+          </div>
+
+          <button onClick={() => { if (playing) toggle(); setClipping({ episode, show, startAt: Math.max(0, time - 30) }); }}
+            style={{ display:"inline-flex", alignItems:"center", gap:7, background:"#C8A96E", color:"#14120E", border:"none", borderRadius:22, padding:"10px 20px", fontSize:13, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:"pointer" }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
+            Clip this passage
+          </button>
+
+          {clipping && (
+            <ClipCreator episode={clipping.episode} show={clipping.show} startAt={clipping.startAt}
+              onClose={() => setClipping(null)}
+              onUse={({ episode: ep, show: sh, start, end }) => {
+                setClipping(null); setExpanded(false);
+                navigate("/write", { state: { clip: {
+                  episode_id: ep.id, start, end,
+                  episode: { id: ep.id, title: ep.title, audio_url: ep.audio_url, image_url: ep.image_url },
+                  show: { id: sh?.id, title: sh?.title, image_url: sh?.image_url },
+                } } });
+              }}/>
+          )}
+
+          {queue.length > 0 && (
+            <div style={{ width:"100%", maxWidth:460, borderTop:"1px solid #EDE6D8", paddingTop:14 }}>
+              <div style={{ fontSize:10, letterSpacing:"0.14em", textTransform:"uppercase", color:"#B0A488", fontFamily:"'DM Mono', monospace", marginBottom:10 }}>Up next · {queue.length}</div>
+              {queue.map(q => (
+                <div key={q.episode.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"7px 0" }}>
+                  <ShowArt src={q.episode.image_url || q.show?.image_url} title={q.show?.title} size={32} radius={5}/>
+                  <div style={{ flex:1, minWidth:0, fontFamily:"'DM Sans', sans-serif", fontSize:12.5, color:"#333", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{q.episode.title}</div>
+                  <button onClick={() => dequeue(q.episode.id)} style={{ background:"none", border:"none", color:"#C0B9A6", cursor:"pointer", fontSize:15, padding:"0 4px" }}>×</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="letters-playerbar" onClick={() => setExpanded(true)}
+      style={{ position:"fixed", left:0, right:0, zIndex:45, background:"rgba(20,18,14,0.97)", backdropFilter:"blur(12px)", cursor:"pointer", boxSizing:"border-box" }}>
+      <div style={{ height:2, background:"rgba(255,255,255,0.12)" }}>
+        <div style={{ height:"100%", width:`${pct}%`, background:"#C8A96E", transition:"width 0.25s linear" }}/>
+      </div>
+      <div style={{ display:"flex", alignItems:"center", gap:11, padding:"9px 14px" }}>
+        <ShowArt src={art} title={show?.title} size={40} radius={6}/>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontFamily:"'DM Sans', sans-serif", fontSize:13, fontWeight:600, color:"#F5F0E4", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{episode.title}</div>
+          <div style={{ fontFamily:"'DM Mono', monospace", fontSize:10, color:"#9A9282", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", marginTop:1 }}>{show?.title}</div>
+        </div>
+        <IconBtn onClick={() => skip(-15)} size={32} color="#C0B9A6">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M11 17l-5-5 5-5"/><path d="M18 17l-5-5 5-5"/></svg>
+        </IconBtn>
+        <IconBtn onClick={toggle} size={38} bg="#C8A96E" color="#141414"><PlayIcon/></IconBtn>
+      </div>
+    </div>
+  );
+}
+
+// ── Clips: a bounded segment of an episode ──────────────────────────────────
+// A clip is a pointer — {episode, start, end} — not a new audio file. This card
+// owns its OWN <audio> element rather than borrowing the global player, because
+// a clip must stop dead at `clip_end`; hijacking the global player would mean
+// stealing whatever the user was already listening to. Playing a clip pauses
+// the main player (you can't listen to two things), but doesn't clobber it.
+function ClipCard({ clip, compact }) {
+  // clip: { episode_id, start, end, episode: { title, audio_url, image_url }, show: { title, image_url } }
+  const audio = useAudio();
+  const ref = useRef(null);
+  const [playing, setPlaying] = useState(false);
+  const [t, setT] = useState(clip.start);
+  const len = Math.max(1, clip.end - clip.start);
+  const pct = Math.min(100, Math.max(0, ((t - clip.start) / len) * 100));
+
+  const toggle = (e) => {
+    e.stopPropagation();
+    const a = ref.current;
+    if (!a) return;
+    if (a.paused) {
+      if (audio?.playing) audio.toggle();          // don't play two things at once
+      if (a.currentTime < clip.start || a.currentTime >= clip.end) a.currentTime = clip.start;
+      a.play().then(() => setPlaying(true)).catch(err => console.error("Clip playback failed:", err));
+    } else {
+      a.pause(); setPlaying(false);
+    }
+  };
+
+  const onTime = () => {
+    const a = ref.current;
+    if (!a) return;
+    if (a.currentTime >= clip.end) {               // hard stop at the out-point
+      a.pause();
+      a.currentTime = clip.start;
+      setPlaying(false);
+      setT(clip.start);
+      return;
+    }
+    setT(a.currentTime);
+  };
+
+  const art = clip.episode?.image_url || clip.show?.image_url;
+
+  return (
+    <div onClick={e => e.stopPropagation()}
+      style={{ display:"flex", gap:11, alignItems:"center", background:"#14120E", borderRadius:12, padding: compact ? "10px 12px" : "13px 14px", margin:"10px 0" }}>
+      <audio ref={ref} src={clip.episode?.audio_url} onTimeUpdate={onTime} onEnded={() => setPlaying(false)} preload="none"/>
+      <ShowArt src={art} title={clip.show?.title} size={compact ? 38 : 46} radius={7}/>
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ fontSize:8.5, letterSpacing:"0.14em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:3 }}>
+          Clip · {fmtTime(clip.start)}–{fmtTime(clip.end)}
+        </div>
+        <div style={{ fontFamily:"'DM Sans', sans-serif", fontSize: compact ? 12.5 : 13.5, fontWeight:600, color:"#F5F0E4", lineHeight:1.3, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+          {clip.episode?.title || "Episode"}
+        </div>
+        <div style={{ fontFamily:"'DM Mono', monospace", fontSize:10, color:"#8F8877", marginTop:2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+          {clip.show?.title}
+        </div>
+        <div style={{ height:3, background:"rgba(255,255,255,0.14)", borderRadius:2, marginTop:8, overflow:"hidden" }}>
+          <div style={{ height:"100%", width:`${pct}%`, background:"#C8A96E", transition:"width 0.2s linear" }}/>
+        </div>
+      </div>
+      <button onClick={toggle}
+        style={{ width:40, height:40, borderRadius:"50%", border:"none", background:"#C8A96E", color:"#14120E", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", flexShrink:0, padding:0 }}>
+        {playing
+          ? <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+          : <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l14 8-14 8z"/></svg>}
+      </button>
+    </div>
+  );
+}
+
+// ── Clips: the creator ──────────────────────────────────────────────────────
+// Opened from the player or an episode row. Mark in/out, nudge the handles,
+// preview the segment, then carry it into the composer.
+function ClipCreator({ episode, show, startAt, onClose, onUse }) {
+  const MAX = 300;  // 5 minutes — matches the DB trigger
+  const dur = episode.duration || 0;
+  const [start, setStart] = useState(Math.max(0, Math.floor(startAt || 0)));
+  const [end, setEnd] = useState(Math.min(dur || 60, Math.floor(startAt || 0) + 60));
+  const ref = useRef(null);
+  const [previewing, setPreviewing] = useState(false);
+
+  const clampEnd = (v) => Math.min(dur || v, Math.max(start + 5, Math.min(v, start + MAX)));
+  const clampStart = (v) => Math.max(0, Math.min(v, end - 5));
+  const len = end - start;
+
+  const preview = () => {
+    const a = ref.current;
+    if (!a) return;
+    if (!a.paused) { a.pause(); setPreviewing(false); return; }
+    a.currentTime = start;
+    a.play().then(() => setPreviewing(true)).catch(e => console.error("Preview failed:", e));
+  };
+  const onTime = () => {
+    const a = ref.current;
+    if (a && a.currentTime >= end) { a.pause(); setPreviewing(false); }
+  };
+
+  const Nudge = ({ onClick, children }) => (
+    <button onClick={onClick} style={{ background:"#fff", border:"1px solid #E2DAC9", borderRadius:6, width:30, height:28, fontSize:13, color:"#6B6250", cursor:"pointer", fontFamily:"'DM Mono', monospace", padding:0 }}>{children}</button>
+  );
+
+  return (
+    <div onClick={onClose} style={{ position:"fixed", inset:0, background:"rgba(20,18,14,0.6)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:2200, padding:20 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background:"#FBF8F1", borderRadius:16, maxWidth:460, width:"100%", maxHeight:"88vh", overflowY:"auto", boxShadow:"0 24px 70px rgba(0,0,0,0.34)" }}>
+        <audio ref={ref} src={episode.audio_url} onTimeUpdate={onTime} preload="metadata"/>
+
+        <div style={{ padding:"22px 24px 14px", borderBottom:"1px solid #EDE6D8" }}>
+          <div style={{ fontSize:10, letterSpacing:"0.16em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:7 }}>Clip this episode</div>
+          <div style={{ display:"flex", gap:12, alignItems:"center" }}>
+            <ShowArt src={episode.image_url || show?.image_url} title={show?.title} size={48} radius={8}/>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontFamily:"'Playfair Display', serif", fontSize:16, fontWeight:800, color:"#141414", lineHeight:1.25 }}>{episode.title}</div>
+              <div style={{ fontFamily:"'DM Mono', monospace", fontSize:10.5, color:"#B0A488", marginTop:2 }}>{show?.title}</div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ padding:"18px 24px" }}>
+          <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:14, color:"#8A8170", margin:"0 0 18px", lineHeight:1.55 }}>
+            Choose the passage you want to quote. Clips can run up to five minutes.
+          </p>
+
+          {[
+            { label:"Start", val:start, set:(v) => { const s = clampStart(v); setStart(s); if (end - s > MAX) setEnd(s + MAX); } },
+            { label:"End",   val:end,   set:(v) => setEnd(clampEnd(v)) },
+          ].map(row => (
+            <div key={row.label} style={{ marginBottom:16 }}>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 }}>
+                <span style={{ fontSize:10, letterSpacing:"0.14em", textTransform:"uppercase", color:"#B0A488", fontFamily:"'DM Mono', monospace" }}>{row.label}</span>
+                <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                  <Nudge onClick={() => row.set(row.val - 5)}>−5</Nudge>
+                  <span style={{ fontFamily:"'DM Mono', monospace", fontSize:13, color:"#141414", minWidth:58, textAlign:"center" }}>{fmtTime(row.val)}</span>
+                  <Nudge onClick={() => row.set(row.val + 5)}>+5</Nudge>
+                </div>
+              </div>
+              <input type="range" min={0} max={dur || 3600} value={row.val} onChange={e => row.set(Number(e.target.value))}
+                style={{ width:"100%", accentColor:"#C8A96E", cursor:"pointer" }}/>
+            </div>
+          ))}
+
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background:"#fff", border:"1px solid #EDE6D8", borderRadius:10, padding:"11px 14px", marginTop:4 }}>
+            <div>
+              <div style={{ fontFamily:"'DM Sans', sans-serif", fontSize:13.5, fontWeight:600, color:"#141414" }}>{fmtTime(len)} selected</div>
+              <div style={{ fontFamily:"'DM Mono', monospace", fontSize:10.5, color:"#B0A488", marginTop:1 }}>{fmtTime(start)} – {fmtTime(end)}</div>
+            </div>
+            <button onClick={preview}
+              style={{ display:"inline-flex", alignItems:"center", gap:6, background:"#F0EDE8", border:"none", borderRadius:18, padding:"7px 14px", fontSize:12, fontFamily:"'DM Sans', sans-serif", fontWeight:600, color:"#333", cursor:"pointer" }}>
+              {previewing
+                ? <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+                : <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l14 8-14 8z"/></svg>}
+              {previewing ? "Stop" : "Preview"}
+            </button>
+          </div>
+        </div>
+
+        <div style={{ padding:"14px 24px 20px", borderTop:"1px solid #EDE6D8", display:"flex", justifyContent:"flex-end", gap:10 }}>
+          <button onClick={onClose} style={{ background:"none", border:"1px solid #E0D8CC", borderRadius:22, padding:"9px 18px", fontSize:13, fontFamily:"'DM Sans', sans-serif", color:"#777", cursor:"pointer" }}>Cancel</button>
+          <button onClick={() => { const a = ref.current; if (a) a.pause(); onUse({ episode, show, start, end }); }}
+            style={{ background:"#111", color:"#F0EAD8", border:"none", borderRadius:22, padding:"9px 22px", fontSize:13, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:"pointer" }}>
+            Write about this →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Listen: episode row (shared across every list) ──────────────────────────
+function EpisodeRow({ episode, show, progress, onOpenShow, onClip }) {
+  const audio = useAudio();
+  const isCurrent = audio?.current?.episode?.id === episode.id;
+  const isPlaying = isCurrent && audio?.playing;
+  const pct = progress && episode.duration ? Math.min(100, (progress.position / episode.duration) * 100) : 0;
+  const done = progress?.completed;
+
+  return (
+    <div style={{ display:"flex", gap:12, padding:"16px 0", borderBottom:"1px solid #F0EDE8" }}>
+      <ShowArt src={episode.image_url || show?.image_url} title={show?.title} size={56} radius={8}/>
+      <div style={{ flex:1, minWidth:0 }}>
+        {show && onOpenShow && (
+          <button onClick={() => onOpenShow(show)} style={{ background:"none", border:"none", padding:0, fontSize:9.5, letterSpacing:"0.1em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", cursor:"pointer", marginBottom:4, display:"block" }}>{show.title}</button>
+        )}
+        <div style={{ fontFamily:"'Playfair Display', serif", fontSize:15.5, fontWeight:700, color:"#111", lineHeight:1.3, marginBottom:5 }}>{episode.title}</div>
+        {episode.description && (
+          <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:14, lineHeight:1.55, color:"#666", margin:"0 0 9px", display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden" }}>{episode.description}</p>
+        )}
+        <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
+          <button onClick={() => audio.play(episode, show)}
+            style={{ display:"inline-flex", alignItems:"center", gap:6, background: isCurrent ? "#141414" : "#F0EDE8", color: isCurrent ? "#F0EAD8" : "#333", border:"none", borderRadius:18, padding:"6px 13px", fontSize:12, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:"pointer" }}>
+            {isPlaying
+              ? <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+              : <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4l14 8-14 8z"/></svg>}
+            {isPlaying ? "Playing" : done ? "Play again" : pct > 0 ? "Resume" : "Play"}
+          </button>
+          <button onClick={() => audio.enqueue(episode, show)} title="Add to queue"
+            style={{ background:"none", border:"1px solid #E2DAC9", borderRadius:18, padding:"6px 11px", fontSize:11, fontFamily:"'DM Mono', monospace", color:"#8A8170", cursor:"pointer" }}>+ Queue</button>
+          {onClip && (
+            <button onClick={() => onClip(episode, show, 0)} title="Clip a passage"
+              style={{ display:"inline-flex", alignItems:"center", gap:5, background:"none", border:"1px solid #E2DAC9", borderRadius:18, padding:"6px 11px", fontSize:11, fontFamily:"'DM Mono', monospace", color:"#8A8170", cursor:"pointer" }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
+              Clip
+            </button>
+          )}
+          <span style={{ fontFamily:"'DM Mono', monospace", fontSize:10.5, color:"#B0A488" }}>
+            {fmtDate(episode.published_at)}{episode.duration ? ` · ${fmtDuration(episode.duration)}` : ""}
+          </span>
+          {done && <span style={{ fontFamily:"'DM Mono', monospace", fontSize:9.5, color:"#5A8C6A", letterSpacing:"0.06em", textTransform:"uppercase" }}>Played</span>}
+        </div>
+        {pct > 0 && !done && (
+          <div style={{ height:3, background:"#F0EDE8", borderRadius:2, marginTop:9, overflow:"hidden" }}>
+            <div style={{ height:"100%", width:`${pct}%`, background:"#C8A96E" }}/>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Listen: the tab ─────────────────────────────────────────────────────────
+function ListenPage({ session, onSignOut, onNavigate }) {
+  const navigate = useNavigate();
+  const audio = useAudio();
+  const me = session?.user?.id;
+
+  const [tab, setTab] = useState("for-you");     // for-you | subscribed | browse
+  const [shows, setShows] = useState([]);
+  const [episodes, setEpisodes] = useState([]);  // latest across the catalog
+  const [subs, setSubs] = useState([]);          // show ids
+  const [plays, setPlays] = useState({});        // episode_id -> { position, completed }
+  const [loading, setLoading] = useState(true);
+  const [openShow, setOpenShow] = useState(null);
+  const [showEpisodes, setShowEpisodes] = useState([]);
+  const [showLoading, setShowLoading] = useState(false);
+  const [q, setQ] = useState("");
+  const [clipping, setClipping] = useState(null);   // { episode, show, startAt }
+
+  // Carry the clip into the composer via router state; WritePage picks it up.
+  const useClip = ({ episode, show, start, end }) => {
+    setClipping(null);
+    navigate("/write", { state: { clip: {
+      episode_id: episode.id, start, end,
+      episode: { id: episode.id, title: episode.title, audio_url: episode.audio_url, image_url: episode.image_url },
+      show: { id: show?.id, title: show?.title, image_url: show?.image_url },
+    } } });
+  };
+
+  const showsById = {};
+  shows.forEach(s => { showsById[s.id] = s; });
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const [{ data: sh }, { data: ep }, { data: sb }, { data: pl }] = await Promise.all([
+        supabase.from("podcast_shows").select("*").order("featured", { ascending:false }).order("title"),
+        supabase.from("podcast_episodes").select("*").order("published_at", { ascending:false }).limit(60),
+        me ? supabase.from("podcast_subscriptions").select("show_id").eq("user_id", me) : Promise.resolve({ data: [] }),
+        me ? supabase.from("podcast_plays").select("episode_id, position, completed").eq("user_id", me).order("updated_at", { ascending:false }) : Promise.resolve({ data: [] }),
+      ]);
+      if (cancelled) return;
+      setShows(sh || []);
+      setEpisodes(ep || []);
+      setSubs((sb || []).map(r => r.show_id));
+      const pmap = {};
+      (pl || []).forEach(p => { pmap[p.episode_id] = p; });
+      setPlays(pmap);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [me]);
+
+  const toggleSub = async (showId) => {
+    if (!me) return;
+    const subbed = subs.includes(showId);
+    setSubs(prev => subbed ? prev.filter(id => id !== showId) : [...prev, showId]);
+    if (subbed) await supabase.from("podcast_subscriptions").delete().eq("user_id", me).eq("show_id", showId);
+    else await supabase.from("podcast_subscriptions").insert({ user_id: me, show_id: showId });
+  };
+
+  const loadShow = async (show) => {
+    setOpenShow(show); setShowLoading(true);
+    const { data } = await supabase.from("podcast_episodes").select("*")
+      .eq("show_id", show.id).order("published_at", { ascending:false }).limit(50);
+    setShowEpisodes(data || []);
+    setShowLoading(false);
+    window.scrollTo(0, 0);
+  };
+
+  // In-progress episodes, most recent first — the "continue listening" rail.
+  const inProgress = episodes
+    .filter(e => plays[e.id] && !plays[e.id].completed && plays[e.id].position > 5)
+    .slice(0, 6);
+
+  const subEpisodes = episodes.filter(e => subs.includes(e.show_id));
+  const filteredShows = q.trim()
+    ? shows.filter(s => (s.title + " " + (s.author||"") + " " + (s.category||"")).toLowerCase().includes(q.toLowerCase()))
+    : shows;
+
+  // ── Show detail ──
+  if (openShow) {
+    const subbed = subs.includes(openShow.id);
+    return (
+      <div className="letters-main" style={{ minHeight:"100vh", background:"#F9F6F0", paddingBottom:160 }}>
+        <TopBar title={<span>Listen<span style={{ color:"#C8A96E" }}>.</span></span>} maxWidth={1040} onLogoClick={() => navigate("/feed")}/>
+        <main style={{ maxWidth:680, margin:"0 auto", padding:"14px 20px 0" }}>
+          <button onClick={() => setOpenShow(null)} style={{ background:"none", border:"none", color:"#B0A488", fontFamily:"'DM Mono', monospace", fontSize:11.5, letterSpacing:"0.06em", cursor:"pointer", margin:"0 0 16px", display:"flex", alignItems:"center", gap:6, padding:0 }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="m15 18-6-6 6-6"/></svg> All shows
+          </button>
+
+          <div style={{ display:"flex", gap:16, marginBottom:18 }}>
+            <ShowArt src={openShow.image_url} title={openShow.title} size={104} radius={12}/>
+            <div style={{ flex:1, minWidth:0 }}>
+              {openShow.category && <div style={{ fontSize:9.5, letterSpacing:"0.12em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:5 }}>{openShow.category}</div>}
+              <h1 style={{ fontFamily:"'Playfair Display', serif", fontSize:24, fontWeight:900, color:"#111", margin:"0 0 4px", lineHeight:1.15 }}>{openShow.title}</h1>
+              {openShow.author && <div style={{ fontFamily:"'DM Mono', monospace", fontSize:11, color:"#B0A488", marginBottom:11 }}>{openShow.author}</div>}
+              <button onClick={() => toggleSub(openShow.id)} disabled={!me}
+                style={{ background: subbed ? "#F0EDE8" : "#111", color: subbed ? "#888" : "#F0EAD8", border: subbed ? "1px solid #E0D8CC" : "none", borderRadius:20, padding:"7px 18px", fontSize:12.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:"pointer" }}>
+                {subbed ? "Following" : "Follow"}
+              </button>
+            </div>
+          </div>
+
+          {openShow.description && (
+            <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:15, lineHeight:1.6, color:"#555", margin:"0 0 24px" }}>{openShow.description}</p>
+          )}
+
+          <div style={{ fontSize:10, letterSpacing:"0.14em", textTransform:"uppercase", color:"#B0A488", fontFamily:"'DM Mono', monospace", marginBottom:4, borderTop:"1px solid #E8E0D0", paddingTop:18 }}>
+            Episodes {openShow.episode_count ? `· ${openShow.episode_count}` : ""}
+          </div>
+
+          {showLoading ? (
+            <div style={{ textAlign:"center", padding:"40px 0", fontSize:11, color:"#AAA", fontFamily:"'DM Mono', monospace", letterSpacing:"0.1em" }}>Loading...</div>
+          ) : showEpisodes.length === 0 ? (
+            <div style={{ textAlign:"center", padding:"48px 20px" }}>
+              <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:16, color:"#888", margin:0 }}>No episodes have been fetched for this show yet.</p>
+            </div>
+          ) : showEpisodes.map(e => (
+            <EpisodeRow key={e.id} episode={e} show={openShow} progress={plays[e.id]} onClip={(ep, sh, at) => setClipping({ episode: ep, show: sh, startAt: at })}/>
+          ))}
+        </main>
+        {clipping && <ClipCreator episode={clipping.episode} show={clipping.show} startAt={clipping.startAt} onClose={() => setClipping(null)} onUse={useClip}/>}
+      </div>
+    );
+  }
+
+  // ── Main tab ──
+  return (
+    <div className="letters-main" style={{ minHeight:"100vh", background:"#F9F6F0", paddingBottom:160 }}>
+      <TopBar title={<span>Listen<span style={{ color:"#C8A96E" }}>.</span></span>} maxWidth={1040} onLogoClick={() => navigate("/feed")}/>
+      <main style={{ maxWidth:680, margin:"0 auto", padding:"0 20px" }}>
+
+        <div style={{ display:"flex", borderBottom:"1px solid #E8E0D0", marginBottom:6 }}>
+          {[["for-you","For You"],["subscribed","Following"],["browse","Browse"]].map(([id, label]) => (
+            <button key={id} onClick={() => setTab(id)}
+              style={{ background:"none", border:"none", borderBottom: tab===id ? "2px solid #C8A96E" : "2px solid transparent", padding:"13px 16px", fontSize:13, fontFamily:"'DM Sans', sans-serif", fontWeight: tab===id ? 600 : 400, color: tab===id ? "#111" : "#bbb", cursor:"pointer", marginBottom:-1 }}>{label}</button>
+          ))}
+        </div>
+
+        {loading ? (
+          <div style={{ textAlign:"center", padding:"60px 0", fontSize:11, color:"#AAA", fontFamily:"'DM Mono', monospace", letterSpacing:"0.1em" }}>Loading...</div>
+        ) : tab === "browse" ? (
+          <>
+            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search shows…"
+              style={{ width:"100%", boxSizing:"border-box", border:"1px solid #E2DAC9", borderRadius:22, padding:"10px 16px", fontSize:14, fontFamily:"'EB Garamond', Georgia, serif", color:"#2E2A22", background:"#fff", outline:"none", margin:"18px 0" }}/>
+            {filteredShows.length === 0 ? (
+              <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:15, color:"#888", textAlign:"center", padding:"40px 0" }}>No shows match "{q}".</p>
+            ) : (
+              <div className="listen-show-grid">
+                {filteredShows.map(s => (
+                  <button key={s.id} onClick={() => loadShow(s)}
+                    style={{ display:"flex", gap:12, alignItems:"center", textAlign:"left", background:"#fff", border:"1px solid #EDE6D8", borderRadius:12, padding:12, cursor:"pointer", width:"100%" }}>
+                    <ShowArt src={s.image_url} title={s.title} size={54} radius={8}/>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontFamily:"'Playfair Display', serif", fontSize:15, fontWeight:700, color:"#111", lineHeight:1.25, marginBottom:3, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{s.title}</div>
+                      <div style={{ fontFamily:"'DM Mono', monospace", fontSize:10, color:"#B0A488", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{s.author || s.category}</div>
+                    </div>
+                    {subs.includes(s.id) && <span style={{ fontSize:9, letterSpacing:"0.08em", textTransform:"uppercase", color:"#5A8C6A", fontFamily:"'DM Mono', monospace", flexShrink:0 }}>Following</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        ) : tab === "subscribed" ? (
+          subs.length === 0 ? (
+            <div style={{ textAlign:"center", padding:"64px 20px" }}>
+              <div style={{ fontSize:10, letterSpacing:"0.18em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:12 }}>Nothing yet</div>
+              <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:16, color:"#888", margin:"0 0 16px" }}>You're not following any shows.</p>
+              <button onClick={() => setTab("browse")} style={{ background:"#111", color:"#F0EAD8", border:"none", borderRadius:20, padding:"8px 20px", fontSize:12.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:"pointer" }}>Browse shows</button>
+            </div>
+          ) : subEpisodes.length === 0 ? (
+            <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:16, color:"#888", textAlign:"center", padding:"56px 20px" }}>No recent episodes from the shows you follow.</p>
+          ) : (
+            <div style={{ paddingTop:6 }}>
+              {subEpisodes.map(e => <EpisodeRow key={e.id} episode={e} show={showsById[e.show_id]} progress={plays[e.id]} onOpenShow={loadShow} onClip={(ep, sh, at) => setClipping({ episode: ep, show: sh, startAt: at })}/>)}
+            </div>
+          )
+        ) : (
+          <>
+            {inProgress.length > 0 && (
+              <div style={{ paddingTop:20, marginBottom:8 }}>
+                <div style={{ fontSize:10, letterSpacing:"0.14em", textTransform:"uppercase", color:"#B0A488", fontFamily:"'DM Mono', monospace", marginBottom:12 }}>Continue listening</div>
+                <div style={{ display:"flex", gap:12, overflowX:"auto", paddingBottom:6, marginBottom:14 }}>
+                  {inProgress.map(e => {
+                    const s = showsById[e.show_id];
+                    const p = plays[e.id];
+                    const pct = e.duration ? Math.min(100, (p.position / e.duration) * 100) : 0;
+                    return (
+                      <button key={e.id} onClick={() => audio.play(e, s)}
+                        style={{ flexShrink:0, width:150, textAlign:"left", background:"#fff", border:"1px solid #EDE6D8", borderRadius:12, padding:10, cursor:"pointer" }}>
+                        <ShowArt src={e.image_url || s?.image_url} title={s?.title} size={128} radius={8}/>
+                        <div style={{ fontFamily:"'DM Sans', sans-serif", fontSize:12, fontWeight:600, color:"#222", lineHeight:1.35, margin:"8px 0 6px", display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden" }}>{e.title}</div>
+                        <div style={{ height:3, background:"#F0EDE8", borderRadius:2, overflow:"hidden" }}>
+                          <div style={{ height:"100%", width:`${pct}%`, background:"#C8A96E" }}/>
+                        </div>
+                        <div style={{ fontFamily:"'DM Mono', monospace", fontSize:9.5, color:"#B0A488", marginTop:5 }}>{fmtTime(Math.max(0, (e.duration||0) - p.position))} left</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div style={{ fontSize:10, letterSpacing:"0.14em", textTransform:"uppercase", color:"#B0A488", fontFamily:"'DM Mono', monospace", margin:"20px 0 4px" }}>Latest episodes</div>
+            {episodes.length === 0 ? (
+              <div style={{ textAlign:"center", padding:"56px 20px" }}>
+                <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:16, color:"#888", margin:0 }}>No episodes yet — the catalogue is still being fetched.</p>
+              </div>
+            ) : episodes.slice(0, 30).map(e => (
+              <EpisodeRow key={e.id} episode={e} show={showsById[e.show_id]} progress={plays[e.id]} onOpenShow={loadShow} onClip={(ep, sh, at) => setClipping({ episode: ep, show: sh, startAt: at })}/>
+            ))}
+          </>
+        )}
+      </main>
+      {clipping && <ClipCreator episode={clipping.episode} show={clipping.show} startAt={clipping.startAt} onClose={() => setClipping(null)} onUse={useClip}/>}
+    </div>
+  );
+}
+
 function GuidePage({ session, onNavigate }) {
   const navigate = useNavigate();
   const H2 = ({ children }) => <h2 style={{ fontFamily:"'Playfair Display', serif", fontSize:26, fontWeight:900, color:"#141414", letterSpacing:"-0.01em", margin:"0 0 14px", paddingTop:28, borderTop:"1px solid #E8E0D0" }}>{children}</h2>;
@@ -7563,7 +8337,7 @@ function AuthenticatedApp({ session, handleSignOut }) {
 
   // Old code calls onNavigate("write") etc. — translate that single-segment
   // tab name into a real route change.
-  const goToTab = (tabName) => navigate(`/${tabName}`);
+  const goToTab = (tabName, state) => navigate(`/${tabName}`, state ? { state } : undefined);
 
   const [unread, setUnread] = useState(0);
   useEffect(() => {
@@ -7664,6 +8438,7 @@ function AuthenticatedApp({ session, handleSignOut }) {
         <Route path="/read" element={<ReadPage onNavigate={goToTab} session={session}/>}/>
         <Route path="/read/article/:articleId" element={<ReadPage onNavigate={goToTab} session={session}/>}/>
         <Route path="/read/publication/:publicationName" element={<ReadPage onNavigate={goToTab} session={session}/>}/>
+        <Route path="/listen" element={<ListenPage session={session} onSignOut={handleSignOut} onNavigate={goToTab}/>}/>
         <Route path="/write" element={<WritePage session={session} onNavigate={goToTab}/>}/>
         <Route path="/forums" element={<ForumsPage session={session} onSignOut={handleSignOut} onNavigate={goToTab}/>}/>
         <Route path="/forums/:slug" element={<ForumDetailPage session={session} onNavigate={goToTab}/>}/>
@@ -7802,6 +8577,17 @@ function MobileChrome() {
         box-sizing: border-box;
       }
 
+      /* The player bar rides above the bottom nav (mobile) / at the floor (desktop). */
+      .letters-playerbar { bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
+      @media (min-width: 768px) { .letters-playerbar { bottom: 0; } }
+      /* Make room so the player bar never covers the last item on a page. */
+      .player-open .letters-main { padding-bottom: 150px !important; }
+      /* When a player is showing, the nav still sits below it — no overlap. */
+      .kb-open .letters-playerbar { display: none; }
+
+      .listen-show-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+      @media (min-width: 620px) { .listen-show-grid { grid-template-columns: repeat(2, 1fr); } }
+
       /* Touch polish */
       * { -webkit-tap-highlight-color: transparent; }
       input, textarea, select { font-size: 16px; }  /* <16px makes iOS zoom on focus */
@@ -7847,7 +8633,12 @@ export default function App() {
       <MobileChrome/>
       {!session
         ? <MarketingSite onAuthSuccess={() => setSession(true)}/>
-        : <AuthenticatedApp session={session} handleSignOut={handleSignOut}/>
+        : (
+          <AudioProvider session={session}>
+            <AuthenticatedApp session={session} handleSignOut={handleSignOut}/>
+            <PlayerBar/>
+          </AudioProvider>
+        )
       }
     </BrowserRouter>
   );
