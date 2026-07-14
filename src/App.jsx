@@ -3063,8 +3063,8 @@ function WritePicker({ pubs, onClose, onPick }) {
         <div style={{ padding: "8px 0" }}>
           {fresh ? (
             <>
-              <Opt mark="\u270E" ghost title="Give me a blank page" sub={<>Lands in the feed and on your page.<br/>Most letters start here.</>} onClick={() => onPick({})}/>
-              <Opt mark="\u2726" title="Start a publication" sub={<>A title of your own, with its own readers<br/>and its own archive.</>} onClick={() => onPick("new")}/>
+              <Opt mark="✎" ghost title="Give me a blank page" sub={<>Lands in the feed and on your page.<br/>Most letters start here.</>} onClick={() => onPick({})}/>
+              <Opt mark="✦" title="Start a publication" sub={<>A title of your own, with its own readers<br/>and its own archive.</>} onClick={() => onPick("new")}/>
             </>
           ) : (
             <>
@@ -3074,8 +3074,8 @@ function WritePicker({ pubs, onClose, onPick }) {
                   onClick={() => onPick({ publication: p })}/>
               ))}
               <hr style={{ border: 0, borderTop: "1px solid #F0EDE8", margin: "6px 24px" }}/>
-              <Opt mark="\u2726" ghost title="Start a new publication" sub="A title of your own, with its own readers" onClick={() => onPick("new")}/>
-              <Opt mark="\u270E" ghost title="Give me a blank page" sub="No home — lands in the feed and on your page" onClick={() => onPick({})}/>
+              <Opt mark="✦" ghost title="Start a new publication" sub="A title of your own, with its own readers" onClick={() => onPick("new")}/>
+              <Opt mark="✎" ghost title="Give me a blank page" sub="No home — lands in the feed and on your page" onClick={() => onPick({})}/>
             </>
           )}
         </div>
@@ -3878,7 +3878,7 @@ function WritePage({ session, onNavigate }) {
                   </div>
                   <button onClick={() => navigate("/write")}
                     style={{ background:"none", border:"none", fontFamily:"'DM Mono', monospace", fontSize:10.5, color:"#C8A96E", cursor:"pointer" }}>
-                    Change \u21BA
+                    Change ↺
                   </button>
                 </div>
 
