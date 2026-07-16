@@ -3216,6 +3216,7 @@ function WritePage({ session, onNavigate }) {
   const [showPreview, setShowPreview] = useState(false);
   const [showQuoteSource, setShowQuoteSource] = useState(false);
   const [savedAt, setSavedAt] = useState(null);
+  const [savingDraft, setSavingDraft] = useState(false);
   const [bodyFontSize, setBodyFontSize] = useState(17);
   const [bodyFont, setBodyFont] = useState("EB Garamond");
   const [realRecentArticles, setRealRecentArticles] = useState([]);
@@ -3487,43 +3488,57 @@ function WritePage({ session, onNavigate }) {
     }
   }, [form.body === "" ? "empty" : null]);
 
-  // Auto-save draft to the `drafts` table (server-backed), debounced.
-  // Inserts one row on first save, then updates it. savingRef prevents a
-  // second insert racing in before the first returns an id.
-  useEffect(() => {
+  // Persist the current draft to the `drafts` table — inserts one row on the
+  // first save, updates it thereafter. Shared by the debounced auto-save and
+  // the manual "Save draft" button. savingRef prevents a duplicate insert
+  // racing in before the first returns an id. Returns whether it saved.
+  const persistDraft = async () => {
     const uid = session?.user?.id;
-    if (!uid) return;
     const hasContent = form.body.trim() || form.title.trim() || form.sourceTitle;
-    if (!hasContent) return;
-    const timer = setTimeout(async () => {
-      if (savingRef.current) return;
-      savingRef.current = true;
-      const row = {
-        user_id: uid,
-        title: form.title || null,
-        body: form.body || "",
-        source_url: form.sourceUrl || null,
-        source_title: form.sourceTitle || null,
-        source_publication: form.sourcePublication || null,
-        publication_id: publication ? publication.id : null,
-        forum_id: form.forumId || null,
-        clip_episode_id: clip ? clip.episode_id : null,
-        clip_start: clip ? clip.start : null,
-        clip_end: clip ? clip.end : null,
-      };
-      try {
-        if (draftIdRef.current) {
-          await supabase.from("drafts").update(row).eq("id", draftIdRef.current);
-        } else {
-          const { data, error } = await supabase.from("drafts").insert(row).select("id").single();
-          if (!error && data) { draftIdRef.current = data.id; setDraftId(data.id); }
-        }
-        setSavedAt(new Date());
-      } catch {}
-      savingRef.current = false;
-    }, 800);
+    if (!uid || !hasContent || savingRef.current) return false;
+    savingRef.current = true;
+    const row = {
+      user_id: uid,
+      title: form.title || null,
+      body: form.body || "",
+      source_url: form.sourceUrl || null,
+      source_title: form.sourceTitle || null,
+      source_publication: form.sourcePublication || null,
+      publication_id: publication ? publication.id : null,
+      forum_id: form.forumId || null,
+      clip_episode_id: clip ? clip.episode_id : null,
+      clip_start: clip ? clip.start : null,
+      clip_end: clip ? clip.end : null,
+    };
+    let ok = false;
+    try {
+      if (draftIdRef.current) {
+        const { error } = await supabase.from("drafts").update(row).eq("id", draftIdRef.current);
+        ok = !error;
+      } else {
+        const { data, error } = await supabase.from("drafts").insert(row).select("id").single();
+        if (!error && data) { draftIdRef.current = data.id; setDraftId(data.id); ok = true; }
+      }
+      if (ok) setSavedAt(new Date());
+    } catch {}
+    savingRef.current = false;
+    return ok;
+  };
+
+  // Auto-save: 800ms after the last edit.
+  useEffect(() => {
+    const hasContent = form.body.trim() || form.title.trim() || form.sourceTitle;
+    if (!session?.user?.id || !hasContent) return;
+    const timer = setTimeout(() => { persistDraft(); }, 800);
     return () => clearTimeout(timer);
   }, [form, publication, clip, session]);
+
+  // Manual "Save draft" — flushes immediately, with button feedback.
+  const saveDraftNow = async () => {
+    setSavingDraft(true);
+    await persistDraft();
+    setSavingDraft(false);
+  };
 
   const selectArticle = (article) => {
     setForm(f => ({ ...f, sourceTitle: article.title, sourcePublication: article.publication, sourceUrl: article.url }));
@@ -3736,6 +3751,13 @@ function WritePage({ session, onNavigate }) {
                     Draft saved
                   </div>
                 )}
+                <button onClick={saveDraftNow} disabled={savingDraft}
+                  style={{ background:"rgba(255,255,255,0.08)", border:"1px solid rgba(255,255,255,0.18)", borderRadius:20, padding:"8px 18px", fontSize:12.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, color:"#F0EAD8", cursor: savingDraft ? "default" : "pointer", display:"flex", alignItems:"center", gap:7, transition:"background 0.15s", opacity: savingDraft ? 0.6 : 1 }}
+                  onMouseEnter={e => { if (!savingDraft) e.currentTarget.style.background="rgba(255,255,255,0.14)"; }}
+                  onMouseLeave={e => e.currentTarget.style.background="rgba(255,255,255,0.08)"}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                  {savingDraft ? "Saving…" : "Save draft"}
+                </button>
                 <button onClick={() => setShowPreview(true)}
                   style={{ background:"rgba(255,255,255,0.08)", border:"1px solid rgba(255,255,255,0.18)", borderRadius:20, padding:"8px 18px", fontSize:12.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, color:"#F0EAD8", cursor:"pointer", display:"flex", alignItems:"center", gap:7, transition:"background 0.15s" }}
                   onMouseEnter={e => e.currentTarget.style.background="rgba(255,255,255,0.14)"}
@@ -8543,7 +8565,7 @@ function InvestorPage({ navigate }) {
 }
 
 function InvitePage({ navigate }) {
-  const [form, setForm] = useState({ firstName:"", lastName:"", email:"", occupation:"", referral:"", referralOther:"" });
+  const [form, setForm] = useState({ firstName:"", lastName:"", email:"", occupation:"", referral:"", referralOther:"", use:[], wouldPublish:"", draw:"" });
   const [focused, setFocused] = useState(null);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -8556,6 +8578,9 @@ function InvitePage({ navigate }) {
     if (Object.keys(e).length) { setErrors(e); return; }
     setSubmitting(true);
     setSubmitError(null);
+    const survey = (form.use.length || form.wouldPublish || form.draw.trim())
+      ? { use: form.use, would_publish: form.wouldPublish || null, draw: form.draw.trim() || null }
+      : null;
     const { error } = await supabase.from("waitlist").insert({
       first_name: form.firstName.trim(),
       last_name: form.lastName.trim(),
@@ -8563,6 +8588,7 @@ function InvitePage({ navigate }) {
       occupation: form.occupation.trim(),
       referral: form.referral,
       referral_other: form.referralOther.trim() || null,
+      survey,
     });
     if (error) {
       console.error("Waitlist submission failed:", error);
@@ -8582,6 +8608,7 @@ function InvitePage({ navigate }) {
         occupation: form.occupation.trim(),
         referral: form.referral,
         referralOther: form.referralOther.trim() || null,
+        survey,
       },
     }).catch((err) => console.error("Notification email failed (signup still recorded):", err));
 
@@ -8601,6 +8628,10 @@ function InvitePage({ navigate }) {
   const inputStyle = (field) => ({ width:"100%", padding:"12px 14px", fontSize:15, fontFamily:"'EB Garamond', Georgia, serif", color:"#111", background:focused===field?"#fff":"#FDFCF8", border:`1px solid ${errors[field]?"#C0392B":focused===field?"#111":"#C8BFA8"}`, borderRadius:5, outline:"none", transition:"all 0.15s", boxSizing:"border-box", appearance:"none" });
   const labelStyle = { fontSize:9.5, letterSpacing:"0.14em", textTransform:"uppercase", color:"#888", fontFamily:"'DM Mono', monospace", display:"block", marginBottom:6 };
   const errStyle = { fontSize:11, color:"#C0392B", fontFamily:"'EB Garamond', serif", fontStyle:"italic", marginTop:4, display:"block" };
+  const chipStyle = (active) => ({ padding:"8px 14px", borderRadius:20, fontSize:13, fontFamily:"'DM Sans', sans-serif", fontWeight:500, cursor:"pointer", border:`1px solid ${active?"#111":"#C8BFA8"}`, background:active?"#111":"#FDFCF8", color:active?"#F0EAD8":"#555", transition:"all 0.12s" });
+  const useOptions = [["read","Reading the news"],["write","Writing letters & essays"],["forums","Joining forum discussions"],["listen","Listening to podcasts"],["follow","Following specific writers"]];
+  const publishOptions = [["regularly","Yes, regularly"],["occasionally","Occasionally"],["maybe","Maybe later"],["no","No, I'm here to read"]];
+  const toggleUse = (v) => setForm(f => ({ ...f, use: f.use.includes(v) ? f.use.filter(x=>x!==v) : [...f.use, v] }));
   return (
     <div style={{ minHeight:"100vh", background:"#F9F6F0" }}>
       <header style={{ borderBottom:"1px solid #E8E0D0", background:"rgba(249,246,240,0.96)", backdropFilter:"blur(10px)", position:"sticky", top:0, zIndex:50 }}>
@@ -8646,6 +8677,32 @@ function InvitePage({ navigate }) {
                 {errors.referral && <span style={errStyle}>{errors.referral}</span>}
               </div>
               {form.referral==="Other" && <div><label style={labelStyle}>Please tell us more</label><input type="text" placeholder="Where did you find us?" value={form.referralOther} onChange={e=>set("referralOther",e.target.value)} onFocus={()=>setFocused("referralOther")} onBlur={()=>setFocused(null)} style={inputStyle("referralOther")}/></div>}
+              <div style={{ borderTop:"1px solid #E8E0D0", paddingTop:20 }}>
+                <div style={{ fontSize:10, letterSpacing:"0.16em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:4 }}>A Few Quick Questions</div>
+                <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:13.5, color:"#999", margin:"0 0 18px" }}>Optional — but it helps us shape your invitation.</p>
+                <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
+                  <div>
+                    <label style={labelStyle}>How do you imagine using Letters?</label>
+                    <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginTop:2 }}>
+                      {useOptions.map(([v,l]) => (
+                        <button key={v} type="button" onClick={()=>toggleUse(v)} style={chipStyle(form.use.includes(v))}>{l}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Would you publish your own writing?</label>
+                    <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginTop:2 }}>
+                      {publishOptions.map(([v,l]) => (
+                        <button key={v} type="button" onClick={()=>set("wouldPublish", form.wouldPublish===v ? "" : v)} style={chipStyle(form.wouldPublish===v)}>{l}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label style={labelStyle}>What draws you to Letters over today's social &amp; news apps?</label>
+                    <textarea placeholder="A sentence or two (optional)" value={form.draw} onChange={e=>set("draw", e.target.value.slice(0,500))} onFocus={()=>setFocused("draw")} onBlur={()=>setFocused(null)} rows={3} style={{ ...inputStyle("draw"), resize:"vertical", lineHeight:1.6, minHeight:70 }}/>
+                  </div>
+                </div>
+              </div>
               <div style={{ borderTop:"1px solid #E8E0D0", margin:"4px 0" }}/>
               {submitError && (
                 <div style={{ background:"#FDF0F0", border:"1px solid #C8A8A8", borderRadius:5, padding:"10px 14px", fontSize:13, color:"#C0392B", fontFamily:"'EB Garamond', serif", fontStyle:"italic" }}>
