@@ -2955,7 +2955,7 @@ function WriteDeskPage({ session, onNavigate }) {
                         <div>
                           <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 16, fontWeight: 700, lineHeight: 1.25 }}>{d.title || "Untitled"}</div>
                           <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9.5, color: "#B0A488", marginTop: 3 }}>
-                            {timeAgo(d.updated_at)} · {words} words
+                            {timeAgoRead(d.updated_at)} · {words} words
                           </div>
                         </div>
                         <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 8.5, padding: "2px 7px", borderRadius: 10, whiteSpace: "nowrap", flexShrink: 0,
@@ -3173,7 +3173,8 @@ function WritePage({ session, onNavigate }) {
   const navigate = useNavigate();
   const [publication, setPublication] = useState(null);   // destination, if any
   const [draftId, setDraftId] = useState(null);           // server-side draft being edited
-  const draftKey = `letters-draft-${session?.user?.id || "anon"}`;
+  const draftIdRef = useRef(null);
+  const savingRef = useRef(false);
   const location = useLocation();
   const [clip, setClip] = useState(null);
 
@@ -3188,6 +3189,7 @@ function WritePage({ session, onNavigate }) {
     if (st.draft) {
       const d = st.draft;
       setDraftId(d.id);
+      draftIdRef.current = d.id;
       if (d.publication_id) setPublication(d.publication || { id: d.publication_id, title: (d.publication && d.publication.title) || "Publication" });
       setForm(f => ({ ...f, title: d.title || "", body: d.body || "", sourceUrl: d.source_url || "", sourceTitle: d.source_title || "", sourcePublication: d.source_publication || "" }));
     }
@@ -3202,12 +3204,7 @@ function WritePage({ session, onNavigate }) {
     }
   }, [location.state]);
 
-  const [form, setForm] = useState(() => {
-    try {
-      const saved = localStorage.getItem(draftKey);
-      return saved ? JSON.parse(saved) : { sourceUrl:"", sourceTitle:"", sourcePublication:"", title:"", body:"" };
-    } catch { return { sourceUrl:"", sourceTitle:"", sourcePublication:"", title:"", body:"" }; }
-  });
+  const [form, setForm] = useState({ sourceUrl:"", sourceTitle:"", sourcePublication:"", title:"", body:"" });
   const [focused, setFocused] = useState(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -3490,18 +3487,43 @@ function WritePage({ session, onNavigate }) {
     }
   }, [form.body === "" ? "empty" : null]);
 
-  // Auto-save draft to localStorage, debounced
+  // Auto-save draft to the `drafts` table (server-backed), debounced.
+  // Inserts one row on first save, then updates it. savingRef prevents a
+  // second insert racing in before the first returns an id.
   useEffect(() => {
+    const uid = session?.user?.id;
+    if (!uid) return;
     const hasContent = form.body.trim() || form.title.trim() || form.sourceTitle;
     if (!hasContent) return;
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
+      if (savingRef.current) return;
+      savingRef.current = true;
+      const row = {
+        user_id: uid,
+        title: form.title || null,
+        body: form.body || "",
+        source_url: form.sourceUrl || null,
+        source_title: form.sourceTitle || null,
+        source_publication: form.sourcePublication || null,
+        publication_id: publication ? publication.id : null,
+        forum_id: form.forumId || null,
+        clip_episode_id: clip ? clip.episode_id : null,
+        clip_start: clip ? clip.start : null,
+        clip_end: clip ? clip.end : null,
+      };
       try {
-        localStorage.setItem(draftKey, JSON.stringify(form));
+        if (draftIdRef.current) {
+          await supabase.from("drafts").update(row).eq("id", draftIdRef.current);
+        } else {
+          const { data, error } = await supabase.from("drafts").insert(row).select("id").single();
+          if (!error && data) { draftIdRef.current = data.id; setDraftId(data.id); }
+        }
         setSavedAt(new Date());
       } catch {}
-    }, 600);
+      savingRef.current = false;
+    }, 800);
     return () => clearTimeout(timer);
-  }, [form, draftKey]);
+  }, [form, publication, clip, session]);
 
   const selectArticle = (article) => {
     setForm(f => ({ ...f, sourceTitle: article.title, sourcePublication: article.publication, sourceUrl: article.url }));
@@ -3510,8 +3532,10 @@ function WritePage({ session, onNavigate }) {
 
   const clearSource = () => setForm(f => ({ ...f, sourceUrl:"", sourceTitle:"", sourcePublication:"" }));
 
-  const clearDraft = () => {
-    try { localStorage.removeItem(draftKey); } catch {}
+  const clearDraft = async () => {
+    if (draftIdRef.current) { try { await supabase.from("drafts").delete().eq("id", draftIdRef.current); } catch {} }
+    setDraftId(null);
+    draftIdRef.current = null;
     setForm({ sourceUrl:"", sourceTitle:"", sourcePublication:"", title:"", body:"" });
     setSavedAt(null);
     if (editorRef.current) editorRef.current.innerHTML = "";
@@ -3573,8 +3597,8 @@ function WritePage({ session, onNavigate }) {
       const tags = [...new Set((plain.match(/#[a-zA-Z0-9_-]+/g) || []).map(s => s.slice(1)))];
       if (tags.length) { try { await supabase.rpc("tag_letter", { p_letter: inserted.id, p_tags: tags }); } catch (e) {} }
     }
-    if (!isPost) { try { localStorage.removeItem(draftKey); } catch {} }
     if (draftId) { try { await supabase.from("drafts").delete().eq("id", draftId); } catch {} }
+    draftIdRef.current = null;
     track(isPost ? "post_published" : "letter_published", {
       publication: !!publication,
       has_source: !!form.sourceUrl,
