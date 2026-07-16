@@ -353,11 +353,26 @@ const mockFeed = [
   { id:8, type:"news", publication:"ESPN", section:"Sports", headline:"Why Gen Z Is Falling Back in Love With Baseball", summary:"Attendance is up, viewership among 18-34 year olds has climbed for the third straight year, and a new generation of stars is driving a renaissance nobody saw coming.", timeAgo:"1d ago", letters:28 },
 ];
 
-function Avatar({ initial, color, size=34 }) {
+function Avatar({ initial, color, size=34, src }) {
+  if (src) return <img src={src} alt="" referrerPolicy="no-referrer" style={{ width:size, height:size, borderRadius:"50%", objectFit:"cover", flexShrink:0, background:color }} onError={e => { e.currentTarget.style.display = "none"; }}/>;
   return <div style={{ width:size, height:size, borderRadius:"50%", background:color, display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontSize:size*0.38, fontFamily:"'Playfair Display', serif", fontWeight:500, flexShrink:0 }}>{initial}</div>;
 }
 
 // ── Letter Detail View ────────────────────────────────────────────────────────
+// Downscale an image File to fit within maxDim (px), returning a compressed Blob.
+async function downscaleImage(file, maxDim) {
+  const dataUrl = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file); });
+  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = dataUrl; });
+  let w = img.width, h = img.height;
+  if (Math.max(w, h) > maxDim) { const s = maxDim / Math.max(w, h); w = Math.round(w * s); h = Math.round(h * s); }
+  const canvas = document.createElement("canvas");
+  canvas.width = w; canvas.height = h;
+  canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+  const type = file.type === "image/png" ? "image/png" : "image/jpeg";
+  const blob = await new Promise((res) => canvas.toBlob(res, type, 0.85));
+  return blob || file;
+}
+
 const mockReplies = [
   { id:1, author:"Thomas R.", initial:"T", color:"#1B4F72", timeAgo:"1h ago", body:"This is exactly the kind of nuanced take that's been missing from the mainstream coverage. The distinction you're drawing between structural and cyclical factors is crucial — most commentary collapses the two." },
   { id:2, author:"Elena V.", initial:"E", color:"#117A65", timeAgo:"2h ago", body:"I'd push back slightly on the framing here. The data from the Midwest doesn't necessarily generalize — coastal rust belt cities have had very different trajectories over the same period." },
@@ -1137,7 +1152,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
   // Fetch the current user's own profile once, so we can label their own republishes correctly
   useEffect(() => {
     if (!session?.user?.id) return;
-    supabase.from("profiles").select("username, full_name").eq("id", session.user.id).single()
+    supabase.from("profiles").select("username, full_name, avatar_url").eq("id", session.user.id).single()
       .then(({ data }) => { if (data) setMyProfile(data); });
   }, [session?.user?.id]);
 
@@ -1617,7 +1632,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
 
             {/* Quick-post composer — short posts (kind: "post") straight from the feed */}
             <div style={{ display:"flex", gap:10, alignItems:"flex-start", padding:"14px 0", borderBottom:"1px solid #F0EDE8" }}>
-              <Avatar initial={(myProfile?.full_name || myProfile?.username || session?.user?.email?.[0] || "Y")[0].toUpperCase()} color="#C8A96E" size={38}/>
+              <Avatar initial={(myProfile?.full_name || myProfile?.username || session?.user?.email?.[0] || "Y")[0].toUpperCase()} color="#C8A96E" size={38} src={myProfile?.avatar_url}/>
               <div style={{ flex:1, minWidth:0 }}>
                 <textarea
                   value={composeText}
@@ -5759,9 +5774,9 @@ function YouPage({ session, onSignOut }) {
           <div style={{ display:"flex", alignItems:"flex-start", gap:16, marginBottom:16 }}>
             {/* Profile photo */}
             <div style={{ position:"relative", flexShrink:0 }}>
-              {!imgError ? (
+              {profile?.avatar_url && !imgError ? (
                 <img
-                  src={`https://picsum.photos/seed/${photoSeed}/120/120`}
+                  src={profile.avatar_url}
                   alt={displayName}
                   onError={() => setImgError(true)}
                   style={{ width:72, height:72, borderRadius:"50%", objectFit:"cover", border:"3px solid #fff", boxShadow:"0 0 0 1.5px #E8E0D0" }}
@@ -6365,6 +6380,9 @@ function EditProfilePage({ session, onNavigate }) {
   const [showDelete, setShowDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [blocked, setBlocked] = useState([]);
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef(null);
 
   useEffect(() => {
     if (!me) return;
@@ -6377,6 +6395,7 @@ function EditProfilePage({ session, onNavigate }) {
         setName(data.full_name || data.username || "");
         setLocation(data.location || "");
         setBio(data.bio || "");
+        setAvatarUrl(data.avatar_url || "");
       }
       setLoading(false);
     })();
@@ -6392,6 +6411,37 @@ function EditProfilePage({ session, onNavigate }) {
     if (error) { console.error("Save profile failed:", error); alert(`Couldn't save: ${error.message}`); return; }
     setSaved(true);
     setTimeout(() => setSaved(false), 2200);
+  };
+
+  const onPickAvatar = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !me) return;
+    if (!file.type.startsWith("image/")) { alert("Please choose an image file."); return; }
+    if (file.size > 10 * 1024 * 1024) { alert("That image is over 10MB — please choose a smaller one."); return; }
+    setUploadingAvatar(true);
+    try {
+      const blob = await downscaleImage(file, 1024);
+      const ext = blob.type === "image/png" ? "png" : "jpg";
+      const path = `${me}/avatar-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("media").upload(path, blob, { contentType: blob.type, upsert: true });
+      if (upErr) throw upErr;
+      const url = supabase.storage.from("media").getPublicUrl(path).data.publicUrl;
+      const { error: dbErr } = await supabase.from("profiles").update({ avatar_url: url }).eq("id", me);
+      if (dbErr) throw dbErr;
+      setAvatarUrl(url);
+    } catch (err) {
+      console.error("Avatar upload failed:", err);
+      alert(`Couldn't upload photo: ${err.message || err}`);
+    }
+    setUploadingAvatar(false);
+  };
+
+  const removeAvatar = async () => {
+    if (!me || uploadingAvatar) return;
+    const { error } = await supabase.from("profiles").update({ avatar_url: null }).eq("id", me);
+    if (error) { alert(`Couldn't remove photo: ${error.message}`); return; }
+    setAvatarUrl("");
   };
 
   const handleDeleteAccount = async () => {
@@ -6453,12 +6503,16 @@ function EditProfilePage({ session, onNavigate }) {
             <div style={{ marginBottom:26 }}>
               <span style={label}>Profile photo</span>
               <div style={{ display:"flex", alignItems:"center", gap:14 }}>
-                {!imgError ? (
-                  <img src={`https://picsum.photos/seed/${photoSeed}/120/120`} alt="" onError={() => setImgError(true)} style={{ width:64, height:64, borderRadius:"50%", objectFit:"cover", border:"3px solid #fff", boxShadow:"0 0 0 1.5px #E8E0D0" }}/>
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="" style={{ width:64, height:64, borderRadius:"50%", objectFit:"cover", border:"3px solid #fff", boxShadow:"0 0 0 1.5px #E8E0D0" }}/>
                 ) : (
                   <div style={{ width:64, height:64, borderRadius:"50%", background:"#111", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'Playfair Display', serif", fontSize:24, fontWeight:900, color:"#F0EAD8" }}>{initial}</div>
                 )}
-                <div style={{ fontFamily:"'EB Garamond', Georgia, serif", fontStyle:"italic", fontSize:13.5, color:"#A99F86", lineHeight:1.5 }}>Photo uploads are coming soon.</div>
+                <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                  <input ref={avatarInputRef} type="file" accept="image/*" onChange={onPickAvatar} style={{ display:"none" }}/>
+                  <button onClick={() => avatarInputRef.current?.click()} disabled={uploadingAvatar} style={{ background:"#111", color:"#F0EAD8", border:"none", borderRadius:20, padding:"7px 16px", fontSize:12.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor: uploadingAvatar ? "default" : "pointer", opacity: uploadingAvatar ? 0.7 : 1, alignSelf:"flex-start" }}>{uploadingAvatar ? "Uploading…" : (avatarUrl ? "Change photo" : "Upload photo")}</button>
+                  {avatarUrl && !uploadingAvatar && <button onClick={removeAvatar} style={{ background:"none", border:"none", color:"#B0A488", fontSize:11.5, fontFamily:"'DM Mono', monospace", letterSpacing:"0.04em", cursor:"pointer", alignSelf:"flex-start", padding:0 }}>Remove</button>}
+                </div>
               </div>
             </div>
 
