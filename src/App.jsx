@@ -1098,6 +1098,9 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
   const [composeText, setComposeText] = useState("");
   const [composeOpen, setComposeOpen] = useState(false);
   const [composingPost, setComposingPost] = useState(false);
+  const [quickMedia, setQuickMedia] = useState([]);
+  const [quickUploading, setQuickUploading] = useState(false);
+  const quickMediaRef = useRef(null);
   const COMPOSE_LIMIT = 216;
 
   // Follow graph — the set of user_ids the current user follows
@@ -1456,13 +1459,39 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
 
   // Publish a short post from the feed compose box, then drop it into the feed
   // immediately (optimistic) so it appears without a refresh.
+  const onAddQuickMedia = async (e) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = "";
+    const uid = session?.user?.id;
+    if (!files.length || !uid) return;
+    setQuickUploading(true);
+    for (const file of files) {
+      try {
+        const isVideo = file.type.startsWith("video/");
+        const isImage = file.type.startsWith("image/");
+        if (!isImage && !isVideo) { alert("Only images and video are supported."); continue; }
+        const cap = isVideo ? 100 : 10;
+        if (file.size > cap * 1024 * 1024) { alert(`That file is over ${cap}MB.`); continue; }
+        const blob = isImage ? await downscaleImage(file, 1600) : file;
+        const ext = (file.name.split(".").pop() || (isVideo ? "mp4" : "jpg")).toLowerCase().slice(0, 5);
+        const path = `${uid}/post-${Date.now()}-${Math.random().toString(36).slice(2,7)}.${ext}`;
+        const { error: upErr } = await supabase.storage.from("media").upload(path, blob, { contentType: blob.type || file.type });
+        if (upErr) throw upErr;
+        const url = supabase.storage.from("media").getPublicUrl(path).data.publicUrl;
+        setQuickMedia(m => [...m, { url, type: isVideo ? "video" : "image" }]);
+      } catch (err) { console.error("Media upload failed:", err); alert(`Couldn't upload ${file.name}: ${err.message || err}`); }
+    }
+    setQuickUploading(false);
+  };
+  const removeQuickMedia = (url) => setQuickMedia(m => m.filter(x => x.url !== url));
+
   const submitPost = async () => {
     if (!composeText.trim() || !session?.user?.id) return;
     setComposingPost(true);
     const myName = myProfile?.full_name || myProfile?.username || session.user.email?.split("@")[0] || "You";
     const { data, error } = await supabase
       .from("letters")
-      .insert({ user_id: session.user.id, body: composeText.trim(), kind: "post" })
+      .insert({ user_id: session.user.id, body: composeText.trim(), kind: "post", media: quickMedia.length ? quickMedia : null })
       .select()
       .single();
     if (error) {
@@ -1477,10 +1506,11 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
         initial: myName[0].toUpperCase(), color: colorForId(session.user.id),
         timeAgo: "Just now", createdAt: data.created_at || new Date().toISOString(),
         section: "", publication: "", headline: "", title: null,
-        preview: plain, fullBody: plain, replies: 0, likes: 0,
+        preview: plain, fullBody: plain, replies: 0, likes: 0, media: quickMedia.length ? quickMedia : null,
       }, ...prev]);
       setComposeText("");
       setComposeOpen(false);
+      setQuickMedia([]);
     }
     setComposingPost(false);
   };
@@ -1664,10 +1694,25 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
                   style={{ width:"100%", border:`1px solid ${composeOpen ? "#C8A96E" : "#E8E0D0"}`, borderRadius:12, padding:"10px 14px", fontFamily:"'EB Garamond', Georgia, serif", fontSize:15, lineHeight:1.5, color:"#111", background:"#FDFCF8", outline:"none", resize:"none", boxSizing:"border-box", transition:"border-color 0.15s" }}
                 />
                 {composeOpen && (
+                  <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginTop:8, alignItems:"center" }}>
+                    {quickMedia.map(m => (
+                      <div key={m.url} style={{ position:"relative", width:56, height:56, borderRadius:6, overflow:"hidden", border:"1px solid #E0D8CC", background:"#000" }}>
+                        {m.type === "video" ? <video src={m.url} muted style={{ width:"100%", height:"100%", objectFit:"cover" }}/> : <img src={m.url} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/>}
+                        <button onClick={() => removeQuickMedia(m.url)} style={{ position:"absolute", top:2, right:2, width:16, height:16, borderRadius:"50%", background:"rgba(0,0,0,0.6)", border:"none", color:"#fff", fontSize:11, lineHeight:1, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>×</button>
+                      </div>
+                    ))}
+                    <input ref={quickMediaRef} type="file" accept="image/*,video/*" multiple onChange={onAddQuickMedia} style={{ display:"none" }}/>
+                    <button onClick={() => quickMediaRef.current?.click()} disabled={quickUploading} style={{ width:56, height:56, borderRadius:6, border:"1px dashed #C8BFA8", background:"none", color:"#B0A488", cursor: quickUploading ? "default" : "pointer", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:2, fontSize:9, fontFamily:"'DM Mono', monospace" }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                      {quickUploading ? "…" : "Add"}
+                    </button>
+                  </div>
+                )}
+                {composeOpen && (
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:8 }}>
                     <span style={{ fontSize:11, color: composeText.length > COMPOSE_LIMIT - 50 ? "#C0392B" : "#CCC", fontFamily:"'DM Mono', monospace" }}>{composeText.length}/{COMPOSE_LIMIT}</span>
                     <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-                      <button onClick={() => { setComposeText(""); setComposeOpen(false); }}
+                      <button onClick={() => { setComposeText(""); setComposeOpen(false); setQuickMedia([]); }}
                         style={{ background:"none", border:"none", fontSize:12, color:"#BBB", fontFamily:"'DM Sans', sans-serif", cursor:"pointer" }}>Cancel</button>
                       <button onClick={submitPost} disabled={composingPost || !composeText.trim()}
                         style={{ background: composeText.trim() ? "#111" : "#E8E0D0", color: composeText.trim() ? "#F0EAD8" : "#AAA", border:"none", borderRadius:20, padding:"7px 18px", fontSize:12.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor: composeText.trim() ? "pointer" : "default" }}>
@@ -3230,6 +3275,7 @@ function WritePage({ session, onNavigate }) {
       draftIdRef.current = d.id;
       if (d.publication_id) setPublication(d.publication || { id: d.publication_id, title: (d.publication && d.publication.title) || "Publication" });
       setForm(f => ({ ...f, title: d.title || "", body: d.body || "", sourceUrl: d.source_url || "", sourceTitle: d.source_title || "", sourcePublication: d.source_publication || "" }));
+      setMedia(d.media || []);
     }
     if (st.read) {
       const r = st.read;
@@ -3550,6 +3596,7 @@ function WritePage({ session, onNavigate }) {
       clip_episode_id: clip ? clip.episode_id : null,
       clip_start: clip ? clip.start : null,
       clip_end: clip ? clip.end : null,
+      media: media.length ? media : null,
     };
     let ok = false;
     try {
@@ -3718,7 +3765,7 @@ function WritePage({ session, onNavigate }) {
         <h2 style={{ fontFamily:"'Playfair Display', serif", fontSize:32, fontWeight:900, color:"#111", margin:"0 0 16px" }}>Your {kind === "post" ? "post" : "letter"} is live<span style={{ color:"#C8A96E" }}>.</span></h2>
         <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:16, color:"#888", margin:"0 0 32px" }}>It's now visible in the feed for your followers to read and respond to.</p>
         <div style={{ display:"flex", gap:12, justifyContent:"center" }}>
-          <button onClick={() => { setSuccess(false); setForm({ sourceUrl:"", sourceTitle:"", sourcePublication:"", title:"", body:"" }); setPostBody(""); if(editorRef.current) editorRef.current.innerHTML=""; }}
+          <button onClick={() => { setSuccess(false); setForm({ sourceUrl:"", sourceTitle:"", sourcePublication:"", title:"", body:"" }); setPostBody(""); setMedia([]); if(editorRef.current) editorRef.current.innerHTML=""; }}
             style={{ background:"none", border:"1px solid #C8BFA8", borderRadius:6, padding:"10px 20px", fontSize:13, fontFamily:"'DM Sans', sans-serif", cursor:"pointer", color:"#555" }}>
             Write another
           </button>
@@ -3773,6 +3820,27 @@ function WritePage({ session, onNavigate }) {
               {error}
             </div>
           )}
+
+          <div style={{ marginBottom:2 }}>
+            {media.length > 0 && (
+              <div style={{ display:"flex", flexWrap:"wrap", gap:10, marginBottom:12 }}>
+                {media.map(m => (
+                  <div key={m.url} style={{ position:"relative", width:88, height:88, borderRadius:8, overflow:"hidden", border:"1px solid #E0D8CC", background:"#000" }}>
+                    {m.type === "video"
+                      ? <video src={m.url} muted style={{ width:"100%", height:"100%", objectFit:"cover" }}/>
+                      : <img src={m.url} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/>}
+                    <button onClick={() => removeMedia(m.url)} style={{ position:"absolute", top:4, right:4, width:20, height:20, borderRadius:"50%", background:"rgba(0,0,0,0.6)", border:"none", color:"#fff", fontSize:13, lineHeight:1, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>×</button>
+                    {m.type === "video" && <span style={{ position:"absolute", bottom:4, left:6, fontSize:9, color:"#fff", fontFamily:"'DM Mono', monospace", textShadow:"0 1px 2px rgba(0,0,0,0.8)" }}>VIDEO</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+            <input ref={mediaInputRef} type="file" accept="image/*,video/*" multiple onChange={onAddMedia} style={{ display:"none" }}/>
+            <button onClick={() => mediaInputRef.current?.click()} disabled={uploadingMedia} style={{ display:"inline-flex", alignItems:"center", gap:8, background:"none", border:"1px dashed #C8BFA8", borderRadius:8, padding:"9px 16px", fontSize:12.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, color:"#8A7F66", cursor: uploadingMedia ? "default" : "pointer", opacity: uploadingMedia ? 0.6 : 1 }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+              {uploadingMedia ? "Uploading…" : "Add photo or video"}
+            </button>
+          </div>
 
           <button onClick={handlePublish} disabled={loading}
             style={{ width:"100%", background:loading?"#555":"#111", color:"#F0EAD8", border:"none", borderRadius:6, padding:"15px 0", fontSize:14, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:loading?"not-allowed":"pointer", letterSpacing:"0.02em", lineHeight:1.4, transition:"background 0.15s" }}>
