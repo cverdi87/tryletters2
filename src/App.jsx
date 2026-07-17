@@ -3239,6 +3239,9 @@ function WritePage({ session, onNavigate }) {
   const [realRecentArticles, setRealRecentArticles] = useState([]);
   const [loadingRecentArticles, setLoadingRecentArticles] = useState(true);
   const editorRef = useRef(null);
+  const [media, setMedia] = useState([]);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const mediaInputRef = useRef(null);
   const writerUserId = session?.user?.id;
   const isWriterStaff = !!session?.user?.email && session.user.email.toLowerCase().endsWith("@tryletters.tech");
   const [eligibleForums, setEligibleForums] = useState([]);
@@ -3569,6 +3572,7 @@ function WritePage({ session, onNavigate }) {
     setDraftId(null);
     draftIdRef.current = null;
     setForm({ sourceUrl:"", sourceTitle:"", sourcePublication:"", title:"", body:"" });
+    setMedia([]);
     setSavedAt(null);
     if (editorRef.current) editorRef.current.innerHTML = "";
   };
@@ -3586,6 +3590,35 @@ function WritePage({ session, onNavigate }) {
   });
 
   const labelStyle = { fontSize:9.5, letterSpacing:"0.14em", textTransform:"uppercase", color:"#888", fontFamily:"'DM Mono', monospace", display:"block", marginBottom:6 };
+
+  const onAddMedia = async (e) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = "";
+    const uid = session?.user?.id;
+    if (!files.length || !uid) return;
+    setUploadingMedia(true);
+    for (const file of files) {
+      try {
+        const isVideo = file.type.startsWith("video/");
+        const isImage = file.type.startsWith("image/");
+        if (!isImage && !isVideo) { alert("Only images and video are supported."); continue; }
+        const cap = isVideo ? 100 : 10;
+        if (file.size > cap * 1024 * 1024) { alert(`That file is over ${cap}MB.`); continue; }
+        const blob = isImage ? await downscaleImage(file, 1600) : file;
+        const ext = (file.name.split(".").pop() || (isVideo ? "mp4" : "jpg")).toLowerCase().slice(0, 5);
+        const path = `${uid}/post-${Date.now()}-${Math.random().toString(36).slice(2,7)}.${ext}`;
+        const { error: upErr } = await supabase.storage.from("media").upload(path, blob, { contentType: blob.type || file.type });
+        if (upErr) throw upErr;
+        const url = supabase.storage.from("media").getPublicUrl(path).data.publicUrl;
+        setMedia(m => [...m, { url, type: isVideo ? "video" : "image" }]);
+      } catch (err) {
+        console.error("Media upload failed:", err);
+        alert(`Couldn't upload ${file.name}: ${err.message || err}`);
+      }
+    }
+    setUploadingMedia(false);
+  };
+  const removeMedia = (url) => setMedia(m => m.filter(x => x.url !== url));
 
   const handlePublish = async () => {
     const isPost = kind === "post";
@@ -3607,6 +3640,7 @@ function WritePage({ session, onNavigate }) {
             source_title: null,
             source_publication: null,
             kind: "post",
+            media: media.length ? media : null,
           }
         : {
             user_id: session.user.id,
@@ -3621,6 +3655,7 @@ function WritePage({ session, onNavigate }) {
             clip_episode_id: clip ? clip.episode_id : null,
             clip_start: clip ? clip.start : null,
             clip_end: clip ? clip.end : null,
+            media: media.length ? media : null,
           }
     ).select("id").single();
     if (error) { setError(error.message); setLoading(false); return; }
@@ -3984,6 +4019,27 @@ function WritePage({ session, onNavigate }) {
               {error}
             </div>
           )}
+
+          <div style={{ marginBottom:2 }}>
+            {media.length > 0 && (
+              <div style={{ display:"flex", flexWrap:"wrap", gap:10, marginBottom:12 }}>
+                {media.map(m => (
+                  <div key={m.url} style={{ position:"relative", width:88, height:88, borderRadius:8, overflow:"hidden", border:"1px solid #E0D8CC", background:"#000" }}>
+                    {m.type === "video"
+                      ? <video src={m.url} muted style={{ width:"100%", height:"100%", objectFit:"cover" }}/>
+                      : <img src={m.url} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/>}
+                    <button onClick={() => removeMedia(m.url)} style={{ position:"absolute", top:4, right:4, width:20, height:20, borderRadius:"50%", background:"rgba(0,0,0,0.6)", border:"none", color:"#fff", fontSize:13, lineHeight:1, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>×</button>
+                    {m.type === "video" && <span style={{ position:"absolute", bottom:4, left:6, fontSize:9, color:"#fff", fontFamily:"'DM Mono', monospace", textShadow:"0 1px 2px rgba(0,0,0,0.8)" }}>VIDEO</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+            <input ref={mediaInputRef} type="file" accept="image/*,video/*" multiple onChange={onAddMedia} style={{ display:"none" }}/>
+            <button onClick={() => mediaInputRef.current?.click()} disabled={uploadingMedia} style={{ display:"inline-flex", alignItems:"center", gap:8, background:"none", border:"1px dashed #C8BFA8", borderRadius:8, padding:"9px 16px", fontSize:12.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, color:"#8A7F66", cursor: uploadingMedia ? "default" : "pointer", opacity: uploadingMedia ? 0.6 : 1 }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+              {uploadingMedia ? "Uploading…" : "Add photo or video"}
+            </button>
+          </div>
 
           <div style={{ display:"flex", gap:10 }}>
             <button onClick={handlePublish} disabled={loading}
