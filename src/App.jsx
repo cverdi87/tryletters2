@@ -5017,12 +5017,12 @@ function EditorialBoardModal({ forum, session, onClose }) {
     const ids = (rows || []).map(r => r.user_id);
     let profs = [];
     if (ids.length) {
-      const { data: pr } = await supabase.from("profiles").select("id, username, full_name, status").in("id", ids);
+      const { data: pr } = await supabase.from("profiles").select("id, username, full_name, status, avatar_url").in("id", ids);
       profs = pr || [];
     }
     return (rows || []).map(r => {
       const pf = profs.find(x => x.id === r.user_id) || {};
-      return { user_id: r.user_id, added_at: r.added_at, username: pf.username, full_name: pf.full_name, status: pf.status };
+      return { user_id: r.user_id, added_at: r.added_at, username: pf.username, full_name: pf.full_name, status: pf.status, avatar_url: pf.avatar_url };
     });
   };
 
@@ -5070,7 +5070,7 @@ function EditorialBoardModal({ forum, session, onClose }) {
     if (!q || !canManage) { setResults([]); return; }
     let cancelled = false;
     (async () => {
-      const { data } = await supabase.from("profiles").select("id, username, full_name").or(`username.ilike.%${q}%,full_name.ilike.%${q}%`).limit(8);
+      const { data } = await supabase.from("profiles").select("id, username, full_name, avatar_url").or(`username.ilike.%${q}%,full_name.ilike.%${q}%`).limit(8);
       const editorIds = new Set(editors.map(e => e.user_id));
       if (!cancelled) setResults((data || []).filter(pp => !editorIds.has(pp.id) && !pendingTargets.has(pp.id)));
     })();
@@ -5168,7 +5168,7 @@ function EditorialBoardModal({ forum, session, onClose }) {
 
               {editors.map((e, i) => (
                 <div key={e.user_id} style={{ display:"flex", alignItems:"center", gap:12, background:"#fff", border:"1px solid #E8E0D0", borderRadius:11, padding:"12px 14px", marginBottom:10 }}>
-                  <div style={{ width:40, height:40, borderRadius:"50%", background:colorFor(e.user_id), flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", color:"#F4ECD8", fontFamily:"'Playfair Display', serif", fontWeight:700, fontSize:17 }}>{initialOf(e)}</div>
+                  <Avatar initial={initialOf(e)} color={colorFor(e.user_id)} size={40} src={e.avatar_url}/>
                   <div style={{ minWidth:0, flex:1 }}>
                     <div style={{ fontSize:14.5, fontWeight:600, color:"#141414", fontFamily:"'DM Sans', sans-serif" }}>{nameOf(e)}</div>
                     <div style={{ fontSize:11, color:"#AAA", fontFamily:"'DM Mono', monospace" }}>{e.username ? `@${e.username}` : "Editorial board"}{i === 0 ? " · Chair" : ""}</div>
@@ -5208,7 +5208,7 @@ function EditorialBoardModal({ forum, session, onClose }) {
                               style={{ display:"flex", alignItems:"center", gap:11, width:"100%", textAlign:"left", background:"none", border:"none", borderBottom:"1px solid #F5F1E9", padding:"10px 13px", cursor: busy ? "default" : "pointer" }}
                               onMouseEnter={ev => ev.currentTarget.style.background="#FBF8F1"}
                               onMouseLeave={ev => ev.currentTarget.style.background="none"}>
-                              <div style={{ width:30, height:30, borderRadius:"50%", background:colorFor(pp.id), flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", color:"#F4ECD8", fontFamily:"'Playfair Display', serif", fontWeight:700, fontSize:13 }}>{(pp.full_name || pp.username || "?").trim().charAt(0).toUpperCase()}</div>
+                              <Avatar initial={(pp.full_name || pp.username || "?").trim().charAt(0).toUpperCase()} color={colorFor(pp.id)} size={30} src={pp.avatar_url}/>
                               <div style={{ minWidth:0, flex:1 }}>
                                 <div style={{ fontSize:13.5, fontWeight:600, color:"#141414", fontFamily:"'DM Sans', sans-serif" }}>{pp.full_name || pp.username || "Member"}</div>
                                 {pp.username && <div style={{ fontSize:10.5, color:"#AAA", fontFamily:"'DM Mono', monospace" }}>@{pp.username}</div>}
@@ -5243,8 +5243,8 @@ function ManageContributorsModal({ forum, session, onClose }) {
   const hydrate = async (rows) => {
     const ids = rows.map(r => r.user_id);
     if (!ids.length) return [];
-    const { data: pr } = await supabase.from("profiles").select("id, username, full_name").in("id", ids);
-    return rows.map(r => { const pf = (pr || []).find(x => x.id === r.user_id) || {}; return { user_id: r.user_id, username: pf.username, full_name: pf.full_name }; });
+    const { data: pr } = await supabase.from("profiles").select("id, username, full_name, avatar_url").in("id", ids);
+    return rows.map(r => { const pf = (pr || []).find(x => x.id === r.user_id) || {}; return { user_id: r.user_id, username: pf.username, full_name: pf.full_name, avatar_url: pf.avatar_url }; });
   };
 
   const load = async () => {
@@ -5304,7 +5304,7 @@ function ManageContributorsModal({ forum, session, onClose }) {
               ) : (
                 verified.map(e => (
                   <div key={e.user_id} style={{ display:"flex", alignItems:"center", gap:12, background:"#fff", border:"1px solid #E8E0D0", borderRadius:11, padding:"11px 14px", marginBottom:10 }}>
-                    <div style={{ width:38, height:38, borderRadius:"50%", background:colorFor(e.user_id), flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", color:"#F4ECD8", fontFamily:"'Playfair Display', serif", fontWeight:700, fontSize:16 }}>{initialOf(e)}</div>
+                    <Avatar initial={initialOf(e)} color={colorFor(e.user_id)} size={38} src={e.avatar_url}/>
                     <div style={{ minWidth:0, flex:1 }}>
                       <div style={{ fontSize:14, fontWeight:600, color:"#141414", fontFamily:"'DM Sans', sans-serif", display:"flex", alignItems:"center", gap:5 }}>
                         {nameOf(e)}
@@ -5343,7 +5343,7 @@ function ManageContributorsModal({ forum, session, onClose }) {
                           style={{ display:"flex", alignItems:"center", gap:11, width:"100%", textAlign:"left", background:"#fff", border:"1px solid #EFE9DD", borderRadius:10, padding:"9px 12px", marginBottom:7, cursor: busy ? "default" : "pointer" }}
                           onMouseEnter={ev => { if(!busy) ev.currentTarget.style.borderColor="#C8A96E"; }}
                           onMouseLeave={ev => ev.currentTarget.style.borderColor="#EFE9DD"}>
-                          <div style={{ width:30, height:30, borderRadius:"50%", background:colorFor(m.user_id), flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", color:"#F4ECD8", fontFamily:"'Playfair Display', serif", fontWeight:700, fontSize:13 }}>{initialOf(m)}</div>
+                          <Avatar initial={initialOf(m)} color={colorFor(m.user_id)} size={30} src={m.avatar_url}/>
                           <div style={{ minWidth:0, flex:1 }}>
                             <div style={{ fontSize:13.5, fontWeight:600, color:"#141414", fontFamily:"'DM Sans', sans-serif" }}>{nameOf(m)}</div>
                             {m.username && <div style={{ fontSize:10.5, color:"#AAA", fontFamily:"'DM Mono', monospace" }}>@{m.username}</div>}
