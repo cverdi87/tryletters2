@@ -2037,6 +2037,15 @@ const cleanImageUrl = (url) => {
 // tags become real, convert block boundaries to paragraph breaks, strip the
 // remaining tags, then decode anything left in the text. Preserves \n\n so the
 // article reader can still split into paragraphs.
+const truncate = (text, n) => {
+  if (!text) return "";
+  const t = String(text).trim();
+  if (t.length <= n) return t;
+  const cut = t.slice(0, n);
+  const sp = cut.lastIndexOf(" ");
+  return (sp > n * 0.6 ? cut.slice(0, sp) : cut).replace(/[\s.,;:]+$/, "") + "…";
+};
+
 const cleanNewsText = (raw) => {
   if (!raw) return "";
   const decode = (str) => {
@@ -2571,7 +2580,7 @@ function ReadPage({ onNavigate, session }) {
                     </h2>
                     {(filteredArticles[0].dek || filteredArticles[0].description) && (
                       <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:15, lineHeight:1.55, color:"#777", margin:"0 0 12px" }}>
-                        {filteredArticles[0].dek || filteredArticles[0].description}
+                        {truncate(filteredArticles[0].dek || filteredArticles[0].description, 200)}
                       </p>
                     )}
                     <div style={{ display:"flex", alignItems:"center", gap:6 }}>
