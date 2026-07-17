@@ -353,6 +353,22 @@ const mockFeed = [
   { id:8, type:"news", publication:"ESPN", section:"Sports", headline:"Why Gen Z Is Falling Back in Love With Baseball", summary:"Attendance is up, viewership among 18-34 year olds has climbed for the third straight year, and a new generation of stars is driving a renaissance nobody saw coming.", timeAgo:"1d ago", letters:28 },
 ];
 
+function MediaGrid({ media }) {
+  if (!media || !media.length) return null;
+  const cols = media.length === 1 ? 1 : 2;
+  return (
+    <div style={{ display:"grid", gridTemplateColumns:`repeat(${cols}, 1fr)`, gap:6, marginTop:12 }}>
+      {media.map((m, i) => (
+        <div key={i} onClick={(e) => e.stopPropagation()} style={{ position:"relative", width:"100%", aspectRatio: media.length === 1 ? "16 / 10" : "1 / 1", background:"#000", borderRadius:8, overflow:"hidden", border:"1px solid #EDE8E0" }}>
+          {m.type === "video"
+            ? <video src={m.url} controls playsInline preload="metadata" style={{ width:"100%", height:"100%", objectFit:"cover", background:"#000", display:"block" }}/>
+            : <img src={m.url} alt="" loading="lazy" style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }}/>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Avatar({ initial, color, size=34, src }) {
   if (src) return <img src={src} alt="" referrerPolicy="no-referrer" style={{ width:size, height:size, borderRadius:"50%", objectFit:"cover", flexShrink:0, background:color }} onError={e => { e.currentTarget.style.display = "none"; }}/>;
   return <div style={{ width:size, height:size, borderRadius:"50%", background:color, display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontSize:size*0.38, fontFamily:"'Playfair Display', serif", fontWeight:500, flexShrink:0 }}>{initial}</div>;
@@ -704,6 +720,7 @@ function LetterCard({ item, onOpen, selected, onToggleLike, isLiked, onToggleRep
             </div>
           )}
 
+          <MediaGrid media={item.media}/>
           <div style={{ display:"flex", gap:18, marginTop:12, alignItems:"center" }}>
             <button
               onClick={(e) => { e.stopPropagation(); onToggleLike && onToggleLike(item); }}
@@ -781,6 +798,7 @@ function PostCard({ item, onOpen, selected, onToggleLike, isLiked, onToggleRepub
             {item.fullBody || item.preview}
           </p>
 
+          <MediaGrid media={item.media}/>
           <div style={{ display:"flex", gap:18, marginTop:12, alignItems:"center" }}>
             <button
               onClick={(e) => { e.stopPropagation(); onToggleLike && onToggleLike(item); }}
@@ -1244,6 +1262,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
             timeAgo: timeAgo(letter.created_at),
             createdAt: letter.created_at,
             avatarUrl: profile.avatar_url,
+            media: letter.media,
             section: letter.source_publication ? "" : "General",
             publication: letter.source_publication || "",
             headline: letter.source_title || "",
@@ -1309,7 +1328,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
         id: `real-${letter.id}`, dbId: letter.id, removed: letter.removed, clip: letter.clip_episode_id && letter.clip ? { episode_id: letter.clip_episode_id, start: letter.clip_start, end: letter.clip_end, episode: letter.clip, show: letter.clip.show } : null, type: "letter", kind: letter.kind || "letter", isReal: true,
         userId: letter.user_id, author: profile.full_name || profile.username || "Anonymous", username: profile.username || "user",
         status: profile.status || "contributor", initial: (profile.full_name || profile.username || "A")[0].toUpperCase(),
-        color: colorForId(letter.user_id), timeAgo: timeAgo(letter.created_at), createdAt: letter.created_at, avatarUrl: profile.avatar_url,
+        color: colorForId(letter.user_id), timeAgo: timeAgo(letter.created_at), createdAt: letter.created_at, avatarUrl: profile.avatar_url, media: letter.media,
         section: letter.source_publication ? "" : "General", publication: letter.source_publication || "",
         headline: letter.source_title || "", title: letter.title,
         preview: plainBody.length > 280 ? plainBody.slice(0, 280) + "…" : plainBody, fullBody: letter.body,
@@ -1799,6 +1818,8 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
                     <p style={{ margin:0 }}>What this piece gets right is the urgency. What it misses is the geography. Not all of America is declining equally, and our policy responses need to reflect that complexity rather than treating the middle class as a monolith.</p>
                   </div>
                 )}
+
+                <MediaGrid media={openLetter.media}/>
 
                 {/* Actions */}
                 <div style={{ display:"flex", alignItems:"center", gap:16, paddingBottom:20, borderBottom:"1px solid #F0EDE8", marginBottom:20 }}>
