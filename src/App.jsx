@@ -2263,7 +2263,7 @@ function ReadPage({ onNavigate, session }) {
       setLoadingReadLetters(true);
       const { data, error } = await supabase
         .from("letters")
-        .select("id, title, body, source_title, source_publication, created_at, user_id, kind, profiles:user_id (username, full_name, status)")
+        .select("id, title, body, source_title, source_publication, created_at, user_id, kind, profiles:user_id (username, full_name, status, avatar_url)")
         .eq("kind", "letter")
         .order("created_at", { ascending: false })
         .limit(8);
@@ -5248,10 +5248,10 @@ function ForumPostPage({ session, onNavigate }) {
   const load = async () => {
     const [{ data: f }, { data: l }] = await Promise.all([
       supabase.from("forums").select("*").eq("slug", slug).maybeSingle(),
-      supabase.from("letters").select("*, profiles:user_id (username, full_name, status)").eq("id", letterId).maybeSingle(),
+      supabase.from("letters").select("*, profiles:user_id (username, full_name, status, avatar_url)").eq("id", letterId).maybeSingle(),
     ]);
     const [{ data: rs }, { data: lk }] = await Promise.all([
-      supabase.from("replies").select("*, profiles:user_id (username, full_name, status)").eq("letter_id", letterId).order("created_at", { ascending: true }),
+      supabase.from("replies").select("*, profiles:user_id (username, full_name, status, avatar_url)").eq("letter_id", letterId).order("created_at", { ascending: true }),
       supabase.from("likes").select("user_id").eq("letter_id", letterId),
     ]);
     return { f, l, rs: rs || [], lk: (lk || []).map(x => x.user_id) };
@@ -5268,7 +5268,7 @@ function ForumPostPage({ session, onNavigate }) {
     setSubmitting(true);
     const { data, error } = await supabase.from("replies")
       .insert({ letter_id: letterId, user_id: userId, body: replyText.trim(), parent_reply_id: replyingTo ? replyingTo.id : null })
-      .select("*, profiles:user_id (username, full_name, status)").single();
+      .select("*, profiles:user_id (username, full_name, status, avatar_url)").single();
     if (!error && data) { setReplies(prev => [...prev, data]); setReplyText(""); setReplyingTo(null); }
     setSubmitting(false);
   };
@@ -5285,7 +5285,7 @@ function ForumPostPage({ session, onNavigate }) {
   const renderReply = (r, depth) => (
     <div key={r.id} style={{ marginTop:14, marginLeft: depth > 0 ? 16 : 0, paddingLeft: depth > 0 ? 13 : 0, borderLeft: depth > 0 ? "2px solid #EDE6D6" : "none" }}>
       <div style={{ display:"flex", gap:11 }}>
-        <Avatar initial={initialOf(r)} color={colorFor(r.user_id)} size={32}/>
+        <Avatar initial={initialOf(r)} color={colorFor(r.user_id)} size={32} src={r.profiles?.avatar_url}/>
         <div style={{ flex:1, minWidth:0 }}>
           <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:3 }}>
             <AuthorLink userId={r.user_id} style={{ fontSize:13, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}>{authorOf(r)}</AuthorLink>
@@ -5330,7 +5330,7 @@ function ForumPostPage({ session, onNavigate }) {
       <article style={{ background:"#fff", border:"1px solid #EAE2D2", borderRadius:14, padding:"22px 24px", marginBottom:26 }}>
         {letter.title && <h1 style={{ fontFamily:"'Playfair Display', serif", fontSize:26, fontWeight:900, color:"#141414", lineHeight:1.2, letterSpacing:"-0.01em", margin:"0 0 14px" }}>{letter.title}</h1>}
         <div style={{ display:"flex", alignItems:"center", gap:11, marginBottom:18 }}>
-          <Avatar initial={(((letter.profiles && (letter.profiles.full_name || letter.profiles.username)) || "A")[0] || "A").toUpperCase()} color={colorFor(letter.user_id)} size={38}/>
+          <Avatar initial={(((letter.profiles && (letter.profiles.full_name || letter.profiles.username)) || "A")[0] || "A").toUpperCase()} color={colorFor(letter.user_id)} size={38} src={letter.profiles?.avatar_url}/>
           <div>
             <div style={{ fontSize:14, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}><AuthorLink userId={letter.user_id}>{(letter.profiles && (letter.profiles.full_name || letter.profiles.username)) || "A writer"}</AuthorLink></div>
             <div style={{ fontSize:11, color:"#AAA", fontFamily:"'DM Mono', monospace" }}>{letter.profiles && letter.profiles.username ? "@" + letter.profiles.username + " · " : ""}{ago(letter.created_at)}</div>
@@ -6175,8 +6175,8 @@ function AuthorProfilePage({ session, onNavigate }) {
         <div style={{ background:"#fff", borderBottom:"1px solid #E8E0D0", padding:"18px 20px 0" }}>
           <div style={{ display:"flex", alignItems:"flex-start", gap:16, marginBottom:16 }}>
             <div style={{ position:"relative", flexShrink:0 }}>
-              {!imgError ? (
-                <img src={`https://picsum.photos/seed/${photoSeed}/120/120`} alt={displayName} onError={() => setImgError(true)}
+              {profile?.avatar_url && !imgError ? (
+                <img src={profile.avatar_url} alt={displayName} onError={() => setImgError(true)}
                   style={{ width:72, height:72, borderRadius:"50%", objectFit:"cover", border:"3px solid #fff", boxShadow:"0 0 0 1.5px #E8E0D0" }}/>
               ) : (
                 <div style={{ width:72, height:72, borderRadius:"50%", background:"#111", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'Playfair Display', serif", fontSize:28, fontWeight:900, color:"#F0EAD8", border:"3px solid #fff", boxShadow:"0 0 0 1.5px #E8E0D0" }}>{initial}</div>
