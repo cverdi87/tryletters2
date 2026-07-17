@@ -554,7 +554,7 @@ function LetterDetailView({ item, onBack, session }) {
 
         {/* Author */}
         <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:20 }}>
-          <Avatar initial={item.initial} color={item.color} size={44}/>
+          <Avatar initial={item.initial} color={item.color} size={44} src={item.avatarUrl}/>
           <div>
             <div style={{ fontSize:15, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}>{item.author}</div>
             <div style={{ fontSize:11, color:"#BBB", fontFamily:"'DM Mono', monospace", marginTop:2 }}>{item.timeAgo}</div>
@@ -596,7 +596,7 @@ function LetterDetailView({ item, onBack, session }) {
           </div>
           {replies.map((reply, i) => (
             <div key={reply.id} style={{ display:"flex", gap:12, paddingBottom:20, marginBottom: i < replies.length-1 ? 20 : 0, borderBottom: i < replies.length-1 ? "1px solid #F9F6F0" : "none" }}>
-              <Avatar initial={reply.initial} color={reply.color} size={34}/>
+              <Avatar initial={reply.initial} color={reply.color} size={34} src={reply.avatarUrl}/>
               <div style={{ flex:1 }}>
                 <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
                   <span style={{ fontSize:13, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}>{reply.author}</span>
@@ -668,7 +668,7 @@ function LetterCard({ item, onOpen, selected, onToggleLike, isLiked, onToggleRep
 
       {/* Author + body */}
       <div style={{ display:"flex", gap:12, minWidth:0 }}>
-        <Avatar initial={item.initial} color={item.color}/>
+        <Avatar initial={item.initial} color={item.color} src={item.avatarUrl}/>
         <div style={{ flex:1, minWidth:0 }}>
           <div style={{ marginBottom:8 }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
@@ -760,7 +760,7 @@ function PostCard({ item, onOpen, selected, onToggleLike, isLiked, onToggleRepub
       </div>
 
       <div style={{ display:"flex", gap:12, minWidth:0 }}>
-        <Avatar initial={item.initial} color={item.color}/>
+        <Avatar initial={item.initial} color={item.color} src={item.avatarUrl}/>
         <div style={{ flex:1, minWidth:0 }}>
           <div style={{ marginBottom:8 }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
@@ -1199,7 +1199,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
     // Fetch letters joined with their author's profile info
     const { data, error } = await supabase
       .from("letters")
-      .select("*, profiles:user_id (username, full_name, status), clip:clip_episode_id (id, title, audio_url, image_url, show:show_id (id, title, image_url))")
+      .select("*, profiles:user_id (username, full_name, status, avatar_url), clip:clip_episode_id (id, title, audio_url, image_url, show:show_id (id, title, image_url))")
       .order("created_at", { ascending: false })
       .limit(50);
 
@@ -1243,6 +1243,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
             color: colorForId(letter.user_id),
             timeAgo: timeAgo(letter.created_at),
             createdAt: letter.created_at,
+            avatarUrl: profile.avatar_url,
             section: letter.source_publication ? "" : "General",
             publication: letter.source_publication || "",
             headline: letter.source_title || "",
@@ -1299,7 +1300,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
     if (!letterId || realLetters.some(l => l.dbId === letterId)) { setFetchedLetter(null); return; }
     let cancelled = false;
     (async () => {
-      const { data: letter } = await supabase.from("letters").select("*, profiles:user_id (username, full_name, status), clip:clip_episode_id (id, title, audio_url, image_url, show:show_id (id, title, image_url))").eq("id", letterId).maybeSingle();
+      const { data: letter } = await supabase.from("letters").select("*, profiles:user_id (username, full_name, status, avatar_url), clip:clip_episode_id (id, title, audio_url, image_url, show:show_id (id, title, image_url))").eq("id", letterId).maybeSingle();
       if (cancelled) return;
       if (!letter) { setFetchedLetter(null); return; }
       const profile = letter.profiles || {};
@@ -1308,7 +1309,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
         id: `real-${letter.id}`, dbId: letter.id, removed: letter.removed, clip: letter.clip_episode_id && letter.clip ? { episode_id: letter.clip_episode_id, start: letter.clip_start, end: letter.clip_end, episode: letter.clip, show: letter.clip.show } : null, type: "letter", kind: letter.kind || "letter", isReal: true,
         userId: letter.user_id, author: profile.full_name || profile.username || "Anonymous", username: profile.username || "user",
         status: profile.status || "contributor", initial: (profile.full_name || profile.username || "A")[0].toUpperCase(),
-        color: colorForId(letter.user_id), timeAgo: timeAgo(letter.created_at), createdAt: letter.created_at,
+        color: colorForId(letter.user_id), timeAgo: timeAgo(letter.created_at), createdAt: letter.created_at, avatarUrl: profile.avatar_url,
         section: letter.source_publication ? "" : "General", publication: letter.source_publication || "",
         headline: letter.source_title || "", title: letter.title,
         preview: plainBody.length > 280 ? plainBody.slice(0, 280) + "…" : plainBody, fullBody: letter.body,
@@ -1329,7 +1330,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
       setLoadingDetail(true);
       const [{ data: likesData }, { data: repliesData }] = await Promise.all([
         supabase.from("likes").select("user_id").eq("letter_id", openLetterEarly.dbId),
-        supabase.from("replies").select("*, profiles:user_id (username, full_name, status)").eq("letter_id", openLetterEarly.dbId).order("created_at", { ascending: true }),
+        supabase.from("replies").select("*, profiles:user_id (username, full_name, status, avatar_url)").eq("letter_id", openLetterEarly.dbId).order("created_at", { ascending: true }),
       ]);
       setLetterLikes((likesData || []).map(l => l.user_id));
       setLetterReplies((repliesData || []).map(r => ({
@@ -1339,6 +1340,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
         author: r.profiles?.full_name || r.profiles?.username || "Anonymous",
         initial: (r.profiles?.full_name || r.profiles?.username || "A")[0].toUpperCase(),
         color: colorForId(r.user_id),
+        avatarUrl: r.profiles?.avatar_url,
         timeAgo: timeAgo(r.created_at),
         body: r.body,
       })));
@@ -1740,7 +1742,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
 
                 {/* Author */}
                 <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:18 }}>
-                  <Avatar initial={openLetter.initial} color={openLetter.color} size={44}/>
+                  <Avatar initial={openLetter.initial} color={openLetter.color} size={44} src={openLetter.avatarUrl}/>
                   <div>
                     <div style={{ fontSize:15, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}><AuthorLink userId={openLetter.userId}>{openLetter.author}</AuthorLink></div>
                     <div style={{ fontSize:10, fontFamily:"'DM Mono', monospace", marginTop:2 }}>
@@ -1826,7 +1828,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
                     const renderThread = (reply, depth) => (
                       <div key={reply.id} style={{ marginTop: depth > 0 ? 12 : 0, marginBottom: depth === 0 ? 16 : 0, marginLeft: depth > 0 ? 14 : 0, paddingLeft: depth > 0 ? 12 : 0, borderLeft: depth > 0 ? "2px solid #EDE6D6" : "none" }}>
                         <div style={{ display:"flex", gap:10 }}>
-                          <Avatar initial={reply.initial} color={reply.color} size={30}/>
+                          <Avatar initial={reply.initial} color={reply.color} size={30} src={reply.avatarUrl}/>
                           <div style={{ flex:1, minWidth:0 }}>
                             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
                               <AuthorLink userId={reply.userId} style={{ fontSize:12.5, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}>{reply.author}</AuthorLink>
@@ -1853,7 +1855,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
                     { id:3, author:"Sam K.",    initial:"S", color:"#6E2F8C", timeAgo:"3h ago", body:"What's your take on the role of remote work in reversing some of these trends? We're seeing unusual migration patterns." },
                   ].map((reply, i, arr) => (
                     <div key={reply.id} style={{ display:"flex", gap:10, paddingBottom:16, marginBottom: i<arr.length-1?16:0, borderBottom: i<arr.length-1?"1px solid #F0EDE8":"none" }}>
-                      <Avatar initial={reply.initial} color={reply.color} size={30}/>
+                      <Avatar initial={reply.initial} color={reply.color} size={30} src={reply.avatarUrl}/>
                       <div style={{ flex:1 }}>
                         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
                           <AuthorLink userId={reply.userId} style={{ fontSize:12.5, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}>{reply.author}</AuthorLink>
