@@ -15,7 +15,11 @@ function Logo({ size = 40 }) {
 }
 
 export default function Auth({ onAuthSuccess }) {
-  const [mode, setMode] = useState("signin"); // "signin" | "signup" | "reset" | "newPassword" | "verifyOtp"
+  // Start on the signup tab when arrived via an invitation link (?mode=signup).
+  const [mode, setMode] = useState(() => {
+    try { return new URLSearchParams(window.location.search).get("mode") === "signup" ? "signup" : "signin"; }
+    catch { return "signin"; }
+  }); // "signin" | "signup" | "reset" | "newPassword" | "verifyOtp"
   const [form, setForm] = useState({ email: "", password: "", fullName: "", username: "", newPassword: "", confirmPassword: "", otpCode: "" });
   const [focused, setFocused] = useState(null);
   const [loading, setLoading] = useState(false);

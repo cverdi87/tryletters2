@@ -37,7 +37,7 @@ serve(async (req) => {
         <p style="font-size:16px">You're in. Your request to join <strong>Letters</strong> has been approved, and your seat at the editorial page is ready.</p>
         <p style="font-size:16px">Create your account with this same email address to begin reading, writing, and replying.</p>
         <div style="text-align:center;margin:28px 0">
-          <a href="${SITE}" style="display:inline-block;background:#111;color:#F0EAD8;text-decoration:none;font-family:'DM Sans',Arial,sans-serif;font-weight:600;font-size:14px;padding:13px 28px;border-radius:6px">Create your account</a>
+          <a href="${SITE}/signin?mode=signup" style="display:inline-block;background:#111;color:#F0EAD8;text-decoration:none;font-family:'DM Sans',Arial,sans-serif;font-weight:600;font-size:14px;padding:13px 28px;border-radius:6px">Create your account</a>
         </div>
         <p style="font-size:14px;color:#777;font-style:italic">Sign up with <strong>${row.email}</strong> — that's the address your invitation is tied to.</p>
         <p style="font-size:14px;color:#999;margin-top:24px">Awaiting your reply,<br/>The Letters editorial team</p>
