@@ -2383,6 +2383,19 @@ function ReadPage({ onNavigate, session }) {
   const allArticles = [...realArticles, ...trendingArticles];
   const filteredSources = activeCategory === "All" ? newsSources : newsSources.filter(s => s.category === activeCategory);
   const filteredArticles = activeCategory === "All" ? allArticles : allArticles.filter(a => a.category === activeCategory);
+  // Group everything after the front-page hero into newspaper-style category
+  // sections. Category comes from the article, falling back to its source's
+  // category, then "Latest".
+  const newsCatOf = (a) => a.category || (newsSources.find(s => s.name === a.publication)?.category) || "Latest";
+  const NEWS_SECTION_ORDER = ["World","Politics","Economy","Business","Technology","Climate","Culture","Sports"];
+  const newsSections = (() => {
+    if (filteredArticles.length <= 1) return [];
+    const groups = {};
+    filteredArticles.slice(1).forEach(a => { const c = newsCatOf(a); (groups[c] = groups[c] || []).push(a); });
+    return Object.keys(groups)
+      .sort((x, y) => { const ix = NEWS_SECTION_ORDER.indexOf(x), iy = NEWS_SECTION_ORDER.indexOf(y); return (ix < 0 ? 99 : ix) - (iy < 0 ? 99 : iy) || x.localeCompare(y); })
+      .map(name => ({ name, articles: groups[name] }));
+  })();
 
   // Derive open article/publication from the URL instead of local state, so
   // individual articles and publication pages are real, shareable URLs.
@@ -2592,56 +2605,56 @@ function ReadPage({ onNavigate, session }) {
                 </div>
               )}
 
-              {/* ── Tier 2: Secondary stories — 2 medium cards with smaller images ── */}
-              {filteredArticles.length > 1 && (
-                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:14 }}>
-                  {filteredArticles.slice(1, 3).map(article => (
-                    <div key={article.id} onClick={() => setOpenArticle(article)}
-                      style={{ background:"#fff", border:"1px solid #E8E0D0", borderRadius:12, overflow:"hidden", cursor:"pointer", transition:"border-color 0.15s" }}
-                      onMouseEnter={e => e.currentTarget.style.borderColor="#C8A96E"}
-                      onMouseLeave={e => e.currentTarget.style.borderColor="#E8E0D0"}>
-                      <NewsThumb height={110}
-                        src={article.image_url || (article.imgId ? `https://picsum.photos/seed/${article.imgId}/360/220` : null)}
-                        color={article.color} publication={article.publication} />
-                      <div style={{ padding:"12px 14px" }}>
-                        <span style={{ fontSize:9.5, letterSpacing:"0.1em", textTransform:"uppercase", color:article.color, fontFamily:"'DM Mono', monospace", fontWeight:600 }}>{article.publication}</span>
-                        <div style={{ fontFamily:"'Playfair Display', serif", fontSize:15.5, fontWeight:700, color:"#111", lineHeight:1.28, margin:"5px 0 0" }}>
-                          {article.title}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* ── Tier 3: Briefs — text only, no images ── */}
-              {filteredArticles.length > 3 && (
-                <div style={{ background:"#fff", border:"1px solid #E8E0D0", borderRadius:12, overflow:"hidden" }}>
-                  <div style={{ padding:"10px 16px", borderBottom:"1px solid #F0EDE8", background:"#FDFCF8" }}>
-                    <span style={{ fontSize:9.5, letterSpacing:"0.14em", textTransform:"uppercase", color:"#AAA", fontFamily:"'DM Mono', monospace" }}>More stories</span>
+              {/* ── Category sections — broadsheet header + lead + briefs ── */}
+              {newsSections.map(section => (
+                <div key={section.name} style={{ marginBottom:30 }}>
+                  <div style={{ display:"flex", alignItems:"baseline", gap:12, marginBottom:14 }}>
+                    <span style={{ fontFamily:"'Playfair Display', serif", fontSize:18, fontWeight:900, color:"#111", letterSpacing:"-0.01em", whiteSpace:"nowrap" }}>{section.name}</span>
+                    <div style={{ flex:1, height:2, background:"#111", opacity:0.85 }}/>
+                    <span style={{ fontSize:9, letterSpacing:"0.14em", textTransform:"uppercase", color:"#BBB", fontFamily:"'DM Mono', monospace", whiteSpace:"nowrap" }}>{section.articles.length} {section.articles.length === 1 ? "story" : "stories"}</span>
                   </div>
-                  {filteredArticles.slice(3).map((article, i, arr) => (
-                    <div key={article.id} onClick={() => setOpenArticle(article)}
-                      style={{ padding:"13px 16px", borderBottom: i < arr.length-1 ? "1px solid #F0EDE8" : "none", cursor:"pointer", transition:"background 0.15s" }}
-                      onMouseEnter={e => e.currentTarget.style.background="#FDFCF8"}
-                      onMouseLeave={e => e.currentTarget.style.background="none"}>
-                      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:12 }}>
-                        <div style={{ flex:1, minWidth:0 }}>
-                          <div style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:14.5, fontWeight:600, color:"#222", lineHeight:1.4, marginBottom:4 }}>
-                            {article.title}
-                          </div>
-                          <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                            <span style={{ fontSize:9.5, letterSpacing:"0.08em", textTransform:"uppercase", color:article.color, fontFamily:"'DM Mono', monospace", fontWeight:600 }}>{article.publication}</span>
-                            <span style={{ fontSize:9.5, color:"#DDD" }}>·</span>
-                            <span style={{ fontSize:9.5, color:"#BBB", fontFamily:"'DM Mono', monospace" }}>{article.timeAgo}</span>
+                  <div onClick={() => setOpenArticle(section.articles[0])}
+                    style={{ background:"#fff", border:"1px solid #E8E0D0", borderRadius:12, overflow:"hidden", cursor:"pointer", marginBottom: section.articles.length > 1 ? 12 : 0, transition:"border-color 0.15s" }}
+                    onMouseEnter={e => e.currentTarget.style.borderColor="#C8A96E"}
+                    onMouseLeave={e => e.currentTarget.style.borderColor="#E8E0D0"}>
+                    <NewsThumb height={150}
+                      src={section.articles[0].image_url || (section.articles[0].imgId ? `https://picsum.photos/seed/${section.articles[0].imgId}/600/340` : null)}
+                      color={section.articles[0].color} publication={section.articles[0].publication} gradient />
+                    <div style={{ padding:"14px 16px 16px" }}>
+                      <div style={{ marginBottom:6 }}>
+                        <span style={{ fontSize:10, letterSpacing:"0.1em", textTransform:"uppercase", color:section.articles[0].color, fontFamily:"'DM Mono', monospace", fontWeight:600 }}>{section.articles[0].publication}</span>
+                        <span style={{ fontSize:10, color:"#BBB", fontFamily:"'DM Mono', monospace" }}> · {section.articles[0].timeAgo}</span>
+                      </div>
+                      <h3 style={{ fontFamily:"'Playfair Display', serif", fontSize:20, fontWeight:900, color:"#111", lineHeight:1.2, letterSpacing:"-0.01em", margin:"0 0 6px" }}>{section.articles[0].title}</h3>
+                      {(section.articles[0].dek || section.articles[0].description) && (
+                        <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:14, lineHeight:1.5, color:"#777", margin:0 }}>{truncate(section.articles[0].dek || section.articles[0].description, 150)}</p>
+                      )}
+                    </div>
+                  </div>
+                  {section.articles.length > 1 && (
+                    <div style={{ background:"#fff", border:"1px solid #E8E0D0", borderRadius:12, overflow:"hidden" }}>
+                      {section.articles.slice(1).map((article, i, arr) => (
+                        <div key={article.id} onClick={() => setOpenArticle(article)}
+                          style={{ padding:"12px 16px", borderBottom: i < arr.length-1 ? "1px solid #F0EDE8" : "none", cursor:"pointer", transition:"background 0.15s" }}
+                          onMouseEnter={e => e.currentTarget.style.background="#FDFCF8"}
+                          onMouseLeave={e => e.currentTarget.style.background="none"}>
+                          <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:12 }}>
+                            <div style={{ flex:1, minWidth:0 }}>
+                              <div style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:14, fontWeight:600, color:"#222", lineHeight:1.4, marginBottom:4 }}>{article.title}</div>
+                              <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                                <span style={{ fontSize:9, letterSpacing:"0.08em", textTransform:"uppercase", color:article.color, fontFamily:"'DM Mono', monospace", fontWeight:600 }}>{article.publication}</span>
+                                <span style={{ fontSize:9, color:"#DDD" }}>·</span>
+                                <span style={{ fontSize:9, color:"#BBB", fontFamily:"'DM Mono', monospace" }}>{article.timeAgo}</span>
+                              </div>
+                            </div>
+                            <span style={{ fontSize:10, color:"#CCC", fontFamily:"'DM Sans', sans-serif", flexShrink:0, marginTop:2 }}>✉ {article.letters_count ?? article.letters ?? 0}</span>
                           </div>
                         </div>
-                        <span style={{ fontSize:10, color:"#CCC", fontFamily:"'DM Sans', sans-serif", flexShrink:0, marginTop:2 }}>✉ {article.letters_count ?? article.letters ?? 0}</span>
-                      </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
-              )}
+              ))}
             </>
           )}
         </div>
