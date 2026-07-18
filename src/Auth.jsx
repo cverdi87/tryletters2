@@ -137,6 +137,17 @@ export default function Auth({ onAuthSuccess }) {
     if (!form.username.trim()) { setError("Please choose a username."); setLoading(false); return; }
     if (form.password.length < 6) { setError("Password must be at least 6 characters."); setLoading(false); return; }
 
+    // Invite-only beta: the email must be approved on the waitlist before an
+    // account can be created. email_is_approved() is a SECURITY DEFINER RPC so
+    // the waitlist stays private (nobody can read who's on it).
+    const { data: approved, error: gateError } = await supabase.rpc("email_is_approved", { p_email: form.email.trim().toLowerCase() });
+    if (gateError) { setError("We couldn't verify your invitation just now — please try again in a moment."); setLoading(false); return; }
+    if (!approved) {
+      setError("This email hasn't been approved yet. Request an invitation from the home page, and we'll email you the moment you're in.");
+      setLoading(false);
+      return;
+    }
+
     // Create auth user — Supabase sends a 6-digit verification code to their
     // email automatically as part of signUp. The account exists but is
     // unconfirmed until they enter that code on the next screen.
