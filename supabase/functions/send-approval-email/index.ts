@@ -14,11 +14,13 @@ serve(async (req) => {
     if (!email) return json({ error: "missing email" }, 400);
 
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
-    const { data: row } = await supabase
+    const { data: rows } = await supabase
       .from("waitlist")
       .select("email, first_name, status")
       .ilike("email", String(email).trim())
-      .maybeSingle();
+      .order("created_at", { ascending: false })
+      .limit(1);
+    const row = rows && rows[0];
 
     if (!row || row.status !== "approved") return json({ skipped: true }, 200);
 
