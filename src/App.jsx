@@ -6743,6 +6743,132 @@ function EditProfilePage({ session, onNavigate }) {
   );
 }
 
+function StaffInvitationsPage({ session, onNavigate }) {
+  const navigate = useNavigate();
+  const email = session?.user?.email || "";
+  const isStaff = !!email && email.toLowerCase().endsWith("@tryletters.tech");
+
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState("pending");
+  const [busy, setBusy] = useState(null);
+
+  const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString("en-US", { month:"short", day:"numeric" }) : "";
+  const USE_LABELS = { read:"Reading news", write:"Writing letters & essays", forums:"Forum discussions", listen:"Podcasts", follow:"Following writers" };
+  const PUBLISH_LABELS = { regularly:"Yes, regularly", occasionally:"Occasionally", maybe:"Maybe later", no:"Here to read" };
+  const statusOf = (r) => (r.status === "approved" || r.status === "declined") ? r.status : "pending";
+
+  const load = async () => {
+    setLoading(true);
+    const { data, error } = await supabase.rpc("staff_list_waitlist");
+    if (error) console.error("Load invitations failed:", error);
+    setRows(data || []);
+    setLoading(false);
+  };
+  useEffect(() => { if (!isStaff) { setLoading(false); return; } load(); }, [isStaff]);
+
+  const act = async (row, status) => {
+    setBusy(row.email);
+    const { error } = await supabase.rpc("staff_set_waitlist_status", { p_email: row.email, p_status: status });
+    if (error) { alert(`Couldn't update: ${error.message}`); setBusy(null); return; }
+    setRows(rs => rs.map(r => r.email === row.email ? { ...r, status } : r));
+    setBusy(null);
+  };
+
+  const shown = rows.filter(r => statusOf(r) === tab);
+
+  if (!isStaff) {
+    return (
+      <div className="letters-main" style={{ minHeight:"100vh", background:"#F9F6F0" }}>
+        <TopBar title={<span>Invitations<span style={{ color:"#C8A96E" }}>.</span></span>} maxWidth={1040} onLogoClick={() => navigate("/feed")}/>
+        <main style={{ maxWidth:640, margin:"0 auto", padding:"60px 20px", textAlign:"center" }}>
+          <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:16, color:"#888" }}>This page is for Letters staff only.</p>
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div className="letters-main" style={{ minHeight:"100vh", background:"#F9F6F0", paddingBottom:80 }}>
+      <TopBar title={<span>Invitations<span style={{ color:"#C8A96E" }}>.</span></span>} maxWidth={1040} onLogoClick={() => navigate("/feed")}/>
+      <main style={{ maxWidth:640, margin:"0 auto", padding:"14px 20px 0" }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
+          <div style={{ fontSize:9.5, letterSpacing:"0.16em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace" }}>Requests to join</div>
+          <button onClick={() => navigate("/staff/reports")} style={{ background:"none", border:"none", color:"#B0A488", fontFamily:"'DM Mono', monospace", fontSize:11, cursor:"pointer" }}>Reports →</button>
+        </div>
+
+        <div style={{ display:"flex", gap:4, marginBottom:18, borderBottom:"1px solid #E8E0D0" }}>
+          {["pending","approved","declined"].map(t => {
+            const n = rows.filter(r => statusOf(r) === t).length;
+            return (
+              <button key={t} onClick={() => setTab(t)}
+                style={{ background:"none", border:"none", borderBottom: tab===t ? "2px solid #111" : "2px solid transparent", marginBottom:-1, padding:"8px 14px", fontSize:11, letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'DM Mono', monospace", fontWeight: tab===t?600:400, color: tab===t?"#111":"#AAA", cursor:"pointer" }}>
+                {t}{n > 0 && <span style={{ color:"#C8A96E" }}> · {n}</span>}
+              </button>
+            );
+          })}
+        </div>
+
+        {loading ? (
+          <div style={{ padding:"40px", textAlign:"center", color:"#BBB", fontFamily:"'DM Mono', monospace", fontSize:12 }}>Loading…</div>
+        ) : shown.length === 0 ? (
+          <div style={{ padding:"48px 20px", textAlign:"center" }}>
+            <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:15, color:"#AAA", margin:0 }}>No {tab} requests.</p>
+          </div>
+        ) : (
+          shown.map(row => (
+            <div key={row.email} style={{ background:"#fff", border:"1px solid #E8E0D0", borderRadius:12, padding:"16px 18px", marginBottom:12 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:12, marginBottom:10 }}>
+                <div style={{ minWidth:0 }}>
+                  <div style={{ fontFamily:"'Playfair Display', serif", fontSize:17, fontWeight:800, color:"#111", lineHeight:1.2 }}>{[row.first_name, row.last_name].filter(Boolean).join(" ") || "\u2014"}</div>
+                  <div style={{ fontSize:12.5, color:"#777", fontFamily:"'DM Sans', sans-serif", marginTop:2, wordBreak:"break-all" }}>{row.email}</div>
+                </div>
+                <span style={{ fontSize:9.5, color:"#BBB", fontFamily:"'DM Mono', monospace", whiteSpace:"nowrap", flexShrink:0 }}>{fmtDate(row.created_at)}</span>
+              </div>
+
+              <div style={{ display:"flex", flexWrap:"wrap", gap:"4px 14px", fontSize:12, color:"#666", fontFamily:"'EB Garamond', serif", marginBottom: row.survey ? 10 : 12 }}>
+                {row.occupation && <span><span style={{ color:"#AAA" }}>Occupation:</span> {row.occupation}</span>}
+                {(row.referral || row.referral_other) && <span><span style={{ color:"#AAA" }}>Heard via:</span> {row.referral === "Other" ? (row.referral_other || "Other") : row.referral}</span>}
+              </div>
+
+              {row.survey && (
+                <div style={{ background:"#FDFBF6", border:"1px solid #EFE9DD", borderRadius:8, padding:"10px 12px", marginBottom:12, fontFamily:"'EB Garamond', serif", fontSize:12.5, color:"#555", lineHeight:1.6 }}>
+                  {Array.isArray(row.survey.use) && row.survey.use.length > 0 && (
+                    <div><span style={{ color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontSize:9, letterSpacing:"0.08em", textTransform:"uppercase", marginRight:5 }}>Would use for</span>{row.survey.use.map(u => USE_LABELS[u] || u).join(", ")}</div>
+                  )}
+                  {row.survey.would_publish && (
+                    <div><span style={{ color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontSize:9, letterSpacing:"0.08em", textTransform:"uppercase", marginRight:5 }}>Publish</span>{PUBLISH_LABELS[row.survey.would_publish] || row.survey.would_publish}</div>
+                  )}
+                  {row.survey.draw && (<div style={{ fontStyle:"italic", marginTop:3, color:"#666" }}>{"\u201C"}{row.survey.draw}{"\u201D"}</div>)}
+                </div>
+              )}
+
+              {statusOf(row) === "pending" ? (
+                <div style={{ display:"flex", gap:8 }}>
+                  <button onClick={() => act(row, "approved")} disabled={busy === row.email}
+                    style={{ flex:1, background:"#111", color:"#F0EAD8", border:"none", borderRadius:6, padding:"9px 0", fontSize:12.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor: busy===row.email ? "default":"pointer", opacity: busy===row.email?0.6:1 }}>
+                    {busy === row.email ? "\u2026" : "Approve & invite"}
+                  </button>
+                  <button onClick={() => act(row, "declined")} disabled={busy === row.email}
+                    style={{ background:"none", color:"#B0A488", border:"1px solid #E0D8CC", borderRadius:6, padding:"9px 16px", fontSize:12.5, fontFamily:"'DM Sans', sans-serif", cursor: busy===row.email ? "default":"pointer" }}>
+                    Decline
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                  <span style={{ fontSize:10, letterSpacing:"0.08em", textTransform:"uppercase", fontFamily:"'DM Mono', monospace", color: row.status === "approved" ? "#117A65" : "#B03A2E" }}>{row.status === "approved" ? "\u2713 Approved & invited" : "Declined"}</span>
+                  <button onClick={() => act(row, "pending")} disabled={busy === row.email}
+                    style={{ background:"none", border:"none", color:"#BBB", fontFamily:"'DM Mono', monospace", fontSize:10.5, cursor:"pointer" }}>Move to pending</button>
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </main>
+    </div>
+  );
+}
+
 function StaffReportsPage({ session, onNavigate }) {
   const navigate = useNavigate();
   const email = session?.user?.email || "";
@@ -9366,6 +9492,7 @@ function AuthenticatedApp({ session, handleSignOut }) {
         <Route path="/settings/notifications" element={<NotificationSettingsPage session={session} onNavigate={goToTab}/>}/>
         <Route path="/edit-profile" element={<EditProfilePage session={session} onNavigate={goToTab}/>}/>
         <Route path="/staff/reports" element={<StaffReportsPage session={session} onNavigate={goToTab}/>}/>
+        <Route path="/staff/invitations" element={<StaffInvitationsPage session={session} onNavigate={goToTab}/>}/>
         <Route path="/privacy" element={<LegalPage doc="privacy"/>}/>
         <Route path="/terms" element={<LegalPage doc="terms"/>}/>
         <Route path="/inbox" element={<InboxPage session={session} onNavigate={goToTab}/>}/>
