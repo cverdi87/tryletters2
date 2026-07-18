@@ -5917,10 +5917,10 @@ function YouPage({ session, onSignOut }) {
     fetchData();
   }, [session]);
 
-  const displayName = profile?.full_name || session.user.email.split("@")[0];
-  const username = profile?.username || session.user.email.split("@")[0];
-  const initial = displayName[0].toUpperCase();
-  const photoSeed = `user-${session.user.id?.slice(0,8) || "default"}`;
+  const displayName = profile?.full_name || session?.user?.email?.split("@")[0] || "Reader";
+  const username = profile?.username || session?.user?.email?.split("@")[0] || "reader";
+  const initial = (displayName || "R")[0].toUpperCase();
+  const photoSeed = `user-${session?.user?.id?.slice(0,8) || "default"}`;
 
   return (
     <div className="letters-main" style={{ minHeight:"100vh", background:"#F9F6F0", paddingBottom:80 }}>
