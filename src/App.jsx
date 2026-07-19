@@ -873,17 +873,6 @@ const discoverPodcasts = [
   { id:8, title:"Press Freedom Roundtable",   forum:"World",      duration:"67m", live:false, reason:"Featured" },
 ];
 
-const mockBreaking = [
-  { id:1, headline:"Markets fall sharply on Fed rate decision", source:"Reuters",      timeAgo:"8m ago",  urgent:true  },
-  { id:2, headline:"Major earthquake hits Pacific coast",       source:"AP News",      timeAgo:"22m ago", urgent:true  },
-  { id:3, headline:"EU parliament votes on emergency measure",  source:"BBC News",     timeAgo:"41m ago", urgent:false },
-];
-
-const discoverPeople = [
-  { name:"Elena V.",   username:"elena_v",   status:"journalist",         initial:"E", color:"#117A65" },
-  { name:"Thomas R.",  username:"thomas_r",  status:"featured",           initial:"T", color:"#1B4F72" },
-  { name:"Sam K.",     username:"sam_k",     status:"contributing-editor",initial:"S", color:"#6E2F8C" },
-];
 
 function SideNav({ activeTab, onNavigate, onSignOut, session }) {
   const [sideTab, setSideTab] = useState("breaking");
@@ -2108,18 +2097,6 @@ const newsSources = [
   { name:"BBC Sport", category:"Sports", color:"#F39C12" },
 ];
 
-const trendingArticles = [
-  { id:1,  title:"The Quiet Death of the American Middle Class",       publication:"The Atlantic",  category:"Economy",    timeAgo:"2h ago",  color:"#2C3E50", imgId:159,  reason:"Trending in your feed",    letters:14, dek:"Fifty years of wage stagnation and deindustrialization have hollowed out more than paychecks — they've unraveled entire communities.", body:"For fifty years, economists have debated when exactly the American middle class began to erode. The data is clear on the broad strokes: wage growth has stagnated relative to productivity, the cost of housing, healthcare, and education has outpaced inflation, and the social safety net that once cushioned economic shocks has steadily thinned.\n\nBut numbers alone don't capture what's been lost. In towns across the Rust Belt, the disappearance of stable manufacturing jobs didn't just remove a paycheck — it removed an entire social structure. Union halls closed. Main streets emptied. The sense of mutual obligation between employer and employee, between neighbor and neighbor, frayed in ways that don't show up in GDP figures.\n\nWhat comes next is an open question. Some economists point to remote work and the gig economy as potential equalizers, distributing opportunity beyond traditional urban centers. Others warn that without deliberate policy intervention, the divide between America's prosperous coastal metros and its hollowed-out interior will only widen.\n\nThe answer likely lies somewhere in between — in policies that combine the dynamism of the new economy with the stability the old one once provided." },
-  { id:2,  title:"EU Reaches Historic Agreement on AI Liability",      publication:"Reuters",       category:"Technology", timeAgo:"4h ago",  color:"#E67E22", imgId:48,   reason:"Popular this week",         letters:6,  dek:"The directive holds AI developers legally responsible for harms, marking the most aggressive AI regulation from any major economy.", body:"After three years of negotiation, the European Union has finalized a sweeping directive that holds AI developers legally responsible for harms caused by their systems, marking the most aggressive regulatory stance on artificial intelligence taken by any major economy to date.\n\nThe framework establishes tiered liability based on risk classification, with the highest scrutiny reserved for AI systems used in healthcare, hiring, and law enforcement. Companies deploying these systems will be required to maintain detailed audit trails and submit to regular third-party assessments.\n\nIndustry response has been mixed. Major tech firms have warned that compliance costs could push smaller AI startups out of the European market entirely, while consumer advocacy groups have praised the measure as a long-overdue check on unaccountable algorithmic decision-making.\n\nThe directive takes effect in eighteen months, giving companies a transition period to adapt their compliance infrastructure." },
-  { id:3,  title:"Climate Scientists Warn of Tipping Points by 2030",  publication:"The Guardian",  category:"Climate",    timeAgo:"5h ago",  color:"#27AE60", imgId:1043, reason:"Based on your interests",   letters:22, dek:"New modeling suggests critical climate thresholds could be crossed within five years, far sooner than previous estimates.", body:"New modeling published this week suggests that several critical climate tipping points — thresholds beyond which changes become self-sustaining and irreversible — may be reached earlier than previously projected, potentially within the next five years.\n\nThe research focuses on Arctic ice sheet dynamics, permafrost thaw, and coral reef collapse, three systems considered especially vulnerable to even modest additional warming. Once crossed, these thresholds could trigger cascading effects that accelerate warming independent of future emissions reductions.\n\nLead researchers emphasize that 'irreversible' does not mean 'instantaneous' — the full effects of crossing these tipping points could unfold over decades or centuries. But the political and economic implications are immediate: the window for preventive action is narrower than policymakers have assumed.\n\nThe findings are expected to feature prominently in upcoming international climate negotiations." },
-  { id:4,  title:"The AI Arms Race Nobody Is Talking About",           publication:"Wired",         category:"Technology", timeAgo:"6h ago",  color:"#1A1A1A", imgId:180,  reason:"From sources you follow",   letters:9,  dek:"Autonomous weapons and military AI are proliferating faster than international law can address them.", body:"While public attention remains fixed on consumer-facing AI products, a quieter and arguably more consequential race is underway in military and defense applications. Autonomous weapons systems, AI-driven intelligence analysis, and algorithmic logistics are being deployed faster than international law can address them.\n\nDefense analysts describe a fragmented regulatory landscape where individual nations are setting their own rules — or none at all — creating a patchwork of standards that could prove dangerous as these systems proliferate.\n\nThe absence of binding international agreements echoes early nuclear arms control debates, but with a key difference: AI systems are far cheaper to develop and far easier to proliferate than nuclear weapons, lowering the barrier to entry for state and non-state actors alike." },
-  { id:5,  title:"Senate Advances Bipartisan Infrastructure Bill",     publication:"AP News",       category:"Politics",   timeAgo:"9h ago",  color:"#C0392B", imgId:249,  reason:"Trending in Politics",      letters:18, dek:"The $180 billion package focused on rural broadband and transit cleared a key procedural hurdle with rare bipartisan support.", body:"The Senate voted to advance a $180 billion infrastructure package focused on broadband expansion and rural transit, clearing a key procedural hurdle with support from both parties — a rarity in the current legislative environment.\n\nThe bill allocates the bulk of funding toward closing the rural broadband gap, an issue that has gained renewed urgency as remote work and telehealth have become more central to everyday life. A smaller but significant portion is earmarked for transit projects in underserved rural communities.\n\nSupporters call it a pragmatic, narrowly-scoped measure that avoids the partisan gridlock that has stalled larger infrastructure proposals. Critics on both ends of the spectrum argue it doesn't go far enough — either in total investment or in addressing urban infrastructure needs.\n\nThe bill now moves to a final floor vote expected within the next two weeks." },
-  { id:6,  title:"Inside the World's Most Secretive Election",         publication:"BBC News",      category:"World",      timeAgo:"11h ago", color:"#2980B9", imgId:326,  reason:"Trending in World",         letters:31, dek:"Behind closed doors, one of the world's most opaque electoral processes draws renewed international scrutiny.", body:"Behind closed doors and away from international observers, one of the world's most opaque electoral processes is once again underway, drawing renewed scrutiny from human rights organizations and foreign governments alike.\n\nUnlike most national elections, this process involves no public campaigning, no independent media coverage, and no verifiable vote count. Information that does emerge comes primarily through unofficial channels and diaspora networks, making it nearly impossible to verify claims from either the government or opposition voices.\n\nInternational pressure has done little to change the process historically, though several governments have signaled they may reconsider diplomatic and trade relationships depending on the outcome and how it's reached.\n\nAnalysts caution against expecting meaningful transparency in the near term, noting that the opacity itself has become a defining feature of the political system." },
-  { id:7,  title:"How Streaming Killed the Auteur",                    publication:"The New Yorker",category:"Culture",    timeAgo:"1d ago",  color:"#8E44AD", imgId:342,  reason:"Popular in Culture",        letters:63, dek:"Streaming's economics favor predictable volume over singular vision, critics argue, quietly dismantling a defining cultural role.", body:"There was a time when a director's vision, however uncommercial, could find its way to a movie screen because a studio executive believed in it enough to take the risk. That era, film critics increasingly argue, is over — and streaming platforms, despite their promise of creative freedom, may be partly responsible.\n\nThe economics of streaming favor volume and algorithmic predictability over singular artistic vision. A film that performs modestly but consistently across a subscriber base is, in financial terms, more valuable to a platform than a polarizing masterpiece that divides audiences sharply.\n\nThis isn't a uniformly negative story — streaming has also enabled niche and international films to find audiences they never could have reached theatrically. But the particular cultural function of the auteur, the director whose name alone could greenlight a project, has been quietly dismantled.\n\nWhat replaces it remains an open question, one playing out in real time across every major platform." },
-  { id:8,  title:"Champions League Final: A Night Nobody Will Forget", publication:"BBC Sport",     category:"Sports",     timeAgo:"3h ago",  color:"#F39C12", imgId:416,  reason:"Trending in Sports",        letters:41, dek:"A stoppage-time equalizer, extra time, and a five-round shootout delivered the drama the sport's biggest stage rarely fulfills.", body:"In a final that will be replayed in highlight reels for years, last night's match delivered everything the sport's biggest stage promises and so rarely fulfills: drama, controversy, and a finish that defied every prediction.\n\nThe first half offered little hint of what was to come, a cautious, tactical affair that suggested a low-scoring, defensively-minded final. Everything changed in the second half, when a stoppage-time equalizer forced extra time, followed by two more goals that pushed the match to penalties.\n\nThe shootout itself became its own spectacle — five rounds, two missed attempts, and a save that will likely define one goalkeeper's career. When the final whistle blew, both sets of players collapsed to the turf, exhausted in a way that transcended the usual post-match ritual.\n\nFor the winning club, it's a moment of vindication after years of near-misses. For the losing side, it's a heartbreak that will take time to process — but a performance that, in defeat, may have won them new admirers." },
-  { id:9,  title:"The Hidden Economics of College Athletics",          publication:"The Atlantic",  category:"Sports",     timeAgo:"8h ago",  color:"#2C3E50", imgId:452,  reason:"Based on your interests",   letters:17, dek:"Television contracts and NIL payments have transformed college sports into a multi-billion dollar industry with murky accountability.", body:"Beneath the pageantry of college sports lies a financial system so byzantine that even university administrators struggle to fully explain it. Television contracts, conference realignments, and now name-image-likeness payments have transformed what was once framed as amateur athletics into a multi-billion dollar industry with murky accountability.\n\nThe recent wave of conference realignment, driven almost entirely by television revenue rather than geographic or academic logic, has left some of the sport's oldest rivalries severed and replaced by cross-country matchups that exist purely for broadcast appeal.\n\nMeanwhile, the introduction of NIL payments has created a new layer of complexity, with boosters and collectives operating in a regulatory gray zone that the NCAA has struggled to police. The result is a system where the line between amateur and professional athletics has effectively dissolved, even as the institutional framework still pretends otherwise.\n\nReform efforts continue, but few close observers expect a clean resolution anytime soon." },
-  { id:10, title:"Why Gen Z Is Falling Back in Love With Baseball",    publication:"NPR",           category:"Sports",     timeAgo:"1d ago",  color:"#8E44AD", imgId:488,  reason:"Popular this week",         letters:28, dek:"Rule changes and a new generation of charismatic stars are reversing a decade-long decline in young viewership.", body:"For a sport long dismissed as too slow for a generation raised on short-form video, baseball is experiencing an unexpected renaissance among viewers under 25 — and the numbers back it up. Attendance among 18-34 year olds has climbed for three consecutive years, reversing a decade-long decline.\n\nPart of the shift traces back to rule changes designed to speed up gameplay: a pitch clock, larger bases, and restrictions on defensive positioning have shortened average game length by nearly thirty minutes since their introduction.\n\nBut rule changes alone don't explain the cultural shift. A new generation of charismatic, often multicultural stars has given the sport a social media presence it previously lacked, with highlight clips and personality-driven content reaching audiences who would never tune into a full nine-inning broadcast.\n\nWhether this momentum translates into long-term audience growth remains to be seen, but for a sport that spent years anxious about its future, the early signs are unmistakably encouraging." },
-];
 
 // ── Article Reader View ───────────────────────────────────────────────────────
 function ArticleReaderView({ article, onBack, onWriteAbout }) {
@@ -2392,9 +2369,9 @@ function ReadPage({ onNavigate, session }) {
   const followedLetters = readLetters.filter(l => readFollowing.includes(l.userId));
   const displayLetters = (readFollowing.length > 0 && followedLetters.length > 0) ? followedLetters : readLetters;
 
-  // Merge real articles ahead of mock ones — mock content fills in categories/sources
-  // we haven't connected real RSS feeds for yet, so the page never looks sparse.
-  const allArticles = [...realArticles, ...trendingArticles];
+  // Real articles only. A thin category renders thin — we never pad the page
+  // with invented journalism attributed to a real outlet.
+  const allArticles = realArticles;
   const filteredSources = activeCategory === "All" ? newsSources : newsSources.filter(s => s.category === activeCategory);
   const filteredArticles = activeCategory === "All" ? allArticles : allArticles.filter(a => a.category === activeCategory);
   // Group everything after the front-page hero into newspaper-style category
@@ -2715,29 +2692,14 @@ function ReadPage({ onNavigate, session }) {
 
 // ── Page: Write ───────────────────────────────────────────────────────────────
 
-// Mock article data — in production from RSS + reading history
-const recentArticles = [
-  { id:1, title:"The Quiet Death of the American Middle Class", publication:"The Atlantic", date:"Jun 10, 2025", url:"https://theatlantic.com", color:"#2C3E50", imgId:159, readAt:"2h ago" },
-  { id:2, title:"EU Reaches Historic Agreement on AI Liability", publication:"Reuters", date:"Jun 10, 2025", url:"https://reuters.com", color:"#E67E22", imgId:48, readAt:"4h ago" },
-  { id:3, title:"Climate Scientists Warn of Tipping Points by 2030", publication:"The Guardian", date:"Jun 9, 2025", url:"https://theguardian.com", color:"#27AE60", imgId:1043, readAt:"Yesterday" },
-  { id:4, title:"Senate Advances Bipartisan Infrastructure Bill", publication:"AP News", date:"Jun 9, 2025", url:"https://apnews.com", color:"#C0392B", imgId:249, readAt:"Yesterday" },
-  { id:5, title:"How Streaming Killed the Auteur", publication:"The New Yorker", date:"Jun 8, 2025", url:"https://newyorker.com", color:"#8E44AD", imgId:342, readAt:"2 days ago" },
-];
-
-const recommendedArticles = [
-  { id:6,  title:"The AI Arms Race Nobody Is Talking About", publication:"Wired", date:"Jun 10, 2025", url:"https://wired.com", color:"#1A1A1A", imgId:180, reason:"Based on your interests" },
-  { id:7,  title:"Inside the World's Most Secretive Election", publication:"BBC News", date:"Jun 10, 2025", url:"https://bbc.com", color:"#2980B9", imgId:326, reason:"Trending in World" },
-  { id:8,  title:"Why America's Cities Are Emptying Out", publication:"Politico", date:"Jun 9, 2025", url:"https://politico.com", color:"#C0392B", imgId:267, reason:"Trending in Politics" },
-  { id:9,  title:"The New Science of Longevity", publication:"The Atlantic", date:"Jun 9, 2025", url:"https://theatlantic.com", color:"#2C3E50", imgId:399, reason:"Based on your interests" },
-  { id:10, title:"How Open Source Is Eating AI", publication:"Ars Technica", date:"Jun 8, 2025", url:"https://arstechnica.com", color:"#E74C3C", imgId:201, reason:"From sources you follow" },
-];
-
 function ArticleRow({ article, onSelect, onRead }) {
   return (
     <div style={{ borderBottom:"1px solid #F0EDE8", padding:"14px 20px", display:"flex", alignItems:"center", gap:14 }}>
       {/* Image thumbnail */}
       <div style={{ width:52, height:52, borderRadius:8, background:article.color, overflow:"hidden", flexShrink:0 }}>
-        <img src={`https://picsum.photos/seed/${article.imgId}/104/104`} alt={article.title} style={{ width:"100%", height:"100%", objectFit:"cover" }}/>
+        {article.image_url && (
+          <img src={article.image_url} alt={article.title} referrerPolicy="no-referrer" style={{ width:"100%", height:"100%", objectFit:"cover" }}/>
+        )}
       </div>
       {/* Content */}
       <div style={{ flex:1, minWidth:0 }}>
@@ -2745,7 +2707,7 @@ function ArticleRow({ article, onSelect, onRead }) {
         <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
           <span style={{ fontSize:10, letterSpacing:"0.1em", textTransform:"uppercase", color:article.color, fontFamily:"'DM Mono', monospace", fontWeight:600 }}>{article.publication}</span>
           <span style={{ fontSize:10, color:"#DDD", fontFamily:"'DM Mono', monospace" }}>·</span>
-          <span style={{ fontSize:10, color:"#BBB", fontFamily:"'DM Mono', monospace" }}>{article.readAt || article.reason}</span>
+          <span style={{ fontSize:10, color:"#BBB", fontFamily:"'DM Mono', monospace" }}>{article.readAt || article.date}</span>
         </div>
       </div>
       {/* Actions */}
@@ -2763,16 +2725,65 @@ function ArticleRow({ article, onSelect, onRead }) {
   );
 }
 
-function ArticleBrowseModal({ onSelect, onRead, onClose }) {
+function ArticleBrowseModal({ session, onSelect, onRead, onClose }) {
   const [activeTab, setActiveTab] = useState("recent");
   const [search, setSearch] = useState("");
+  const [recent, setRecent] = useState([]);
+  const [latest, setLatest] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const allArticles = activeTab === "recent" ? recentArticles : recommendedArticles;
+  // Real articles only. "Recently read" is this user's actual reading_history;
+  // "Latest headlines" is the live RSS table. Nothing here is invented, and a
+  // linked source always points at a real URL the reader can open.
+  useEffect(() => {
+    let cancelled = false;
+    const mapArticle = (a, extra = {}) => ({
+      id: a.id,
+      title: cleanNewsText(a.title),
+      publication: a.source,
+      color: colorForSource(a.source),
+      image_url: cleanImageUrl(a.image_url),
+      description: cleanNewsText(a.description),
+      url: a.link,
+      date: a.published_at ? timeAgoRead(a.published_at) : "",
+      ...extra,
+    });
+    const load = async () => {
+      setLoading(true);
+      const uid = session?.user?.id;
+      const [latestRes, histRes] = await Promise.all([
+        supabase.from("news_articles").select("*").order("published_at", { ascending:false }).limit(30),
+        uid
+          ? supabase.from("reading_history").select("ref_id, read_at").eq("user_id", uid).eq("kind", "article").order("read_at", { ascending:false }).limit(15)
+          : Promise.resolve({ data: [] }),
+      ]);
+      if (cancelled) return;
+      setLatest((latestRes.data || []).map(a => mapArticle(a)));
+      const hist = histRes.data || [];
+      if (hist.length) {
+        const { data: arts } = await supabase.from("news_articles").select("*").in("id", hist.map(h => h.ref_id));
+        if (cancelled) return;
+        const byId = {};
+        (arts || []).forEach(a => { byId[a.id] = a; });
+        setRecent(hist.map(h => byId[h.ref_id] ? mapArticle(byId[h.ref_id], { readAt: timeAgoRead(h.read_at) }) : null).filter(Boolean));
+      } else {
+        setRecent([]);
+      }
+      setLoading(false);
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [session?.user?.id]);
+
+  const allArticles = activeTab === "recent" ? recent : latest;
+  const q = search.toLowerCase();
+  const seen = new Set();
   const filtered = search
-    ? [...recentArticles, ...recommendedArticles].filter(a =>
-        a.title.toLowerCase().includes(search.toLowerCase()) ||
-        a.publication.toLowerCase().includes(search.toLowerCase())
-      )
+    ? [...recent, ...latest].filter(a => {
+        if (seen.has(a.id)) return false;
+        seen.add(a.id);
+        return (a.title || "").toLowerCase().includes(q) || (a.publication || "").toLowerCase().includes(q);
+      })
     : allArticles;
 
   return (
@@ -2807,7 +2818,7 @@ function ArticleBrowseModal({ onSelect, onRead, onClose }) {
           <div style={{ display:"flex", borderBottom:"1px solid #E8E0D0", margin:"12px 20px 0", paddingBottom:0 }}>
             {[
               { id:"recent", label:"Recently Read" },
-              { id:"recommended", label:"Recommended for You" },
+              { id:"latest", label:"Latest Headlines" },
             ].map(t => (
               <button key={t.id} onClick={() => setActiveTab(t.id)}
                 style={{ background:"none", border:"none", borderBottom: activeTab===t.id ? "2px solid #C8A96E" : "2px solid transparent", marginBottom:-1, padding:"8px 16px 10px", fontSize:12, letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"'DM Mono', monospace", fontWeight: activeTab===t.id ? 500 : 400, color: activeTab===t.id ? "#111" : "#AAA", cursor:"pointer", whiteSpace:"nowrap" }}>
@@ -2826,8 +2837,16 @@ function ArticleBrowseModal({ onSelect, onRead, onClose }) {
 
         {/* Article list */}
         <div style={{ overflowY:"auto", flex:1, paddingBottom:20 }}>
-          {filtered.length === 0 ? (
-            <div style={{ textAlign:"center", padding:"40px 20px", fontSize:15, color:"#AAA", fontFamily:"'EB Garamond', serif", fontStyle:"italic" }}>No articles found</div>
+          {loading ? (
+            <div style={{ textAlign:"center", padding:"40px 20px", fontSize:15, color:"#AAA", fontFamily:"'EB Garamond', serif", fontStyle:"italic" }}>Loading articles…</div>
+          ) : filtered.length === 0 ? (
+            <div style={{ textAlign:"center", padding:"40px 20px", fontSize:15, color:"#AAA", fontFamily:"'EB Garamond', serif", fontStyle:"italic", lineHeight:1.6 }}>
+              {search
+                ? "No articles found."
+                : activeTab === "recent"
+                  ? "Nothing yet. Articles you open in the Read tab will appear here."
+                  : "No headlines available right now."}
+            </div>
           ) : filtered.map(article => (
             <ArticleRow key={article.id} article={article} onSelect={onSelect} onRead={onRead}/>
           ))}
@@ -2844,10 +2863,11 @@ function ArticleBrowseModal({ onSelect, onRead, onClose }) {
   );
 }
 
-function QuoteSourceModal({ sourceTitle, sourcePublication, onInsert, onClose }) {
+function QuoteSourceModal({ sourceTitle, sourcePublication, sourceExcerpt, sourceUrl, onInsert, onClose }) {
   const [selection, setSelection] = useState("");
-  const matched = trendingArticles.find(a => a.title === sourceTitle);
-  const paragraphs = matched?.body ? matched.body.split("\n\n") : null;
+  // We do not host or republish full article text — we don't own it. What we can
+  // offer is the publisher's own summary, which the reader can select and quote.
+  const paragraphs = sourceExcerpt ? sourceExcerpt.split("\n\n") : null;
 
   const handleTextSelect = () => {
     const sel = window.getSelection().toString().trim();
@@ -2876,8 +2896,8 @@ function QuoteSourceModal({ sourceTitle, sourcePublication, onInsert, onClose })
           {paragraphs ? paragraphs.map((para, i) => (
             <p key={i} style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:15.5, lineHeight:1.75, color:"#333", margin:"0 0 16px" }}>{para}</p>
           )) : (
-            <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:14, color:"#AAA", margin:0 }}>
-              Full article text isn't available for this source yet. Once live RSS is connected, the full article will be readable and selectable here.
+            <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:14, color:"#AAA", margin:0, lineHeight:1.6 }}>
+              No summary was published with this article. Letters doesn't reproduce full article text — {sourceUrl ? "open it at the source" : "open it at the source"} and paste the passage you want to quote.
             </p>
           )}
         </div>
@@ -3417,9 +3437,9 @@ function WritePage({ session, onNavigate }) {
     fetchRecent();
   }, []);
 
-  // Real articles first, falling back to mock content to fill out to 4 if
-  // the live feed doesn't have enough yet — keeps the panel from looking sparse.
-  const recentArticlesCombined = [...realRecentArticles, ...recentArticles].slice(0, 4);
+  // Real articles only. Fewer than four is fine; padding the panel with
+  // invented headlines under a real masthead is not.
+  const recentArticlesCombined = realRecentArticles.slice(0, 4);
 
   const fontOptions = [
     { name:"EB Garamond",    label:"Garamond",    sample:"Serif · Classic",   stack:"'EB Garamond', Georgia, serif" },
@@ -3665,11 +3685,11 @@ function WritePage({ session, onNavigate }) {
   };
 
   const selectArticle = (article) => {
-    setForm(f => ({ ...f, sourceTitle: article.title, sourcePublication: article.publication, sourceUrl: article.url }));
+    setForm(f => ({ ...f, sourceTitle: article.title, sourcePublication: article.publication, sourceUrl: article.url, sourceExcerpt: article.description || "" }));
     setShowBrowse(false);
   };
 
-  const clearSource = () => setForm(f => ({ ...f, sourceUrl:"", sourceTitle:"", sourcePublication:"" }));
+  const clearSource = () => setForm(f => ({ ...f, sourceUrl:"", sourceTitle:"", sourcePublication:"", sourceExcerpt:"" }));
 
   const clearDraft = async () => {
     if (draftIdRef.current) { try { await supabase.from("drafts").delete().eq("id", draftIdRef.current); } catch {} }
@@ -4367,41 +4387,19 @@ function WritePage({ session, onNavigate }) {
         <QuoteSourceModal
           sourceTitle={form.sourceTitle}
           sourcePublication={form.sourcePublication}
+          sourceExcerpt={form.sourceExcerpt}
+          sourceUrl={form.sourceUrl}
           onInsert={insertQuote}
           onClose={() => setShowQuoteSource(false)}
         />
       )}
 
-      {showBrowse && <ArticleBrowseModal onSelect={selectArticle} onRead={(article) => { setShowBrowse(false); window.open(article.url, "_blank"); }} onClose={() => setShowBrowse(false)}/>}
+      {showBrowse && <ArticleBrowseModal session={session} onSelect={selectArticle} onRead={(article) => { setShowBrowse(false); window.open(article.url, "_blank"); }} onClose={() => setShowBrowse(false)}/>}
     </div>
   );
 }
 
 // ── Page: Forums ──────────────────────────────────────────────────────────────
-
-const myForums = [
-  { id:1, name:"Politics & Policy", type:"topic", lastActive:"2m ago", unread:4, color:"#C0392B", imgId:249 },
-  { id:2, name:"NYT Forum", type:"institutional", verified:true, lastActive:"8m ago", unread:12, color:"#1A1A1A", imgId:159 },
-];
-
-const allForums = [
-  // Institutional
-  { id:3,  name:"NYT Forum",           type:"institutional", verified:true,  description:"Moderated by The New York Times. In-depth discussion on the stories that matter.", members:14200, color:"#1A1A1A", imgId:159,  topic:"News",       live:false },
-  { id:4,  name:"The Guardian Forum",  type:"institutional", verified:true,  description:"The Guardian's official space for readers to engage on global news and culture.", members:8900,  color:"#27AE60", imgId:1043, topic:"News",       live:true  },
-  { id:5,  name:"BBC Debate",          type:"institutional", verified:true,  description:"BBC's moderated forum for civil debate on current affairs and world events.",     members:11400, color:"#2980B9", imgId:326,  topic:"World",      live:false },
-  // Topic-based
-  { id:6,  name:"Politics & Policy",   type:"topic",         verified:false, description:"Debate the issues shaping government and society — from local to global.",       members:6200,  color:"#C0392B", imgId:249,  topic:"Politics",   live:false },
-  { id:7,  name:"Technology",          type:"topic",         verified:false, description:"From AI to gadgets — the ideas driving the future of how we live and work.",     members:5100,  color:"#1A1A1A", imgId:180,  topic:"Technology", live:false },
-  { id:8,  name:"Climate & Earth",     type:"topic",         verified:false, description:"Science, policy, and the urgent path forward on our planet's future.",            members:3800,  color:"#27AE60", imgId:1043, topic:"Climate",    live:true  },
-  { id:9,  name:"Culture & Arts",      type:"topic",         verified:false, description:"Film, music, literature, and the ideas that move us.",                            members:4400,  color:"#8E44AD", imgId:342,  topic:"Culture",    live:false },
-  { id:10, name:"Business & Economy",  type:"topic",         verified:false, description:"Markets, companies, and the forces shaping the global economy.",                  members:3100,  color:"#E67E22", imgId:48,   topic:"Economy",    live:false },
-  { id:11, name:"World Affairs",       type:"topic",         verified:false, description:"International news and global perspectives from every corner of the world.",      members:5600,  color:"#2C3E50", imgId:326,  topic:"World",      live:false },
-  { id:12, name:"Sports Central",      type:"topic",         verified:false, description:"All sports, all the time. Game threads, analysis, and hot takes welcome.",        members:7800,  color:"#F39C12", imgId:416,  topic:"Sports",     live:true  },
-  // User-created
-  { id:13, name:"Dr. Who Universe",    type:"user",          verified:false, description:"A fan forum for all things Doctor Who — lore, episodes, theories, and debates.", members:920,   color:"#2980B9", imgId:201,  topic:"Culture",    live:false },
-  { id:14, name:"Iran: Developing Story", type:"user",       verified:false, description:"Following the developing situation in Iran — news aggregation and analysis.",     members:2100,  color:"#C0392B", imgId:399,  topic:"World",      live:true  },
-  { id:15, name:"AI & Society",        type:"user",          verified:false, description:"How artificial intelligence is reshaping work, democracy, and everyday life.",    members:1400,  color:"#1A1A1A", imgId:488,  topic:"Technology", live:false },
-];
 
 
 function ForumCard({ forum, joined, onJoin, onOpen }) {
@@ -8163,7 +8161,7 @@ function HomepageModal({ onDismiss, navigate }) {
     <div onClick={onDismiss} style={{ position:"fixed", inset:0, zIndex:100, background:"rgba(0,0,0,0.45)", display:"flex", alignItems:"center", justifyContent:"center", padding:24, opacity:visible?1:0, transition:"opacity 0.3s ease" }}>
       <div onClick={e=>e.stopPropagation()} style={{ background:"#F7F4EE", border:"1px solid #C8BFA8", borderRadius:14, width:"100%", maxWidth:460, overflow:"hidden", opacity:visible?1:0, transform:visible?"translateY(0)":"translateY(20px)", transition:"opacity 0.3s ease, transform 0.3s ease" }}>
         <div style={{ padding:"22px 28px 0" }}>
-          <BroadsheetRule left={MASTHEAD_LABEL} center="Coming Soon" right="Free to Join"/>
+          <BroadsheetRule left={MASTHEAD_LABEL} center="Coming Soon" right="By Invitation"/>
           <div style={{ display:"flex", alignItems:"center", gap:20, marginBottom:16, marginTop:-10 }}>
             <div style={{ flex:1 }}>
               <h2 style={{ fontFamily:"'Playfair Display', serif", fontSize:40, fontWeight:900, color:"#111", margin:"0 0 7px", lineHeight:0.95, letterSpacing:"-0.02em" }}>Letters<span style={{ color:"#C8A96E" }}>.</span></h2>
@@ -8771,84 +8769,487 @@ function MarketingHomePage({ navigate }) {
   );
 }
 
+// ── Page: How It Works ────────────────────────────────────────────────────────
+// A scroll-told page: four scenes (Read / Write / Gather / Listen), then the
+// balance sheet, then the invitation. Everything animates on entry via
+// IntersectionObserver, and everything collapses to its finished state under
+// prefers-reduced-motion.
+//
+// This is the one component in the file that uses a stylesheet rather than
+// inline styles: it needs @keyframes, mask gradients, :hover and media
+// queries, none of which inline styles can express. Every class is prefixed
+// `hiw-` so it cannot collide with anything else in the app.
+
+const HIW_HAVE = [
+  "Curated news from real newsrooms, every fifteen minutes",
+  "Letters, replies and threads that go deep",
+  "Your own newsletter, with its own subscribers",
+  "Forums with elected editorial boards",
+  "Member votes on the rules of each room",
+  "Podcasts, and a tool to quote them",
+  "Photographs and video in any post",
+  "Drafts that save as you write",
+  "Playback that follows you across devices",
+  "Moderation you can see, and appeal",
+];
+
+const HIW_PROMISE = [
+  "We will never sell your data",
+  "Writers will share in the revenue",
+  "Advertising stays contextual, never behavioural",
+  "No algorithm will decide what you see",
+  "Likes will never determine who gets read",
+  "No autoplay, no streaks, no engineered pull-backs",
+  "We will never invent a user or a headline",
+  "Delete your account and it is genuinely gone",
+];
+
+const HIW_WAVE = [.35,.6,.45,.8,.55,.9,.7,1,.75,.5,.85,.65,.95,.6,.8,.45,.7,.55,.9,.6,.4,.75,.5,.65,.35,.55,.45,.7,.4,.6];
+
+const HIW_CSS = `
+.hiw{--ink:#141414;--paper:#fff;--cream:#F9F6F0;--gold:#C8A96E;--rule:#E8E0D0;
+  --display:'Playfair Display',Georgia,serif;--body:'EB Garamond',Georgia,serif;
+  --ui:'DM Sans',system-ui,sans-serif;--mono:'DM Mono',ui-monospace,monospace;
+  background:var(--paper);color:var(--ink);font-family:var(--body)}
+.hiw *{box-sizing:border-box}
+
+.hiw-spine{position:fixed;left:38px;top:0;bottom:0;width:1px;background:var(--rule);z-index:40;pointer-events:none}
+.hiw-spine-fill{position:absolute;left:0;top:0;width:1px;height:0;background:var(--gold);transition:height .12s linear}
+@media(max-width:900px){.hiw-spine{display:none}}
+
+.hiw-scene{min-height:100svh;display:flex;align-items:center;padding:120px 28px;position:relative}
+.hiw-scene-in{max-width:1100px;margin:0 auto;width:100%;display:grid;grid-template-columns:1fr 380px;gap:80px;align-items:center}
+.hiw-alt{background:var(--cream)}
+@media(max-width:900px){.hiw-scene{min-height:auto;padding:96px 24px}.hiw-scene-in{grid-template-columns:1fr;gap:48px}}
+
+.hiw-eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--gold);margin-bottom:26px}
+.hiw h2{font-family:var(--display);font-weight:900;font-size:clamp(40px,8vw,88px);line-height:.98;letter-spacing:-.035em;margin:0 0 28px;max-width:12ch}
+.hiw-sub{font-family:var(--body);font-size:clamp(17px,2vw,21px);line-height:1.6;color:#6B6B6B;margin:0;max-width:30ch}
+
+.hiw-rev{opacity:0;transform:translateY(26px);transition:opacity .8s cubic-bezier(.2,.7,.2,1),transform .8s cubic-bezier(.2,.7,.2,1)}
+.hiw-in .hiw-rev{opacity:1;transform:none}
+.hiw-in .hiw-rev:nth-child(2){transition-delay:.08s}
+.hiw-in .hiw-rev:nth-child(3){transition-delay:.16s}
+
+.hiw-hero{min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:80px 28px 40px}
+.hiw-hero h1{font-family:var(--display);font-weight:900;font-size:clamp(46px,11vw,132px);line-height:.9;letter-spacing:-.045em;margin:0 0 30px}
+.hiw-hero h1 i{color:var(--gold);font-style:normal}
+.hiw-hero .hiw-sub{max-width:24ch;font-size:clamp(18px,2.4vw,24px);text-align:center}
+.hiw-cue{margin-top:72px;display:flex;flex-direction:column;align-items:center;gap:18px}
+.hiw-cue span{display:block;width:1px;height:40px;background:var(--rule);animation:hiwDrop 2.4s ease-in-out infinite}
+@keyframes hiwDrop{0%,100%{transform:scaleY(.3);transform-origin:top}50%{transform:scaleY(1);transform-origin:top}}
+.hiw-cue svg{display:block;border-radius:8px;box-shadow:0 10px 26px -14px rgba(20,20,20,.5)}
+
+.hiw-shot{margin:0;opacity:0;transform:translateY(30px) scale(.985);
+  transition:opacity 1s cubic-bezier(.2,.7,.2,1) .1s,transform 1s cubic-bezier(.2,.7,.2,1) .1s}
+.hiw-in .hiw-shot{opacity:1;transform:none}
+.hiw-shot img{display:block;width:100%;max-width:380px;margin:0 auto;height:auto;
+  filter:drop-shadow(0 26px 34px rgba(20,20,20,.16)) drop-shadow(0 4px 10px rgba(20,20,20,.10))}
+
+.hiw-phone{width:100%;max-width:340px;margin:0 auto;background:#fff;border:1px solid var(--rule);
+  border-radius:26px;overflow:hidden;box-shadow:0 24px 60px -28px rgba(20,20,20,.28)}
+.hiw-phone-top{padding:16px 20px 12px;border-bottom:1px solid #F2EEE7;display:flex;align-items:baseline;justify-content:space-between}
+.hiw-mast{font-family:var(--display);font-weight:900;font-size:15px}
+.hiw-mast i{color:var(--gold);font-style:normal}
+.hiw-phone-date{font-family:var(--mono);font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:#BBB}
+.hiw-phone-body{padding:18px 20px 24px}
+
+.hiw-modes{position:relative;display:flex;border-bottom:1px solid #F2EEE7}
+.hiw-mode{flex:1;text-align:center;padding:11px 0;font-family:var(--mono);font-size:9.5px;
+  letter-spacing:.16em;text-transform:uppercase;color:#C4C4C4;transition:color .45s}
+.hiw-mode.hiw-on{color:var(--ink)}
+.hiw-mode-ink{position:absolute;bottom:-1px;left:0;width:50%;height:2px;background:var(--gold);
+  transition:transform .55s cubic-bezier(.65,0,.35,1)}
+.hiw-mode-ink.hiw-right{transform:translateX(100%)}
+.hiw-stage{position:relative;min-height:250px}
+.hiw-beat{position:absolute;inset:0;opacity:0;transform:translateY(8px);pointer-events:none;
+  transition:opacity .5s ease,transform .5s ease}
+.hiw-beat.hiw-on{opacity:1;transform:none;pointer-events:auto}
+
+.hiw-qp{border:1px solid var(--rule);border-radius:12px;padding:14px;background:#fff}
+.hiw-qp-row{display:flex;gap:11px}
+.hiw-qp-av{width:32px;height:32px;border-radius:50%;background:#2D6A4F;color:#F0EAD8;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:900;font-size:14px}
+.hiw-qp-text{font-family:var(--body);font-size:15px;line-height:1.55;color:#3A3A3A;min-height:70px;flex:1}
+
+.hiw-issue{border-bottom:1px solid var(--rule);padding-bottom:9px;margin-bottom:13px}
+.hiw-issue-mast{font-family:var(--display);font-weight:900;font-size:16px;letter-spacing:-.01em}
+.hiw-issue-no{font-family:var(--mono);font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);margin-top:3px}
+.hiw-ctitle{font-family:var(--display);font-weight:900;font-size:19px;line-height:1.2;margin-bottom:14px;min-height:23px}
+.hiw-quote{border-left:2px solid var(--gold);padding:8px 0 8px 14px;margin:0 0 14px;font-family:var(--body);
+  font-style:italic;font-size:13.5px;line-height:1.5;color:#777;opacity:0;transform:translateX(-8px);
+  transition:all .6s cubic-bezier(.2,.7,.2,1)}
+.hiw-quote.hiw-show{opacity:1;transform:none}
+.hiw-typed{font-family:var(--body);font-size:14.5px;line-height:1.65;color:#3A3A3A;min-height:88px}
+.hiw-caret{display:inline-block;width:1.5px;height:16px;background:var(--gold);vertical-align:-2px;animation:hiwBlink 1s steps(1) infinite}
+@keyframes hiwBlink{50%{opacity:0}}
+.hiw-pub{margin-top:16px;background:var(--ink);color:#F0EAD8;border:none;border-radius:6px;padding:11px 0;width:100%;
+  font-family:var(--ui);font-weight:600;font-size:13px;cursor:default}
+.hiw-pub.hiw-small{margin-top:12px;width:auto;padding:9px 22px;float:right;border-radius:20px}
+
+.hiw-room{border:1px solid var(--rule);border-radius:12px;padding:15px 16px;margin-bottom:12px;background:#fff}
+.hiw-room-name{font-family:var(--display);font-weight:800;font-size:16px;margin-bottom:3px}
+.hiw-room-meta{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#BBB}
+.hiw-ballot{margin-top:14px}
+.hiw-ballot-q{font-family:var(--body);font-size:13.5px;color:#555;margin-bottom:10px;line-height:1.45}
+.hiw-bar-row{display:flex;align-items:center;gap:10px;margin-bottom:7px}
+.hiw-bar-label{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#999;width:34px;flex-shrink:0}
+.hiw-bar-track{flex:1;height:5px;background:#F2EEE7;border-radius:3px;overflow:hidden}
+.hiw-bar-val{height:100%;width:0;background:var(--gold);border-radius:3px;transition:width 1.4s cubic-bezier(.2,.7,.2,1) .5s}
+.hiw-bar-val.hiw-no{background:#DDD6C8}
+.hiw-in .hiw-bar-val{width:var(--w)}
+.hiw-bar-num{font-family:var(--mono);font-size:9.5px;color:#AAA;width:26px;text-align:right}
+
+.hiw-ep{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.hiw-ep-art{width:44px;height:44px;border-radius:8px;background:linear-gradient(135deg,#2D3A4A,#1A2230);flex-shrink:0}
+.hiw-ep-show{font-family:var(--mono);font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
+.hiw-ep-title{font-family:var(--body);font-size:14.5px;font-weight:500;line-height:1.3;margin-top:3px}
+.hiw-wave{display:flex;align-items:center;gap:2.5px;height:52px;margin:6px 0 12px;position:relative}
+.hiw-wave b{flex:1;background:#EDE7DC;border-radius:1px;transform:scaleY(.3);transform-origin:center}
+.hiw-in .hiw-wave b{animation:hiwEq .9s cubic-bezier(.2,.7,.2,1) forwards}
+.hiw-wave b.hiw-sel{background:var(--gold)}
+@keyframes hiwEq{to{transform:scaleY(1)}}
+.hiw-playhead{position:absolute;top:0;bottom:0;width:1.5px;background:var(--ink);left:28%;opacity:0;transition:opacity .3s .9s}
+.hiw-in .hiw-playhead{opacity:1;animation:hiwSweep 3.2s cubic-bezier(.4,0,.6,1) 1.1s infinite}
+@keyframes hiwSweep{from{left:28%}to{left:62%}}
+.hiw-clip-tag{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);
+  border:1px solid var(--rule);border-radius:20px;padding:5px 11px;display:inline-block}
+
+.hiw-closing{padding:140px 28px;background:var(--ink);color:#F4F1EA}
+.hiw-closing-in{max-width:1100px;margin:0 auto}
+.hiw-closing h2{max-width:16ch;color:#F4F1EA}
+.hiw-ledger{margin-top:64px;display:grid;grid-template-columns:1fr 1fr;gap:1px;background:#2C2C2C;border:1px solid #2C2C2C}
+.hiw-col{background:var(--ink);min-width:0}
+.hiw-col-head{padding:20px 28px;border-bottom:1px solid #2C2C2C;font-family:var(--mono);font-size:10px;
+  letter-spacing:.2em;text-transform:uppercase;color:var(--gold)}
+.hiw-ticker{height:360px;overflow:hidden;position:relative;
+  -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 13%,#000 87%,transparent 100%);
+  mask-image:linear-gradient(180deg,transparent 0,#000 13%,#000 87%,transparent 100%)}
+.hiw-track{animation:hiwUp 34s linear infinite}
+.hiw-track.hiw-down{animation:hiwDown 34s linear infinite}
+.hiw-ticker:hover .hiw-track{animation-play-state:paused}
+@keyframes hiwUp{from{transform:translateY(0)}to{transform:translateY(-50%)}}
+@keyframes hiwDown{from{transform:translateY(-50%)}to{transform:translateY(0)}}
+.hiw-item{padding:16px 28px;display:flex;gap:13px;align-items:flex-start;font-family:var(--body);
+  font-size:17px;line-height:1.42;color:#E8E3DA}
+.hiw-item i{color:var(--gold);font-style:normal;flex-shrink:0;font-size:13px;line-height:1.75}
+@media(max-width:760px){.hiw-ledger{grid-template-columns:1fr}.hiw-ticker{height:290px}}
+
+.hiw-cta{padding:150px 28px;text-align:center}
+.hiw-cta h2{max-width:none;margin-left:auto;margin-right:auto;font-size:clamp(38px,7vw,76px)}
+.hiw-cta .hiw-sub{margin:0 auto 42px}
+.hiw-btn{background:var(--ink);color:#F0EAD8;border:none;border-radius:7px;padding:19px 44px;
+  font-family:var(--ui);font-weight:600;font-size:15px;cursor:pointer;transition:transform .2s}
+.hiw-btn:hover{transform:translateY(-2px)}
+.hiw-btn:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+.hiw-fine{margin-top:22px;font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:#BBB}
+
+@media(prefers-reduced-motion:reduce){
+  .hiw *{animation:none !important;transition:none !important}
+  .hiw-rev,.hiw-shot,.hiw-quote{opacity:1 !important;transform:none !important}
+  .hiw-bar-val{width:var(--w) !important}
+  .hiw-wave b{transform:scaleY(1) !important}
+  .hiw-track{transform:none !important}
+}
+`;
+
 function HowItWorksPage({ navigate }) {
-  const steps = [
-    {
-      label: "Read",
-      title: "Curated news, no algorithm games.",
-      body: "A real-time feed pulling from national outlets and local civic newsrooms — BBC, The Guardian, NPR, and a growing list of nonprofit local papers. No engagement-bait, no outrage sorting.",
-      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C8A96E" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>,
-    },
-    {
-      label: "Write",
-      title: "A letter, not a tweet.",
-      body: "Respond to a story with a real letter — quote the source verbatim, format your thinking, and put your name behind it. No character limit forcing you into a soundbite.",
-      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C8A96E" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>,
-    },
-    {
-      label: "Build standing",
-      title: "Quality earns you a name, not a viral hit.",
-      body: "Contributor status — from Letters Contributor up through Senior Correspondent and Verified Journalist — is built on the substance of what you write, not how many people retweeted it.",
-      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C8A96E" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 15a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/><path d="M8.21 13.89L7 23l5-3 5 3-1.21-9.12"/></svg>,
-    },
-    {
-      label: "Gather",
-      title: "Forums for people who want to go deeper.",
-      body: "Topic communities, verified institutional spaces (think a publication's own moderated forum), and communities anyone can request to start — each pairing a letters-style feed with live discussion.",
-      icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C8A96E" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
-    },
-  ];
+  const rootRef = useRef(null);
+  const fillRef = useRef(null);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const q = (sel) => root.querySelector(sel);
+    const timers = [];
+    let cancelled = false;
+
+    /* Scene reveals */
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) e.target.classList.add("hiw-in"); });
+    }, { threshold: 0.25 });
+    root.querySelectorAll(".hiw-watch").forEach(el => io.observe(el));
+
+    /* Spine progress */
+    const onScroll = () => {
+      const h = document.documentElement.scrollHeight - window.innerHeight;
+      if (fillRef.current) fillRef.current.style.height = (h > 0 ? (window.scrollY / h) * 100 : 0) + "%";
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+
+    /* Waveform bars */
+    const wave = q(".hiw-wave");
+    if (wave) {
+      HIW_WAVE.forEach((hgt, idx) => {
+        const b = document.createElement("b");
+        b.style.height = (hgt * 100) + "%";
+        b.style.animationDelay = (idx * 22) + "ms";
+        if (idx >= 8 && idx <= 18) b.classList.add("hiw-sel");
+        wave.appendChild(b);
+      });
+    }
+
+    /* Write scene: quick post, then the same composer as a newsletter issue */
+    const postText  = "Local newsrooms have lost 70% of their staff since 2005. That isn't just coverage disappearing — it's the institutional memory of a place.";
+    const issueTitle = "When the local paper dies";
+    const issueBody  = "The piece treats this as an economic story. It isn't. What goes missing when a newsroom closes is the daily record of a place — who showed up, who voted, what got built.";
+
+    const wait = (ms) => new Promise(res => { timers.push(setTimeout(res, ms)); });
+    const type = (node, text, speed) => new Promise(res => {
+      if (!node) return res();
+      let n = 0;
+      const caret = document.createElement("span");
+      caret.className = "hiw-caret";
+      const tick = () => {
+        if (cancelled) return res();
+        node.textContent = text.slice(0, n);
+        node.appendChild(caret);
+        if (n++ < text.length) timers.push(setTimeout(tick, speed));
+        else { caret.remove(); res(); }
+      };
+      tick();
+    });
+
+    let started = false;
+    const runWrite = async () => {
+      if (reduce) {
+        if (q(".hiw-post-body")) q(".hiw-post-body").textContent = postText;
+        if (q(".hiw-ctitle")) q(".hiw-ctitle").textContent = issueTitle;
+        if (q(".hiw-typed")) q(".hiw-typed").textContent = issueBody;
+        if (q(".hiw-quote")) q(".hiw-quote").classList.add("hiw-show");
+        if (q(".hiw-beat-b")) q(".hiw-beat-b").classList.add("hiw-on");
+        if (q(".hiw-beat-a")) q(".hiw-beat-a").classList.remove("hiw-on");
+        return;
+      }
+      await wait(400);
+      await type(q(".hiw-post-body"), postText, 20);
+      await wait(500);
+      if (q(".hiw-post-btn")) q(".hiw-post-btn").textContent = "Posted ✓";
+      await wait(950);
+      if (cancelled) return;
+      if (q(".hiw-mode-ink")) q(".hiw-mode-ink").classList.add("hiw-right");
+      if (q(".hiw-mode-post")) q(".hiw-mode-post").classList.remove("hiw-on");
+      if (q(".hiw-mode-news")) q(".hiw-mode-news").classList.add("hiw-on");
+      if (q(".hiw-wmode")) q(".hiw-wmode").textContent = "Newsletter";
+      if (q(".hiw-beat-a")) q(".hiw-beat-a").classList.remove("hiw-on");
+      await wait(320);
+      if (q(".hiw-beat-b")) q(".hiw-beat-b").classList.add("hiw-on");
+      await wait(400);
+      await type(q(".hiw-ctitle"), issueTitle, 52);
+      await wait(280);
+      if (q(".hiw-quote")) q(".hiw-quote").classList.add("hiw-show");
+      await wait(700);
+      await type(q(".hiw-typed"), issueBody, 20);
+    };
+
+    const writeScene = q(".hiw-write");
+    const writeIO = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (!e.isIntersecting || started) return;
+        started = true;
+        runWrite();
+      });
+    }, { threshold: 0.4 });
+    if (writeScene) writeIO.observe(writeScene);
+
+    return () => {
+      cancelled = true;
+      timers.forEach(clearTimeout);
+      io.disconnect();
+      writeIO.disconnect();
+      window.removeEventListener("scroll", onScroll);
+    };
+  }, []);
+
+  const ticker = (items) => (
+    <>
+      {items.map((t, n) => <div className="hiw-item" key={"a" + n}><i>◆</i><span>{t}</span></div>)}
+      {items.map((t, n) => <div className="hiw-item" key={"b" + n}><i>◆</i><span>{t}</span></div>)}
+    </>
+  );
 
   return (
-    <div style={{ minHeight:"100vh", background:"#fff" }}>
-      <header className="letters-topbar" style={{ position:"sticky", top:0, zIndex:50, background:"rgba(255,255,255,0.96)", backdropFilter:"blur(10px)", borderBottom:"1px solid #F0EDE8" }}>
-        <div style={{ maxWidth:680, margin:"0 auto", padding:"0 20px", height:54, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+    <div className="hiw" ref={rootRef} style={{ minHeight:"100vh" }}>
+      <style>{HIW_CSS}</style>
+
+      <div className="hiw-spine"><div className="hiw-spine-fill" ref={fillRef}/></div>
+
+      <header className="letters-topbar" style={{ position:"sticky", top:0, zIndex:60, background:"rgba(255,255,255,0.94)", backdropFilter:"blur(10px)", borderBottom:"1px solid #F0EDE8" }}>
+        <div style={{ maxWidth:1100, margin:"0 auto", padding:"0 28px", height:58, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
           <button onClick={() => navigate("home")} style={{ background:"none", border:"none", cursor:"pointer", display:"flex", alignItems:"center", gap:10, padding:0 }}>
-            <Logo size={34}/><span style={{ fontFamily:"'Playfair Display', serif", fontSize:18, fontWeight:900, color:"#111" }}>Letters<span style={{ color:"#C8A96E" }}>.</span></span>
+            <Logo size={34}/>
+            <span style={{ fontFamily:"'Playfair Display', serif", fontSize:19, fontWeight:900, color:"#111", letterSpacing:"-0.01em" }}>Letters<span style={{ color:"#C8A96E" }}>.</span></span>
           </button>
-          <button onClick={() => navigate("home")} style={{ fontSize:12, color:"#AAA", fontFamily:"'EB Garamond', serif", fontStyle:"italic", background:"none", border:"none", cursor:"pointer" }}>← Back</button>
+          <button onClick={() => navigate("home")} style={{ fontSize:13, color:"#AAA", fontFamily:"'EB Garamond', serif", fontStyle:"italic", background:"none", border:"none", cursor:"pointer" }}>← Back</button>
         </div>
       </header>
 
-      <main style={{ maxWidth:640, margin:"0 auto", padding:"56px 24px 80px" }}>
-        <BroadsheetRule left={MASTHEAD_LABEL} center="Dear Reader" right="Free to Join"/>
-        <div style={{ fontSize:10, letterSpacing:"0.2em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:12 }}>How It Works</div>
-        <h1 style={{ fontFamily:"'Playfair Display', serif", fontSize:36, fontWeight:900, color:"#111", margin:"0 0 16px", letterSpacing:"-0.02em", lineHeight:1.1 }}>
-          Awaiting Your Reply<span style={{ color:"#C8A96E" }}>.</span>
-        </h1>
-        <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:17, color:"#777", lineHeight:1.75, margin:"0 0 40px", fontStyle:"italic" }}>
-          Most platforms reward the loudest take. Letters rewards the best one. Here's the loop.
-        </p>
+      {/* Hero */}
+      <section className="hiw-hero hiw-watch">
+        <div className="hiw-eyebrow hiw-rev">How it works</div>
+        <h1 className="hiw-rev">Awaiting Your Reply<i>.</i></h1>
+        <p className="hiw-sub hiw-rev">The news, and a place to write back to it.</p>
+        <div className="hiw-cue">
+          <span/>
+          <Logo size={64}/>
+        </div>
+      </section>
 
-        <div style={{ display:"flex", flexDirection:"column", gap:32 }}>
-          {steps.map((step, i) => (
-            <div key={step.label} style={{ display:"flex", gap:18 }}>
-              <div style={{ flexShrink:0, display:"flex", flexDirection:"column", alignItems:"center" }}>
-                <div style={{ width:44, height:44, borderRadius:"50%", background:"#F9F6F0", border:"1px solid #E8E0D0", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                  {step.icon}
+      {/* Read */}
+      <section className="hiw-scene hiw-watch">
+        <div className="hiw-scene-in">
+          <div>
+            <div className="hiw-eyebrow hiw-rev">Read</div>
+            <h2 className="hiw-rev">The news, without the algorithm.</h2>
+            <p className="hiw-sub hiw-rev">Ten newsrooms, refreshed every fifteen minutes. Newest first. Nothing boosted, nothing buried.</p>
+          </div>
+          <figure className="hiw-shot">
+            <img src="/letters-read-screenshot.png" alt="The Read tab on Letters, showing the day's front page"/>
+          </figure>
+        </div>
+      </section>
+
+      {/* Write */}
+      <section className="hiw-scene hiw-alt hiw-watch hiw-write">
+        <div className="hiw-scene-in">
+          <div>
+            <div className="hiw-eyebrow hiw-rev">Write</div>
+            <h2 className="hiw-rev">Two hundred words. Or two thousand.</h2>
+            <p className="hiw-sub hiw-rev">Write a short post to your feed, or publish a long-form newsletter. Letters does both.</p>
+          </div>
+          <div className="hiw-phone">
+            <div className="hiw-phone-top">
+              <div className="hiw-mast">Letters<i>.</i></div>
+              <div className="hiw-phone-date hiw-wmode">Quick post</div>
+            </div>
+            <div className="hiw-modes">
+              <div className="hiw-mode hiw-on hiw-mode-post">Post</div>
+              <div className="hiw-mode hiw-mode-news">Newsletter</div>
+              <div className="hiw-mode-ink"/>
+            </div>
+            <div className="hiw-phone-body">
+              <div className="hiw-stage">
+                <div className="hiw-beat hiw-on hiw-beat-a">
+                  <div className="hiw-qp">
+                    <div className="hiw-qp-row">
+                      <div className="hiw-qp-av">L</div>
+                      <div className="hiw-qp-text hiw-post-body"/>
+                    </div>
+                  </div>
+                  <button className="hiw-pub hiw-small hiw-post-btn">Post</button>
                 </div>
-                {i < steps.length - 1 && <div style={{ width:1, flex:1, background:"#E8E0D0", marginTop:8 }}/>}
-              </div>
-              <div style={{ paddingBottom:8 }}>
-                <div style={{ fontSize:9.5, letterSpacing:"0.16em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:6 }}>
-                  Step {i+1} · {step.label}
+                <div className="hiw-beat hiw-beat-b">
+                  <div className="hiw-issue">
+                    <div className="hiw-issue-mast">The Meridian Letter</div>
+                    <div className="hiw-issue-no">Issue 07 · Sample publication</div>
+                  </div>
+                  <div className="hiw-ctitle"/>
+                  <blockquote className="hiw-quote">"Fifty years of wage stagnation have hollowed out more than paychecks."</blockquote>
+                  <div className="hiw-typed"/>
+                  <button className="hiw-pub">Publish issue</button>
                 </div>
-                <h3 style={{ fontFamily:"'Playfair Display', serif", fontSize:20, fontWeight:800, color:"#111", margin:"0 0 8px", lineHeight:1.25 }}>{step.title}</h3>
-                <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:15, color:"#666", lineHeight:1.65, margin:0 }}>{step.body}</p>
               </div>
             </div>
-          ))}
+          </div>
         </div>
+      </section>
 
-        <div style={{ marginTop:48, padding:"24px 26px", background:"#F9F6F0", borderRadius:12, border:"1px solid #E8E0D0", textAlign:"center" }}>
-          <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:15, color:"#777", margin:"0 0 18px", lineHeight:1.6 }}>
-            Letters is launching to a small group of founding members first.
-          </p>
-          <button onClick={() => navigate("invite")} style={{ background:"#111", color:"#F0EAD8", border:"none", borderRadius:6, padding:"13px 28px", fontSize:13.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:"pointer" }}>
-            Request an Invitation →
-          </button>
+      {/* Gather */}
+      <section className="hiw-scene hiw-watch">
+        <div className="hiw-scene-in">
+          <div>
+            <div className="hiw-eyebrow hiw-rev">Letters Forums</div>
+            <h2 className="hiw-rev">The true online town hall.</h2>
+            <p className="hiw-sub hiw-rev">Bring a subject, find the room. Forums build their own rules for engagement.</p>
+          </div>
+          <div className="hiw-phone">
+            <div className="hiw-phone-top">
+              <div className="hiw-mast">Letters<i>.</i></div>
+              <div className="hiw-phone-date">Forum</div>
+            </div>
+            <div className="hiw-phone-body">
+              <div className="hiw-room">
+                <div className="hiw-room-name">Politics &amp; Policy</div>
+                <div className="hiw-room-meta">Open to all · Board of five</div>
+                <div className="hiw-ballot">
+                  <div className="hiw-ballot-q">Proposal: require a source link on every post.</div>
+                  <div className="hiw-bar-row">
+                    <div className="hiw-bar-label">For</div>
+                    <div className="hiw-bar-track"><div className="hiw-bar-val" style={{ "--w":"78%" }}/></div>
+                    <div className="hiw-bar-num">78%</div>
+                  </div>
+                  <div className="hiw-bar-row">
+                    <div className="hiw-bar-label">Against</div>
+                    <div className="hiw-bar-track"><div className="hiw-bar-val hiw-no" style={{ "--w":"22%" }}/></div>
+                    <div className="hiw-bar-num">22%</div>
+                  </div>
+                </div>
+              </div>
+              <div className="hiw-room">
+                <div className="hiw-room-name">Climate &amp; Earth</div>
+                <div className="hiw-room-meta">Open to all · Verified contributors post</div>
+              </div>
+            </div>
+          </div>
         </div>
-      </main>
+      </section>
+
+      {/* Listen */}
+      <section className="hiw-scene hiw-alt hiw-watch">
+        <div className="hiw-scene-in">
+          <div>
+            <div className="hiw-eyebrow hiw-rev">Listen</div>
+            <h2 className="hiw-rev">Quote a podcast like a paragraph.</h2>
+            <p className="hiw-sub hiw-rev">Listen to your favorite podcasts. Share your favorite parts. Playback follows you around the app.</p>
+          </div>
+          <div className="hiw-phone">
+            <div className="hiw-phone-top">
+              <div className="hiw-mast">Letters<i>.</i></div>
+              <div className="hiw-phone-date">Clip</div>
+            </div>
+            <div className="hiw-phone-body">
+              <div className="hiw-ep">
+                <div className="hiw-ep-art"/>
+                <div>
+                  <div className="hiw-ep-show">Sample show</div>
+                  <div className="hiw-ep-title">Episode 214 — What local news lost</div>
+                </div>
+              </div>
+              <div className="hiw-wave"><div className="hiw-playhead"/></div>
+              <span className="hiw-clip-tag">Clip · 1 min 48 sec</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* The balance sheet */}
+      <section className="hiw-closing hiw-watch">
+        <div className="hiw-closing-in">
+          <div className="hiw-eyebrow hiw-rev">The balance sheet</div>
+          <h2 className="hiw-rev">And a lot more good stuff — with a lot less bad stuff.</h2>
+          <div className="hiw-ledger">
+            <div className="hiw-col">
+              <div className="hiw-col-head">What we have</div>
+              <div className="hiw-ticker"><div className="hiw-track">{ticker(HIW_HAVE)}</div></div>
+            </div>
+            <div className="hiw-col">
+              <div className="hiw-col-head">What we promise</div>
+              <div className="hiw-ticker"><div className="hiw-track hiw-down">{ticker(HIW_PROMISE)}</div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Invitation */}
+      <section className="hiw-cta hiw-watch">
+        <div className="hiw-eyebrow hiw-rev">Now opening</div>
+        <h2 className="hiw-rev">Come write back<span style={{ color:"#C8A96E" }}>.</span></h2>
+        <p className="hiw-sub hiw-rev">Letters is opening by invitation, a small group at a time.</p>
+        <button className="hiw-btn hiw-rev" onClick={() => navigate("invite")}>Request an invitation →</button>
+        <div className="hiw-fine">Everyone who joins now joins as a founding member</div>
+      </section>
     </div>
   );
 }
@@ -8982,7 +9383,7 @@ function InvitePage({ navigate }) {
       <main style={{ maxWidth:560, margin:"0 auto", padding:"60px 28px 80px" }}>
         {!submitted ? (
           <>
-            <BroadsheetRule left={MASTHEAD_LABEL} center="First Print" right="Free to Join"/>
+            <BroadsheetRule left={MASTHEAD_LABEL} center="First Print" right="By Invitation"/>
             <div style={{ fontSize:10, letterSpacing:"0.2em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:12 }}>Request an Invitation</div>
             <h1 style={{ fontFamily:"'Playfair Display', serif", fontSize:38, fontWeight:900, color:"#111", margin:"0 0 14px", letterSpacing:"-0.02em", lineHeight:1.1 }}>Join Letters<span style={{ color:"#C8A96E" }}>.</span></h1>
             <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:16.5, color:"#777", lineHeight:1.7, margin:"0 0 28px", fontStyle:"italic" }}>Letters is launching to a small group of founding members first. Leave your details and we'll be in touch.</p>
