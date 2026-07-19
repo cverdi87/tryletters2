@@ -9302,18 +9302,145 @@ function InvestorPage({ navigate }) {
   );
 }
 
+// ── Page: Request an Invitation ───────────────────────────────────────────────
+// A stepped request form: one question per screen. The payload is unchanged
+// from the old single-page version — /staff/invitations and the
+// notify-waitlist function both depend on this exact shape.
+//
+// Like HowItWorksPage, this uses a scoped stylesheet rather than inline styles
+// (transitions, :focus, media queries). Classes are prefixed `inv-`.
+
+const INV_TOTAL = 7;
+const INV_ORDER = ["intro","1","2","3","4","5","6","7","done"];
+
+const INV_USE_OPTIONS = [
+  ["read","Reading the news"],
+  ["write","Writing letters & essays"],
+  ["forums","Joining forum discussions"],
+  ["listen","Listening to podcasts"],
+  ["follow","Following specific writers"],
+];
+const INV_PUBLISH_OPTIONS = [
+  ["regularly","Yes, regularly"],
+  ["occasionally","Occasionally"],
+  ["maybe","Maybe later"],
+  ["no","No, I'm here to read"],
+];
+
+const INV_CSS = `
+.inv{--ink:#141414;--paper:#F9F6F0;--gold:#C8A96E;--rule:#E8E0D0;--err:#B4442F;
+  --display:'Playfair Display',Georgia,serif;--body:'EB Garamond',Georgia,serif;
+  --ui:'DM Sans',system-ui,sans-serif;--mono:'DM Mono',ui-monospace,monospace;
+  background:var(--paper);color:var(--ink);font-family:var(--body);min-height:100svh}
+.inv *{box-sizing:border-box}
+.inv-rail{position:fixed;top:0;left:0;right:0;height:2px;background:var(--rule);z-index:70}
+.inv-rail-fill{height:100%;width:0;background:var(--gold);transition:width .6s cubic-bezier(.2,.7,.2,1)}
+.inv-bar{position:fixed;top:0;left:0;right:0;z-index:60;height:64px;display:flex;align-items:center;
+  justify-content:space-between;padding:0 28px;max-width:1000px;margin:0 auto}
+.inv-count{font-family:var(--mono);font-size:11px;letter-spacing:.18em;color:#B0A99B}
+.inv-count b{color:var(--ink);font-weight:400}
+.inv-deck{min-height:100svh;display:flex;align-items:center;justify-content:center;padding:104px 28px 56px}
+.inv-inner{width:100%;max-width:620px;animation:invIn .5s cubic-bezier(.2,.7,.2,1)}
+@keyframes invIn{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:none}}
+.inv-eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;
+  color:var(--gold);margin-bottom:22px}
+.inv h1{font-family:var(--display);font-weight:900;font-size:clamp(32px,6.2vw,60px);line-height:1.03;
+  letter-spacing:-.03em;margin:0 0 18px}
+.inv-lede{font-family:var(--body);font-size:clamp(17px,2.1vw,20px);line-height:1.6;color:#6E6A62;
+  margin:0 0 38px;max-width:34ch}
+.inv-hint{font-family:var(--body);font-style:italic;font-size:15px;color:#A8A296;margin:14px 0 0}
+.inv-field{border:none;border-bottom:1px solid var(--rule);background:transparent;width:100%;
+  font-family:var(--display);font-weight:700;font-size:clamp(23px,3.8vw,36px);color:var(--ink);
+  padding:10px 0 14px;outline:none;letter-spacing:-.02em}
+.inv-field::placeholder{color:#D6CFC1}
+.inv-field:focus{border-bottom-color:var(--gold)}
+.inv-pair{display:flex;gap:28px}
+.inv-pair>div{flex:1;min-width:0}
+.inv-sublabel{font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;
+  color:#B0A99B;margin-bottom:4px}
+.inv-area{font-family:var(--body);font-weight:400;font-size:20px;line-height:1.55;border:1px solid var(--rule);
+  border-radius:10px;padding:16px;resize:none;height:150px;background:#fff;width:100%;color:var(--ink);outline:none}
+.inv-area:focus{border-color:var(--gold)}
+.inv-choices{display:flex;flex-wrap:wrap;gap:10px}
+.inv-choice{font-family:var(--ui);font-size:15px;font-weight:500;color:#4A463F;background:#fff;
+  border:1px solid var(--rule);border-radius:30px;padding:13px 22px;cursor:pointer;
+  transition:border-color .2s,background .2s,color .2s}
+.inv-choice:hover{border-color:var(--gold)}
+.inv-choice.inv-picked{background:var(--ink);border-color:var(--ink);color:#F0EAD8}
+.inv-actions{display:flex;align-items:center;gap:22px;margin-top:42px;flex-wrap:wrap}
+.inv-next{background:var(--ink);color:#F0EAD8;border:none;border-radius:7px;padding:17px 40px;
+  font-family:var(--ui);font-weight:600;font-size:15px;cursor:pointer;transition:transform .2s,opacity .2s}
+.inv-next:hover{transform:translateY(-2px)}
+.inv-next[disabled]{opacity:.45;cursor:wait;transform:none}
+.inv-skip,.inv-back{background:none;border:none;font-family:var(--body);font-style:italic;font-size:15px;
+  color:#A8A296;cursor:pointer;padding:6px 2px}
+.inv-skip:hover,.inv-back:hover{color:var(--ink)}
+.inv-kbd{margin-left:auto;font-family:var(--mono);font-size:10px;letter-spacing:.14em;
+  text-transform:uppercase;color:#C6BFB1}
+.inv-err{font-family:var(--body);font-style:italic;font-size:15px;color:var(--err);margin:14px 0 0}
+.inv-seal{width:64px;height:64px;border-radius:50%;border:1px solid var(--gold);display:flex;
+  align-items:center;justify-content:center;margin-bottom:28px;color:var(--gold);font-size:24px}
+.inv :focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+@media(max-width:620px){
+  .inv-kbd{display:none}
+  .inv-pair{flex-direction:column;gap:24px}
+  .inv-deck{align-items:flex-start;padding-top:92px}
+}
+@media(max-height:720px){.inv-deck{align-items:flex-start}}
+@media(prefers-reduced-motion:reduce){.inv *,.inv-inner{animation:none!important;transition:none!important}}
+`;
+
 function InvitePage({ navigate }) {
+  const [step, setStep] = useState("intro");
+  const [trail, setTrail] = useState([]);
   const [form, setForm] = useState({ firstName:"", lastName:"", email:"", occupation:"", referral:"", referralOther:"", use:[], wouldPublish:"", draw:"" });
-  const [focused, setFocused] = useState(null);
-  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
-  const [errors, setErrors] = useState({});
-  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+  const firstRef = useRef(null);
+
+  const set = (k,v) => { setForm(f=>({...f,[k]:v})); setError(""); };
+
+  /* Focus the first input of each step — desktop only. On a phone this would
+     throw the keyboard up on every transition, which is worse than a tap. */
+  useEffect(() => {
+    if (window.matchMedia("(max-width: 620px)").matches) return;
+    const t = setTimeout(() => { if (firstRef.current) firstRef.current.focus(); }, 160);
+    return () => clearTimeout(t);
+  }, [step]);
+
+  const validate = (which) => {
+    if (which === "1" && (!form.firstName.trim() || !form.lastName.trim())) return "Please give us both names.";
+    if (which === "2" && (!form.email.trim() || !form.email.includes("@"))) return "That email doesn't look right.";
+    if (which === "3" && !form.occupation.trim()) return "Even one word helps.";
+    if (which === "4") {
+      if (!form.referral) return "Pick whichever is closest.";
+      if (form.referral === "Other" && !form.referralOther.trim()) return "Tell us where, and we'll go find more people like you.";
+    }
+    return "";
+  };
+
+  const go = (next) => {
+    if (INV_ORDER.indexOf(next) > INV_ORDER.indexOf(step)) {
+      const msg = validate(step);
+      if (msg) { setError(msg); return; }
+      setTrail(t => [...t, step]);
+    }
+    setError("");
+    if (next === "done") { handleSubmit(); return; }
+    setStep(next);
+  };
+
+  const back = () => {
+    setTrail(t => {
+      if (!t.length) return t;
+      setStep(t[t.length - 1]);
+      setError("");
+      return t.slice(0, -1);
+    });
+  };
 
   const handleSubmit = async () => {
-    const e = validate();
-    if (Object.keys(e).length) { setErrors(e); return; }
     setSubmitting(true);
     setSubmitError(null);
     const survey = (form.use.length || form.wouldPublish || form.draw.trim())
@@ -9336,8 +9463,8 @@ function InvitePage({ navigate }) {
     }
 
     // Notify chris@tryletters.tech that a new invite request came in.
-    // Fire-and-forget: the waitlist row is already saved, so the user's signup
-    // succeeds and they see the success screen even if this email ever fails.
+    // Fire-and-forget: the waitlist row is already saved, so the request
+    // succeeds and they see the confirmation even if this email ever fails.
     supabase.functions.invoke("notify-waitlist", {
       body: {
         firstName: form.firstName.trim(),
@@ -9348,123 +9475,214 @@ function InvitePage({ navigate }) {
         referralOther: form.referralOther.trim() || null,
         survey,
       },
-    }).catch((err) => console.error("Notification email failed (signup still recorded):", err));
+    }).catch((err) => console.error("Notification email failed (request still recorded):", err));
 
     setSubmitting(false);
-    setSubmitted(true);
+    setStep("done");
   };
 
-  const validate = () => {
-    const e={};
-    if(!form.firstName.trim()) e.firstName="Required";
-    if(!form.lastName.trim()) e.lastName="Required";
-    if(!form.email.trim()||!form.email.includes("@")) e.email="Valid email required";
-    if(!form.occupation.trim()) e.occupation="Required";
-    if(!form.referral) e.referral="Please select an option";
-    return e;
+  const onKeyDown = (e) => {
+    if (e.key !== "Enter") return;
+    if (e.target.tagName === "TEXTAREA" && !e.metaKey) return;
+    if (step === "intro" || step === "done") return;
+    e.preventDefault();
+    go(step === "7" ? "done" : String(Number(step) + 1));
   };
-  const inputStyle = (field) => ({ width:"100%", padding:"12px 14px", fontSize:15, fontFamily:"'EB Garamond', Georgia, serif", color:"#111", background:focused===field?"#fff":"#FDFCF8", border:`1px solid ${errors[field]?"#C0392B":focused===field?"#111":"#C8BFA8"}`, borderRadius:5, outline:"none", transition:"all 0.15s", boxSizing:"border-box", appearance:"none" });
-  const labelStyle = { fontSize:9.5, letterSpacing:"0.14em", textTransform:"uppercase", color:"#888", fontFamily:"'DM Mono', monospace", display:"block", marginBottom:6 };
-  const errStyle = { fontSize:11, color:"#C0392B", fontFamily:"'EB Garamond', serif", fontStyle:"italic", marginTop:4, display:"block" };
-  const chipStyle = (active) => ({ padding:"8px 14px", borderRadius:20, fontSize:13, fontFamily:"'DM Sans', sans-serif", fontWeight:500, cursor:"pointer", border:`1px solid ${active?"#111":"#C8BFA8"}`, background:active?"#111":"#FDFCF8", color:active?"#F0EAD8":"#555", transition:"all 0.12s" });
-  const useOptions = [["read","Reading the news"],["write","Writing letters & essays"],["forums","Joining forum discussions"],["listen","Listening to podcasts"],["follow","Following specific writers"]];
-  const publishOptions = [["regularly","Yes, regularly"],["occasionally","Occasionally"],["maybe","Maybe later"],["no","No, I'm here to read"]];
+
   const toggleUse = (v) => setForm(f => ({ ...f, use: f.use.includes(v) ? f.use.filter(x=>x!==v) : [...f.use, v] }));
+
+  const pickReferral = (opt) => {
+    setForm(f => ({ ...f, referral: opt, referralOther: opt === "Other" ? f.referralOther : "" }));
+    setError("");
+    if (opt !== "Other") setTimeout(() => { setTrail(t => [...t, "4"]); setStep("5"); }, 240);
+  };
+
+  const pickPublish = (v) => {
+    setForm(f => ({ ...f, wouldPublish: v }));
+    setTimeout(() => { setTrail(t => [...t, "6"]); setStep("7"); }, 240);
+  };
+
+  const chip = (label, active, onClick, key) => (
+    <button key={key} type="button" onClick={onClick} className={"inv-choice" + (active ? " inv-picked" : "")}>
+      {active ? "✓  " : ""}{label}
+    </button>
+  );
+
+  const railPct = step === "done" ? 100
+    : (Math.max(0, INV_ORDER.indexOf(step) - 1) / INV_TOTAL) * 100;
+
+  const backRow = (step !== "intro" && step !== "done" && trail.length > 0)
+    ? <button className="inv-back" onClick={back}>← Back</button> : null;
+
   return (
-    <div style={{ minHeight:"100vh", background:"#F9F6F0" }}>
-      <header style={{ borderBottom:"1px solid #E8E0D0", background:"rgba(249,246,240,0.96)", backdropFilter:"blur(10px)", position:"sticky", top:0, zIndex:50 }}>
-        <div style={{ maxWidth:900, margin:"0 auto", padding:"0 28px", height:54, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-          <button onClick={() => navigate("home")} style={{ background:"none", border:"none", cursor:"pointer", display:"flex", alignItems:"center", gap:10, padding:0 }}>
-            <Logo size={34}/><span style={{ fontFamily:"'Playfair Display', serif", fontSize:18, fontWeight:900, color:"#111" }}>Letters<span style={{ color:"#C8A96E" }}>.</span></span>
-          </button>
-          <button onClick={() => navigate("home")} style={{ fontSize:12, color:"#AAA", fontFamily:"'EB Garamond', serif", fontStyle:"italic", background:"none", border:"none", cursor:"pointer" }}>← Back</button>
-        </div>
-      </header>
-      <main style={{ maxWidth:560, margin:"0 auto", padding:"60px 28px 80px" }}>
-        {!submitted ? (
-          <>
-            <BroadsheetRule left={MASTHEAD_LABEL} center="First Print" right="By Invitation"/>
-            <div style={{ fontSize:10, letterSpacing:"0.2em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:12 }}>Request an Invitation</div>
-            <h1 style={{ fontFamily:"'Playfair Display', serif", fontSize:38, fontWeight:900, color:"#111", margin:"0 0 14px", letterSpacing:"-0.02em", lineHeight:1.1 }}>Join Letters<span style={{ color:"#C8A96E" }}>.</span></h1>
-            <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:16.5, color:"#777", lineHeight:1.7, margin:"0 0 28px", fontStyle:"italic" }}>Letters is launching to a small group of founding members first. Leave your details and we'll be in touch.</p>
-            <div style={{ borderTop:"1px solid #111", borderBottom:"3px solid #111", padding:"5px 0", marginBottom:28 }}/>
-            <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
-              <div style={{ display:"flex", gap:14 }}>
-                <div style={{ flex:1 }}>
-                  <label style={labelStyle}>First Name</label>
-                  <input type="text" placeholder="First name" value={form.firstName} onChange={e=>set("firstName",e.target.value)} onFocus={()=>{setFocused("firstName");setErrors(er=>({...er,firstName:null}))}} onBlur={()=>setFocused(null)} style={inputStyle("firstName")}/>
-                  {errors.firstName && <span style={errStyle}>{errors.firstName}</span>}
+    <div className="inv" onKeyDown={onKeyDown}>
+      <style>{INV_CSS}</style>
+
+      <div className="inv-rail"><div className="inv-rail-fill" style={{ width: railPct + "%" }}/></div>
+
+      <div className="inv-bar">
+        <button onClick={() => navigate("home")} style={{ background:"none", border:"none", cursor:"pointer", display:"flex", alignItems:"center", gap:10, padding:0 }}>
+          <Logo size={32}/>
+          <span style={{ fontFamily:"'Playfair Display', serif", fontSize:18, fontWeight:900, color:"#111" }}>Letters<span style={{ color:"#C8A96E" }}>.</span></span>
+        </button>
+        {step !== "intro" && step !== "done" && (
+          <div className="inv-count"><b>{step}</b> / {INV_TOTAL}</div>
+        )}
+      </div>
+
+      <div className="inv-deck">
+        <div className="inv-inner" key={step}>
+
+          {step === "intro" && (
+            <>
+              <div className="inv-eyebrow">Requesting an invite?</div>
+              <h1>Letters is opening to a select group of readers and writers.</h1>
+              <p className="inv-lede">We just need a few pieces of information to get started.</p>
+              <div className="inv-actions">
+                <button className="inv-next" onClick={() => go("1")}>Get started →</button>
+                <span className="inv-kbd">Seven questions · about a minute</span>
+              </div>
+            </>
+          )}
+
+          {step === "1" && (
+            <>
+              <div className="inv-eyebrow">Question 1</div>
+              <h1>First, your name.</h1>
+              <div className="inv-pair">
+                <div>
+                  <div className="inv-sublabel">First</div>
+                  <input ref={firstRef} className="inv-field" value={form.firstName} onChange={e=>set("firstName", e.target.value)} placeholder="Jane" autoComplete="given-name"/>
                 </div>
-                <div style={{ flex:1 }}>
-                  <label style={labelStyle}>Last Name</label>
-                  <input type="text" placeholder="Last name" value={form.lastName} onChange={e=>set("lastName",e.target.value)} onFocus={()=>{setFocused("lastName");setErrors(er=>({...er,lastName:null}))}} onBlur={()=>setFocused(null)} style={inputStyle("lastName")}/>
-                  {errors.lastName && <span style={errStyle}>{errors.lastName}</span>}
+                <div>
+                  <div className="inv-sublabel">Last</div>
+                  <input className="inv-field" value={form.lastName} onChange={e=>set("lastName", e.target.value)} placeholder="Doe" autoComplete="family-name"/>
                 </div>
               </div>
-              <div><label style={labelStyle}>Email Address</label><input type="email" placeholder="you@example.com" value={form.email} onChange={e=>set("email",e.target.value)} onFocus={()=>{setFocused("email");setErrors(er=>({...er,email:null}))}} onBlur={()=>setFocused(null)} style={inputStyle("email")}/>{errors.email && <span style={errStyle}>{errors.email}</span>}</div>
-              <div><label style={labelStyle}>Occupation / Profession</label><input type="text" placeholder="What do you do?" value={form.occupation} onChange={e=>set("occupation",e.target.value)} onFocus={()=>{setFocused("occupation");setErrors(er=>({...er,occupation:null}))}} onBlur={()=>setFocused(null)} style={inputStyle("occupation")}/>{errors.occupation && <span style={errStyle}>{errors.occupation}</span>}</div>
-              <div>
-                <label style={labelStyle}>How did you hear about Letters?</label>
-                <div style={{ position:"relative" }}>
-                  <select value={form.referral} onChange={e=>{set("referral",e.target.value);setErrors(er=>({...er,referral:null}))}} style={{...inputStyle("referral"), color:form.referral?"#111":"#B8B0A0", fontStyle:form.referral?"normal":"italic", paddingRight:36, cursor:"pointer"}}>
-                    <option value="" disabled>Select an option</option>
-                    {referralOptions.map(o => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                  <svg style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", pointerEvents:"none" }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#AAA" strokeWidth="2" strokeLinecap="round"><path d="M6 9l6 6 6-6"/></svg>
-                </div>
-                {errors.referral && <span style={errStyle}>{errors.referral}</span>}
+              {error && <p className="inv-err">{error}</p>}
+              <div className="inv-actions">
+                <button className="inv-next" onClick={() => go("2")}>Continue →</button>
+                {backRow}
+                <span className="inv-kbd">Press Enter ↵</span>
               </div>
-              {form.referral==="Other" && <div><label style={labelStyle}>Please tell us more</label><input type="text" placeholder="Where did you find us?" value={form.referralOther} onChange={e=>set("referralOther",e.target.value)} onFocus={()=>setFocused("referralOther")} onBlur={()=>setFocused(null)} style={inputStyle("referralOther")}/></div>}
-              <div style={{ borderTop:"1px solid #E8E0D0", paddingTop:20 }}>
-                <div style={{ fontSize:10, letterSpacing:"0.16em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:4 }}>A Few Quick Questions</div>
-                <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:13.5, color:"#999", margin:"0 0 18px" }}>Optional — but it helps us shape your invitation.</p>
-                <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
-                  <div>
-                    <label style={labelStyle}>How do you imagine using Letters?</label>
-                    <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginTop:2 }}>
-                      {useOptions.map(([v,l]) => (
-                        <button key={v} type="button" onClick={()=>toggleUse(v)} style={chipStyle(form.use.includes(v))}>{l}</button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Would you publish your own writing?</label>
-                    <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginTop:2 }}>
-                      {publishOptions.map(([v,l]) => (
-                        <button key={v} type="button" onClick={()=>set("wouldPublish", form.wouldPublish===v ? "" : v)} style={chipStyle(form.wouldPublish===v)}>{l}</button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <label style={labelStyle}>What draws you to Letters over today's social &amp; news apps?</label>
-                    <textarea placeholder="A sentence or two (optional)" value={form.draw} onChange={e=>set("draw", e.target.value.slice(0,500))} onFocus={()=>setFocused("draw")} onBlur={()=>setFocused(null)} rows={3} style={{ ...inputStyle("draw"), resize:"vertical", lineHeight:1.6, minHeight:70 }}/>
-                  </div>
-                </div>
+            </>
+          )}
+
+          {step === "2" && (
+            <>
+              <div className="inv-eyebrow">Question 2</div>
+              <h1>Where should we send the invitation?</h1>
+              <input ref={firstRef} className="inv-field" type="email" value={form.email} onChange={e=>set("email", e.target.value)} placeholder="jane@example.com" autoComplete="email"/>
+              <p className="inv-hint">We only use this to send your invitation.</p>
+              {error && <p className="inv-err">{error}</p>}
+              <div className="inv-actions">
+                <button className="inv-next" onClick={() => go("3")}>Continue →</button>
+                {backRow}
+                <span className="inv-kbd">Press Enter ↵</span>
               </div>
-              <div style={{ borderTop:"1px solid #E8E0D0", margin:"4px 0" }}/>
-              {submitError && (
-                <div style={{ background:"#FDF0F0", border:"1px solid #C8A8A8", borderRadius:5, padding:"10px 14px", fontSize:13, color:"#C0392B", fontFamily:"'EB Garamond', serif", fontStyle:"italic" }}>
-                  {submitError}
+            </>
+          )}
+
+          {step === "3" && (
+            <>
+              <div className="inv-eyebrow">Question 3</div>
+              <h1>What do you do?</h1>
+              <input ref={firstRef} className="inv-field" value={form.occupation} onChange={e=>set("occupation", e.target.value)} placeholder="Teacher, nurse, journalist…"/>
+              <p className="inv-hint">A few words is plenty.</p>
+              {error && <p className="inv-err">{error}</p>}
+              <div className="inv-actions">
+                <button className="inv-next" onClick={() => go("4")}>Continue →</button>
+                {backRow}
+                <span className="inv-kbd">Press Enter ↵</span>
+              </div>
+            </>
+          )}
+
+          {step === "4" && (
+            <>
+              <div className="inv-eyebrow">Question 4</div>
+              <h1>How did you hear about Letters?</h1>
+              <div className="inv-choices">
+                {referralOptions.map(opt => chip(opt, form.referral === opt, () => pickReferral(opt), opt))}
+              </div>
+              {form.referral === "Other" && (
+                <div style={{ marginTop:24 }}>
+                  <div className="inv-sublabel">Tell us where</div>
+                  <input className="inv-field" value={form.referralOther} onChange={e=>set("referralOther", e.target.value)} placeholder="Where did you find us?"/>
                 </div>
               )}
-              <button onClick={handleSubmit} disabled={submitting} style={{ width:"100%", background:submitting?"#555":"#111", color:"#F0EAD8", border:"none", borderRadius:6, padding:"15px 0", fontSize:14, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:submitting?"not-allowed":"pointer", lineHeight:1.4 }}>
-                <span style={{ display:"block", fontSize:9.5, letterSpacing:"0.2em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontWeight:500, marginBottom:2 }}>First Print</span>
-                {submitting ? "Submitting..." : "Submit My Request →"}
-              </button>
-            </div>
-          </>
-        ) : (
-          <div style={{ textAlign:"center", padding:"40px 0" }}>
-            <Logo size={64}/>
-            <div style={{ marginTop:32 }}>
-              <div style={{ fontSize:10, letterSpacing:"0.2em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", marginBottom:14 }}>You're on the list</div>
-              <h2 style={{ fontFamily:"'Playfair Display', serif", fontSize:36, fontWeight:900, color:"#111", margin:"0 0 16px" }}>Thank you, {form.firstName}<span style={{ color:"#C8A96E" }}>.</span></h2>
-              <p style={{ fontFamily:"'EB Garamond', serif", fontSize:17, lineHeight:1.75, color:"#666", fontStyle:"italic", margin:"0 0 32px" }}>We'll be in touch at <strong style={{ fontStyle:"normal", color:"#111" }}>{form.email}</strong> when your invitation is ready.</p>
-              <button onClick={() => navigate("home")} style={{ background:"none", color:"#AAA", border:"1px solid #C8BFA8", borderRadius:6, padding:"9px 24px", fontSize:12, fontFamily:"'DM Sans', sans-serif", cursor:"pointer" }}>← Back to Letters</button>
-            </div>
-          </div>
-        )}
-      </main>
+              {error && <p className="inv-err">{error}</p>}
+              <div className="inv-actions">
+                <button className="inv-next" onClick={() => go("5")}>Continue →</button>
+                {backRow}
+              </div>
+            </>
+          )}
+
+          {step === "5" && (
+            <>
+              <div className="inv-eyebrow">Question 5 · Optional</div>
+              <h1>How do you imagine using Letters?</h1>
+              <p className="inv-lede">Choose as many as you like.</p>
+              <div className="inv-choices">
+                {INV_USE_OPTIONS.map(([val,label]) => chip(label, form.use.includes(val), () => toggleUse(val), val))}
+              </div>
+              <div className="inv-actions">
+                <button className="inv-next" onClick={() => go("6")}>Continue →</button>
+                <button className="inv-skip" onClick={() => go("6")}>Skip</button>
+                {backRow}
+              </div>
+            </>
+          )}
+
+          {step === "6" && (
+            <>
+              <div className="inv-eyebrow">Question 6 · Optional</div>
+              <h1>Would you publish your own writing?</h1>
+              <div className="inv-choices">
+                {INV_PUBLISH_OPTIONS.map(([val,label]) => chip(label, form.wouldPublish === val, () => pickPublish(val), val))}
+              </div>
+              <div className="inv-actions">
+                <button className="inv-next" onClick={() => go("7")}>Continue →</button>
+                <button className="inv-skip" onClick={() => go("7")}>Skip</button>
+                {backRow}
+              </div>
+            </>
+          )}
+
+          {step === "7" && (
+            <>
+              <div className="inv-eyebrow">Question 7 · Optional</div>
+              <h1>What draws you to Letters?</h1>
+              <textarea className="inv-area" value={form.draw} onChange={e=>set("draw", e.target.value.slice(0,500))} placeholder="A sentence or two, if you'd like."/>
+              {submitError && <p className="inv-err">{submitError}</p>}
+              <div className="inv-actions">
+                <button className="inv-next" disabled={submitting} onClick={() => go("done")}>
+                  {submitting ? "Sending…" : "Request an invitation →"}
+                </button>
+                {!submitting && <button className="inv-skip" onClick={() => go("done")}>Skip &amp; send</button>}
+                {!submitting && backRow}
+              </div>
+            </>
+          )}
+
+          {step === "done" && (
+            <>
+              <div className="inv-seal">✦</div>
+              <div className="inv-eyebrow">Request received</div>
+              <h1>Thank you, {form.firstName}<span style={{ color:"#C8A96E" }}>.</span></h1>
+              <p className="inv-lede">
+                Invitations go out in small groups. When yours is approved we'll email{" "}
+                <strong style={{ fontWeight:500, color:"#3A3A3A" }}>{form.email}</strong> with a link to create your account.
+              </p>
+              <div className="inv-actions">
+                <button className="inv-next" onClick={() => navigate("home")}>Back to Letters</button>
+              </div>
+            </>
+          )}
+
+        </div>
+      </div>
     </div>
   );
 }
