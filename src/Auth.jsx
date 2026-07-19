@@ -202,14 +202,10 @@ export default function Auth({ onAuthSuccess }) {
     // row already exists is updated in place instead of throwing a 409
     // conflict (which previously crashed this screen).
     if (data.user) {
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .upsert({
-          id: data.user.id,
-          full_name: form.fullName,
-          username: form.username.toLowerCase().replace(/\s/g, ""),
-          status: "founding",
-        }, { onConflict: "id" });
+      const { error: profileError } = await supabase.rpc("create_my_profile", {
+        p_full_name: form.fullName,
+        p_username: form.username.toLowerCase().replace(/\s/g, ""),
+      });
 
       if (profileError) {
         // Profile creation failing shouldn't block sign-in — surface it,
