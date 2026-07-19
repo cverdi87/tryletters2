@@ -343,14 +343,10 @@ const statusColors = {
 };
 
 const mockFeed = [
-  { id:1, type:"letter", author:"Margaret T.", username:"margaret_t", status:"founding", initial:"M", color:"#2D6A4F", timeAgo:"2h ago", section:"Economy", publication:"The Atlantic", headline:"The Quiet Death of the American Middle Class", preview:"The framing of this piece misses what's actually happening in rust-belt communities. Having lived in Youngstown for 30 years, I can tell you the numbers don't capture the social fabric that's unraveled...", replies:14, likes:38 },
-  { id:2, type:"news", publication:"Reuters", section:"World", headline:"EU Reaches Historic Agreement on AI Liability Framework", summary:"After three years of negotiations, member states have signed a landmark directive holding AI developers responsible for harms caused by their systems.", timeAgo:"4h ago", letters:6 },
-  { id:3, type:"letter", author:"David K.", username:"david_k", status:"journalist", initial:"D", color:"#1B4F72", timeAgo:"5h ago", section:"Technology", publication:"NYT", headline:"EU Reaches Historic Agreement on AI Liability Framework", preview:"This is being celebrated as progress, but the liability caps written into section 4(b) effectively immunize the largest players while crushing any startup that can't afford compliance infrastructure...", replies:27, likes:91 },
-  { id:4, type:"letter", author:"Priya N.", username:"priya_n", status:"senior", initial:"P", color:"#6B2D8B", timeAgo:"7h ago", section:"Climate", publication:"The Guardian", headline:"Climate Scientists Warn of Tipping Points by 2030", preview:"As someone who has spent 15 years modeling ice sheet dynamics, I want to clarify what 'irreversible' actually means in this context — the article conflates two very different timescales...", replies:42, likes:156 },
-  { id:5, type:"news", publication:"AP News", section:"Politics", headline:"Senate Advances Bipartisan Infrastructure Spending Bill", summary:"The measure allocates $180 billion to broadband expansion and rural transit over the next decade.", timeAgo:"9h ago", letters:18 },
-  { id:6, type:"letter", author:"James W.", username:"james_w", status:"contributing-editor", initial:"J", color:"#7A3B1E", timeAgo:"11h ago", section:"Culture", publication:"The New Yorker", headline:"How Streaming Killed the Auteur", preview:"Coppola's latest is a disaster by almost any metric, but it's a fascinating one — the kind of failure only possible when a filmmaker has total freedom and no one left to say no...", replies:63, likes:204 },
-  { id:7, type:"news", publication:"BBC Sport", section:"Sports", headline:"Champions League Final: A Night Nobody Will Forget", summary:"In a match that defied expectations from kickoff, the final produced three goals in extra time and a penalty shootout that left fans breathless across the globe.", timeAgo:"3h ago", letters:41 },
-  { id:8, type:"news", publication:"ESPN", section:"Sports", headline:"Why Gen Z Is Falling Back in Love With Baseball", summary:"Attendance is up, viewership among 18-34 year olds has climbed for the third straight year, and a new generation of stars is driving a renaissance nobody saw coming.", timeAgo:"1d ago", letters:28 },
+  { id:2, type:"news", publication:"The Standard", section:"World", headline:"EU Reaches Historic Agreement on AI Liability Framework", summary:"After three years of negotiations, member states have signed a landmark directive holding AI developers responsible for harms caused by their systems.", timeAgo:"4h ago", letters:6 },
+  { id:5, type:"news", publication:"The Dispatch", section:"Politics", headline:"Senate Advances Bipartisan Infrastructure Spending Bill", summary:"The measure allocates $180 billion to broadband expansion and rural transit over the next decade.", timeAgo:"9h ago", letters:18 },
+  { id:7, type:"news", publication:"The Beacon", section:"Sports", headline:"Champions League Final: A Night Nobody Will Forget", summary:"In a match that defied expectations from kickoff, the final produced three goals in extra time and a penalty shootout that left fans breathless across the globe.", timeAgo:"3h ago", letters:41 },
+  { id:8, type:"news", publication:"The Coast Review", section:"Sports", headline:"Why Gen Z Is Falling Back in Love With Baseball", summary:"Attendance is up, viewership among 18-34 year olds has climbed for the third straight year, and a new generation of stars is driving a renaissance nobody saw coming.", timeAgo:"1d ago", letters:28 },
 ];
 
 function MediaGrid({ media }) {
@@ -389,11 +385,6 @@ async function downscaleImage(file, maxDim) {
   return blob || file;
 }
 
-const mockReplies = [
-  { id:1, author:"Thomas R.", initial:"T", color:"#1B4F72", timeAgo:"1h ago", body:"This is exactly the kind of nuanced take that's been missing from the mainstream coverage. The distinction you're drawing between structural and cyclical factors is crucial — most commentary collapses the two." },
-  { id:2, author:"Elena V.", initial:"E", color:"#117A65", timeAgo:"2h ago", body:"I'd push back slightly on the framing here. The data from the Midwest doesn't necessarily generalize — coastal rust belt cities have had very different trajectories over the same period." },
-  { id:3, author:"Sam K.", initial:"S", color:"#6E2F8C", timeAgo:"3h ago", body:"Agreed with the core argument. What's your take on the role of remote work in reversing some of these trends? We're seeing unusual migration patterns that complicate the narrative." },
-];
 
 function ContentMenu({ me, targetType, targetId, authorId, authorName }) {
   const [open, setOpen] = useState(false);
@@ -509,7 +500,7 @@ function AuthorLink({ userId, children, style }) {
 function LetterDetailView({ item, onBack, session }) {
   const [liked, setLiked] = useState(false);
   const [likes, setLikes] = useState(item.likes);
-  const [replies, setReplies] = useState(mockReplies);
+  const [replies, setReplies] = useState([]);
   const [replyText, setReplyText] = useState("");
   const [focused, setFocused] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -1554,8 +1545,8 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
     setComposingPost(false);
   };
 
-  // Merge real letters with mock news cards, sorted so real content appears woven in naturally
-  const combinedFeedBase = [...realLetters, ...republishEntries, ...mockFeed].sort((a, b) => {
+  // Real content only - no mock people or mock news in a real feed.
+  const combinedFeedBase = [...realLetters, ...republishEntries].sort((a, b) => {
     if (a.isReal && !b.isReal) return -1;
     if (!a.isReal && b.isReal) return 1;
     return 0;
@@ -1954,25 +1945,9 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
                     return kidsOf(null).map(r => renderThread(r, 0));
                   })()
                 ) : (
-                  [
-                    { id:1, author:"Thomas R.", initial:"T", color:"#1B4F72", timeAgo:"1h ago", body:"This is exactly the nuanced take missing from mainstream coverage. The distinction between structural and cyclical factors is crucial." },
-                    { id:2, author:"Elena V.",  initial:"E", color:"#117A65", timeAgo:"2h ago", body:"I'd push back slightly. The data from the Midwest doesn't necessarily generalize — coastal rust belt cities have had very different trajectories." },
-                    { id:3, author:"Sam K.",    initial:"S", color:"#6E2F8C", timeAgo:"3h ago", body:"What's your take on the role of remote work in reversing some of these trends? We're seeing unusual migration patterns." },
-                  ].map((reply, i, arr) => (
-                    <div key={reply.id} style={{ display:"flex", gap:10, paddingBottom:16, marginBottom: i<arr.length-1?16:0, borderBottom: i<arr.length-1?"1px solid #F0EDE8":"none" }}>
-                      <Avatar initial={reply.initial} color={reply.color} size={30} src={reply.avatarUrl}/>
-                      <div style={{ flex:1 }}>
-                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
-                          <AuthorLink userId={reply.userId} style={{ fontSize:12.5, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}>{reply.author}</AuthorLink>
-                          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                            <span style={{ fontSize:9.5, color:"#BBB", fontFamily:"'DM Mono', monospace" }}>{reply.timeAgo}</span>
-                            <ContentMenu me={session?.user?.id} targetType="reply" targetId={reply.id} authorId={reply.userId} authorName={reply.author}/>
-                          </div>
-                        </div>
-                        <p style={{ margin:0, fontSize:14, lineHeight:1.65, color:"#555", fontFamily:"'EB Garamond', serif", whiteSpace:"pre-wrap" }}>{reply.body}</p>
-                      </div>
-                    </div>
-                  ))
+                  <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontStyle:"italic", fontSize:14, color:"#AAA", margin:"4px 0 0", lineHeight:1.6 }}>
+                    No replies yet. Be the first to write one.
+                  </p>
                 )}
 
                 {/* Reply box */}
@@ -4428,11 +4403,6 @@ const allForums = [
   { id:15, name:"AI & Society",        type:"user",          verified:false, description:"How artificial intelligence is reshaping work, democracy, and everyday life.",    members:1400,  color:"#1A1A1A", imgId:488,  topic:"Technology", live:false },
 ];
 
-const mockForumFeed = [
-  { id:1, forum:"Politics & Policy", author:"Sarah M.", initial:"S", color:"#C0392B", timeAgo:"4m ago", publication:"Reuters", headline:"Senate Passes Emergency Budget Resolution", preview:"This vote represents a fundamental shift in how the majority caucus is willing to negotiate. Having watched three budget crises play out in the last decade, I can say this one feels structurally different...", replies:8, likes:24 },
-  { id:2, forum:"NYT Forum", author:"James K.", initial:"J", color:"#1A1A1A", timeAgo:"12m ago", publication:"NYT", headline:"The Loneliness Epidemic Has a New Face", preview:"What the data doesn't show is the quality of the connections we've lost. We've substituted convenience for depth and wonder why we feel empty...", replies:31, likes:89, verified:true },
-  { id:3, forum:"Climate & Earth", author:"Priya N.", initial:"P", color:"#27AE60", timeAgo:"28m ago", publication:"The Guardian", headline:"Arctic Ice Sheet Loss Accelerating", preview:"The modelling suggests we've crossed a threshold that wasn't supposed to happen until 2040. This isn't alarmism — it's the data, and it demands a policy response proportional to the scale of the problem...", replies:15, likes:47 },
-];
 
 function ForumCard({ forum, joined, onJoin, onOpen }) {
   const [hovered, setHovered] = useState(false);
@@ -6156,29 +6126,10 @@ function YouPage({ session, onSignOut }) {
 
           {/* Publications tab */}
           {activeTab === "publications" && (
-            <div>
-              <div style={{ fontSize:10, letterSpacing:"0.14em", textTransform:"uppercase", color:"#AAA", fontFamily:"'DM Mono', monospace", marginBottom:14 }}>
-                Following {demoFollowedPublications.length} publications
-              </div>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-                {demoFollowedPublications.map(pub => (
-                  <div key={pub.name} style={{ background:"#fff", border:"1px solid #E8E0D0", borderRadius:10, padding:"14px 16px", display:"flex", alignItems:"center", gap:12, position:"relative", overflow:"hidden" }}>
-                    <div style={{ width:3, height:"100%", background:pub.color, position:"absolute", left:0, top:0, bottom:0, borderRadius:"3px 0 0 3px" }}/>
-                    <div style={{ paddingLeft:8 }}>
-                      <div style={{ fontFamily:"'Playfair Display', serif", fontSize:14, fontWeight:700, color:"#111" }}>{pub.name}</div>
-                      <div style={{ fontSize:9.5, letterSpacing:"0.1em", textTransform:"uppercase", color:"#BBB", fontFamily:"'DM Mono', monospace", marginTop:2 }}>{pub.category}</div>
-                    </div>
-                    <button style={{ marginLeft:"auto", background:"none", border:"1px solid #E0D8CC", borderRadius:20, padding:"3px 12px", fontSize:11, fontFamily:"'DM Sans', sans-serif", color:"#888", cursor:"pointer", flexShrink:0 }}>
-                      Following
-                    </button>
-                  </div>
-                ))}
-                {/* Add more */}
-                <div style={{ background:"none", border:"1px dashed #C8BFA8", borderRadius:10, padding:"14px 16px", display:"flex", alignItems:"center", justifyContent:"center", gap:8, cursor:"pointer" }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C8BFA8" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
-                  <span style={{ fontSize:12, color:"#BBB", fontFamily:"'DM Sans', sans-serif" }}>Add more</span>
-                </div>
-              </div>
+            <div style={{ textAlign:"center", padding:"40px 20px" }}>
+              <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontStyle:"italic", fontSize:14.5, color:"#AAA", margin:0, lineHeight:1.6 }}>
+                No publications yet.
+              </p>
             </div>
           )}
 
@@ -8234,10 +8185,6 @@ function HomepageModal({ onDismiss, navigate }) {
             <span style={{ display:"block", fontSize:10, letterSpacing:"0.18em", textTransform:"uppercase", color:"#888", fontFamily:"'DM Mono', monospace", fontWeight:500, marginBottom:2 }}>Dear Reader</span>
             How Letters Works
           </button>
-          <div style={{ textAlign:"center", paddingTop:4 }}>
-            <span style={{ fontSize:11, color:"#555", fontFamily:"'EB Garamond', serif", fontStyle:"italic" }}>Interested in investing? </span>
-            <button onClick={() => navigate("investor")} style={{ background:"none", border:"none", fontSize:11, color:"#C8A96E", fontFamily:"'EB Garamond', serif", fontStyle:"italic", cursor:"pointer", padding:0, textDecoration:"underline" }}>Learn more →</button>
-          </div>
         </div>
       </div>
     </div>
@@ -8278,7 +8225,8 @@ function AnimatedDemoFeed() {
   const scrollRef = useRef(null);
 
   const demoArticle = { publication:"The Meridian", section:"Economy", headline:"The Quiet Death of the American Middle Class" };
-  const demoLetterAuthor = mockFeed.find(i => i.type === "letter") || { author:"Margaret T.", username:"margaret_t", status:"founding", initial:"M", color:"#2D6A4F", preview:"The framing of this piece misses what's actually happening in rust-belt communities. Having lived in Youngstown for 30 years, I can tell you the numbers don't capture the social fabric that's unraveled..." };
+  const demoLetterAuthor = { author:"A Letters member", username:"sample", initial:"L", color:"#2D6A4F",
+    preview:"The framing of this piece misses what's actually happening in rust-belt communities. The numbers don't capture the social fabric that unravelled, or what it took to hold it together..." };
   const commentText = "I was thinking the same thing! Great minds!";
 
   // Write-slide content
@@ -8477,7 +8425,7 @@ function AnimatedDemoFeed() {
 
               {!mobileOpen ? (
                 <div ref={scrollRef} style={{ height:"100%", overflow:"hidden", padding:"26px 12px 0" }}>
-                  {mockFeed.slice(0, 4).map(item => (
+                  {mockFeed.filter(i => i.type === "news").slice(0, 4).map(item => (
                     <div key={item.id} style={{ transform:"scale(0.74)", transformOrigin:"top center" }}>
                       {item.type==="letter" ? <LetterCard item={item}/> : <NewsCard item={item}/>}
                     </div>
@@ -8501,7 +8449,7 @@ function AnimatedDemoFeed() {
                       <div style={{ width:26, height:26, borderRadius:"50%", background:demoLetterAuthor.color, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:11, fontFamily:"'Playfair Display', serif", fontWeight:700 }}>{demoLetterAuthor.initial}</div>
                       <div>
                         <div style={{ fontSize:10.5, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}>{demoLetterAuthor.author}</div>
-                        <div style={{ fontSize:7.5, color:"#BBB", fontFamily:"'DM Mono', monospace" }}>by {demoLetterAuthor.username} <span style={{ color:"#C8A96E" }}>✦ Founding Member</span></div>
+                        <div style={{ fontSize:7.5, color:"#BBB", fontFamily:"'DM Mono', monospace" }}>Sample letter</div>
                       </div>
                     </div>
                     <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:10.5, lineHeight:1.55, color:"#333", margin:"0 0 12px" }}>{demoLetterAuthor.preview}</p>
@@ -8741,12 +8689,12 @@ function AnimatedDemoFeed() {
                 <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:15 }}>
                   <div style={{ width:52, height:52, borderRadius:"50%", background:"#2D6A4F", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontFamily:"'Playfair Display', serif", fontSize:22, fontWeight:900, flexShrink:0 }}>M</div>
                   <div>
-                    <div style={{ fontFamily:"'Playfair Display', serif", fontSize:15, fontWeight:900, color:"#111", lineHeight:1.1 }}>Margaret T.</div>
+                    <div style={{ fontFamily:"'Playfair Display', serif", fontSize:15, fontWeight:900, color:"#111", lineHeight:1.1 }}>Your name</div>
                     <div style={{ fontSize:8, fontFamily:"'DM Mono', monospace", marginTop:3, color:"#C8A96E", opacity: phase === "you-count" ? 1 : 0, transition:"opacity 0.5s ease" }}>✦ Founding Member</div>
                   </div>
                 </div>
                 <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:10, lineHeight:1.55, color:"#666", margin:"0 0 16px", fontStyle:"italic" }}>
-                  Pharmacist and health-policy writer in Youngstown. Letters on healthcare, local news, and the long arc of the Rust Belt.
+                  Your bio, your beat, and the record of everything you have written here.
                 </p>
                 <div style={{ fontSize:6.5, letterSpacing:"0.12em", textTransform:"uppercase", color:"#C8BFA8", fontFamily:"'DM Mono', monospace", marginBottom:5 }}>Sample profile</div>
                 <div style={{ display:"flex", borderTop:"1px solid #F0EDE8", borderBottom:"1px solid #F0EDE8" }}>
@@ -9568,7 +9516,6 @@ function MarketingSite({ onAuthSuccess }) {
         <Route path="/" element={<MarketingHomePage navigate={goTo}/>}/>
         <Route path="/invite" element={<InvitePage navigate={goTo}/>}/>
         <Route path="/how-it-works" element={<HowItWorksPage navigate={goTo}/>}/>
-        <Route path="/investor" element={<InvestorPage navigate={goTo}/>}/>
         <Route path="/privacy" element={<LegalPage doc="privacy"/>}/>
         <Route path="/terms" element={<LegalPage doc="terms"/>}/>
         <Route path="/signin" element={
