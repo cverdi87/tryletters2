@@ -8287,9 +8287,9 @@ function AnimatedDemoFeed() {
 
   // Forums-slide content
   const demoForums = [
-    { name:"Politics & Policy", members:"6.2k", color:"#C0392B" },
-    { name:"Technology",        members:"5.1k", color:"#1A1A1A" },
-    { name:"Climate & Earth",   members:"3.8k", color:"#27AE60" },
+    { name:"Politics & Policy", note:"Open to all",   color:"#C0392B" },
+    { name:"Technology",        note:"Open to all",   color:"#1A1A1A" },
+    { name:"Climate & Earth",   note:"Private forum", color:"#27AE60" },
   ];
 
   // You-slide stats (count up to these)
@@ -8715,7 +8715,7 @@ function AnimatedDemoFeed() {
                       <div style={{ width:30, height:30, borderRadius:7, background:f.color, flexShrink:0 }}/>
                       <div style={{ flex:1, minWidth:0 }}>
                         <div style={{ fontFamily:"'Playfair Display', serif", fontSize:11, fontWeight:700, color:"#111", lineHeight:1.1 }}>{f.name}</div>
-                        <div style={{ fontSize:7.5, color:"#BBB", fontFamily:"'DM Mono', monospace", marginTop:2 }}>{f.members} members</div>
+                        <div style={{ fontSize:7.5, color:"#BBB", fontFamily:"'DM Mono', monospace", marginTop:2 }}>{f.note}</div>
                       </div>
                       <div style={{
                         background: joined ? "#F0EDE8" : "#111", color: joined ? "#888" : "#F0EAD8",
@@ -8748,6 +8748,7 @@ function AnimatedDemoFeed() {
                 <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:10, lineHeight:1.55, color:"#666", margin:"0 0 16px", fontStyle:"italic" }}>
                   Pharmacist and health-policy writer in Youngstown. Letters on healthcare, local news, and the long arc of the Rust Belt.
                 </p>
+                <div style={{ fontSize:6.5, letterSpacing:"0.12em", textTransform:"uppercase", color:"#C8BFA8", fontFamily:"'DM Mono', monospace", marginBottom:5 }}>Sample profile</div>
                 <div style={{ display:"flex", borderTop:"1px solid #F0EDE8", borderBottom:"1px solid #F0EDE8" }}>
                   {youStats.map((s, i) => (
                     <div key={s.label} style={{ flex:1, textAlign:"center", padding:"11px 2px", borderRight: i < youStats.length-1 ? "1px solid #F0EDE8" : "none" }}>
