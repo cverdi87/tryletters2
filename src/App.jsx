@@ -618,7 +618,7 @@ function LetterDetailView({ item, onBack, session }) {
                   <span style={{ fontSize:13, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}>{reply.author}</span>
                   <span style={{ fontSize:10, color:"#BBB", fontFamily:"'DM Mono', monospace" }}>{reply.timeAgo}</span>
                 </div>
-                <p style={{ margin:0, fontSize:15, lineHeight:1.7, color:"#444", fontFamily:"'EB Garamond', Georgia, serif" }}>{reply.body}</p>
+                <p style={{ margin:0, fontSize:15, lineHeight:1.7, color:"#444", fontFamily:"'EB Garamond', Georgia, serif", whiteSpace:"pre-wrap" }}>{reply.body}</p>
                 <button style={{ marginTop:8, background:"none", border:"none", cursor:"pointer", fontSize:11, color:"#BBB", fontFamily:"'DM Sans', sans-serif", padding:0 }}>♡ Like</button>
               </div>
             </div>
@@ -896,6 +896,49 @@ const discoverPeople = [
 
 function SideNav({ activeTab, onNavigate, onSignOut, session }) {
   const [sideTab, setSideTab] = useState("breaking");
+  const navigate = useNavigate();
+  const [breaking, setBreaking] = useState([]);
+  const [writers, setWriters] = useState([]);
+  const [sideForums, setSideForums] = useState([]);
+  const [episodes, setEpisodes] = useState([]);
+  const [loadedSide, setLoadedSide] = useState(false);
+
+  // Everything in this rail is real data. Empty states say so rather
+  // than inventing headlines.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const uid = session?.user?.id;
+      const [{ data: news }, { data: eps }, { data: fms }, { data: fol }] = await Promise.all([
+        supabase.from("news_articles").select("id, title, source, published_at").order("published_at", { ascending:false }).limit(4),
+        supabase.from("podcast_episodes").select("id, title, duration, published_at, show:show_id (title)").order("published_at", { ascending:false }).limit(4),
+        supabase.from("forums").select("id, name, slug, color").order("name").limit(4),
+        uid ? supabase.from("follows").select("following_id").eq("follower_id", uid) : Promise.resolve({ data: [] }),
+      ]);
+      if (cancelled) return;
+      setBreaking(news || []);
+      setEpisodes(eps || []);
+      setSideForums(fms || []);
+      const followedIds = (fol || []).map(f => f.following_id);
+      const { data: people } = await supabase
+        .from("profiles").select("id, username, full_name, status, avatar_url").limit(20);
+      if (cancelled) return;
+      setWriters((people || []).filter(p => p.id !== uid && !followedIds.includes(p.id)).slice(0, 3));
+      setLoadedSide(true);
+    })();
+    return () => { cancelled = true; };
+  }, [session]);
+
+  const followWriter = async (id) => {
+    const uid = session?.user?.id;
+    if (!uid) return;
+    const { error } = await supabase.from("follows").insert({ follower_id: uid, following_id: id });
+    if (!error) setWriters(ws => ws.filter(w => w.id !== id));
+  };
+
+  const sideEmpty = (text) => (
+    <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontStyle:"italic", fontSize:12.5, color:"#BBB", margin:"6px 0", lineHeight:1.5 }}>{text}</p>
+  );
 
   const sideTabs = [
     { id:"breaking", label:"Breaking" },
@@ -939,106 +982,86 @@ function SideNav({ activeTab, onNavigate, onSignOut, session }) {
       {/* Tab content */}
       <div style={{ flex:1, padding:"12px", overflowY:"auto" }}>
 
-        {/* Breaking News */}
+        {/* Breaking News — live from the news feed */}
         {sideTab === "breaking" && (
           <div>
-            <div style={{ fontSize:9, letterSpacing:"0.16em", textTransform:"uppercase", color:"#AAA", fontFamily:"'DM Mono', monospace", marginBottom:10 }}>Live Updates</div>
-            {mockBreaking.map(item => (
-              <div key={item.id} style={{ padding:"10px 0", borderBottom:"1px solid #F0EDE8", cursor:"pointer" }}>
-                <div style={{ display:"flex", alignItems:"flex-start", gap:7 }}>
-                  {item.urgent && <div style={{ width:5, height:5, borderRadius:"50%", background:"#E74C3C", flexShrink:0, marginTop:5, animation:"pulse 1.5s infinite" }}/>}
-                  <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:13, lineHeight:1.45, color:"#222", margin:0, fontWeight:500 }}>{item.headline}</p>
+            <div style={{ fontSize:9, letterSpacing:"0.16em", textTransform:"uppercase", color:"#AAA", fontFamily:"'DM Mono', monospace", marginBottom:10 }}>Latest headlines</div>
+            {breaking.length === 0
+              ? (loadedSide ? sideEmpty("No headlines yet \u2014 they'll appear as the news feed updates.") : null)
+              : breaking.map((item, i) => (
+                <div key={item.id} onClick={() => navigate("/read")} style={{ padding:"10px 0", borderBottom:"1px solid #F0EDE8", cursor:"pointer" }}>
+                  <div style={{ display:"flex", alignItems:"flex-start", gap:7 }}>
+                    {i === 0 && <div style={{ width:5, height:5, borderRadius:"50%", background:"#E74C3C", flexShrink:0, marginTop:5 }}/>}
+                    <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:13, lineHeight:1.45, color:"#222", margin:0, fontWeight:500 }}>{item.title}</p>
+                  </div>
+                  <div style={{ display:"flex", gap:6, marginTop:5, paddingLeft: i === 0 ? 12 : 0 }}>
+                    <span style={{ fontSize:9.5, color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontWeight:600, textTransform:"uppercase", letterSpacing:"0.08em" }}>{item.source}</span>
+                    <span style={{ fontSize:9.5, color:"#CCC", fontFamily:"'DM Mono', monospace" }}>· {timeAgoRead(item.published_at)}</span>
+                  </div>
                 </div>
-                <div style={{ display:"flex", gap:6, marginTop:5, paddingLeft: item.urgent ? 12 : 0 }}>
-                  <span style={{ fontSize:9.5, color:"#C8A96E", fontFamily:"'DM Mono', monospace", fontWeight:600, textTransform:"uppercase", letterSpacing:"0.08em" }}>{item.source}</span>
-                  <span style={{ fontSize:9.5, color:"#CCC", fontFamily:"'DM Mono', monospace" }}>· {item.timeAgo}</span>
-                </div>
-              </div>
-            ))}
-            <button style={{ width:"100%", background:"none", border:"none", padding:"10px 0", fontSize:11, color:"#C8A96E", fontFamily:"'DM Sans', sans-serif", cursor:"pointer", textAlign:"center" }}>
-              View all breaking news →
+              ))}
+            <button onClick={() => navigate("/read")} style={{ width:"100%", background:"none", border:"none", padding:"10px 0", fontSize:11, color:"#C8A96E", fontFamily:"'DM Sans', sans-serif", cursor:"pointer", textAlign:"center" }}>
+              View all news →
             </button>
           </div>
         )}
 
-        {/* Discover */}
+        {/* Discover — real writers and forums */}
         {sideTab === "discover" && (
           <div>
             <div style={{ fontSize:9, letterSpacing:"0.16em", textTransform:"uppercase", color:"#AAA", fontFamily:"'DM Mono', monospace", marginBottom:10 }}>Writers to follow</div>
-            {discoverPeople.map(person => (
-              <div key={person.username} style={{ display:"flex", alignItems:"center", gap:9, padding:"8px 0", borderBottom:"1px solid #F0EDE8" }}>
-                <div style={{ width:32, height:32, borderRadius:"50%", background:person.color, display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontSize:12, fontFamily:"'Playfair Display', serif", fontWeight:700, flexShrink:0 }}>{person.initial}</div>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:12.5, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif" }}>{person.name}</div>
-                  <div style={{ fontSize:9.5, color: statusColors[person.status] || "#AAA", fontFamily:"'DM Mono', monospace" }}>
-                    {contributorStatuses[person.status]}
+            {writers.length === 0
+              ? (loadedSide ? sideEmpty("You're following everyone here so far.") : null)
+              : writers.map(person => (
+                <div key={person.id} style={{ display:"flex", alignItems:"center", gap:9, padding:"8px 0", borderBottom:"1px solid #F0EDE8" }}>
+                  <div onClick={() => navigate(`/u/${person.id}`)} style={{ cursor:"pointer" }}>
+                    <Avatar initial={(person.full_name || person.username || "A")[0].toUpperCase()} color={colorForId(person.id)} size={32} src={person.avatar_url}/>
                   </div>
+                  <div onClick={() => navigate(`/u/${person.id}`)} style={{ flex:1, minWidth:0, cursor:"pointer" }}>
+                    <div style={{ fontSize:12.5, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{person.full_name || person.username}</div>
+                    <div style={{ fontSize:9.5, color: statusColors[person.status] || "#AAA", fontFamily:"'DM Mono', monospace" }}>
+                      {contributorStatuses[person.status] || "Contributor"}
+                    </div>
+                  </div>
+                  <button onClick={() => followWriter(person.id)} style={{ background:"#111", border:"none", borderRadius:20, padding:"4px 12px", fontSize:10.5, color:"#F0EAD8", fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:"pointer", flexShrink:0 }}>Follow</button>
                 </div>
-                <button style={{ background:"#111", border:"none", borderRadius:20, padding:"4px 12px", fontSize:10.5, color:"#F0EAD8", fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:"pointer", flexShrink:0 }}>Follow</button>
-              </div>
-            ))}
+              ))}
             <div style={{ fontSize:9, letterSpacing:"0.16em", textTransform:"uppercase", color:"#AAA", fontFamily:"'DM Mono', monospace", margin:"14px 0 10px" }}>Forums to join</div>
-            {[{name:"AI & Society",color:"#1A1A1A"},{name:"World Affairs",color:"#2C3E50"},{name:"Sports Central",color:"#F39C12"}].map(f => (
-              <div key={f.name} style={{ display:"flex", alignItems:"center", gap:9, padding:"8px 0", borderBottom:"1px solid #F0EDE8" }}>
-                <div style={{ width:8, height:8, borderRadius:"50%", background:f.color, flexShrink:0 }}/>
-                <span style={{ flex:1, fontSize:12.5, fontFamily:"'DM Sans', sans-serif", color:"#333" }}>{f.name}</span>
-                <button style={{ background:"none", border:"1px solid #E0D8CC", borderRadius:20, padding:"3px 10px", fontSize:10.5, color:"#888", fontFamily:"'DM Sans', sans-serif", cursor:"pointer" }}>Join</button>
-              </div>
-            ))}
+            {sideForums.length === 0
+              ? (loadedSide ? sideEmpty("No forums yet.") : null)
+              : sideForums.map(f => (
+                <div key={f.id} onClick={() => navigate(`/forums/${f.slug}`)} style={{ display:"flex", alignItems:"center", gap:9, padding:"8px 0", borderBottom:"1px solid #F0EDE8", cursor:"pointer" }}>
+                  <div style={{ width:8, height:8, borderRadius:"50%", background:f.color || "#1A1A1A", flexShrink:0 }}/>
+                  <span style={{ flex:1, fontSize:12.5, fontFamily:"'DM Sans', sans-serif", color:"#333", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{f.name}</span>
+                  <span style={{ fontSize:10.5, color:"#888", fontFamily:"'DM Sans', sans-serif", border:"1px solid #E0D8CC", borderRadius:20, padding:"3px 10px", flexShrink:0 }}>Open</span>
+                </div>
+              ))}
           </div>
         )}
 
-        {/* Podcasts */}
+        {/* Podcasts — real recent episodes */}
         {sideTab === "podcasts" && (
           <div>
-            {/* Recent episodes */}
             <div style={{ fontSize:9, letterSpacing:"0.16em", textTransform:"uppercase", color:"#AAA", fontFamily:"'DM Mono', monospace", marginBottom:10 }}>Recent episodes</div>
-            {mockPodcasts.map(pod => (
-              <div key={pod.id} style={{ padding:"10px 0", borderBottom:"1px solid #F0EDE8", cursor:"pointer" }}>
-                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                  <div style={{ width:36, height:36, borderRadius:8, background:"#111", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, position:"relative" }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="#C8A96E"><polygon points="5,3 19,12 5,21"/></svg>
-                    {pod.live && <div style={{ position:"absolute", top:-3, right:-3, width:8, height:8, borderRadius:"50%", background:"#E74C3C", border:"1.5px solid #fff" }}/>}
-                  </div>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:12.5, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif", lineHeight:1.3, display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden" }}>{pod.title}</div>
-                    <div style={{ display:"flex", gap:6, marginTop:3 }}>
-                      <span style={{ fontSize:9.5, color:"#C8A96E", fontFamily:"'DM Mono', monospace", textTransform:"uppercase", letterSpacing:"0.08em", fontWeight:600 }}>{pod.forum}</span>
-                      {pod.live
-                        ? <span style={{ fontSize:9.5, color:"#E74C3C", fontFamily:"'DM Mono', monospace" }}>· LIVE</span>
-                        : <span style={{ fontSize:9.5, color:"#CCC", fontFamily:"'DM Mono', monospace" }}>· {pod.duration}</span>
-                      }
+            {episodes.length === 0
+              ? (loadedSide ? sideEmpty("No episodes yet.") : null)
+              : episodes.map(pod => (
+                <div key={pod.id} onClick={() => navigate("/listen")} style={{ padding:"10px 0", borderBottom:"1px solid #F0EDE8", cursor:"pointer" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                    <div style={{ width:36, height:36, borderRadius:8, background:"#111", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="#C8A96E"><polygon points="5,3 19,12 5,21"/></svg>
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:12.5, fontWeight:600, color:"#111", fontFamily:"'DM Sans', sans-serif", lineHeight:1.3, display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden" }}>{pod.title}</div>
+                      <div style={{ display:"flex", gap:6, marginTop:3 }}>
+                        <span style={{ fontSize:9.5, color:"#C8A96E", fontFamily:"'DM Mono', monospace", textTransform:"uppercase", letterSpacing:"0.08em", fontWeight:600, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", maxWidth:110 }}>{pod.show?.title || "Podcast"}</span>
+                        {pod.duration ? <span style={{ fontSize:9.5, color:"#CCC", fontFamily:"'DM Mono', monospace" }}>· {fmtDuration(pod.duration)}</span> : null}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
-
-            {/* Discover */}
-            <div style={{ fontSize:9, letterSpacing:"0.16em", textTransform:"uppercase", color:"#AAA", fontFamily:"'DM Mono', monospace", margin:"16px 0 10px" }}>Discover</div>
-            {discoverPodcasts.map(pod => (
-              <div key={pod.id} style={{ padding:"9px 0", borderBottom:"1px solid #F0EDE8", cursor:"pointer" }}>
-                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                  <div style={{ width:32, height:32, borderRadius:7, background:"#F0EDE8", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, position:"relative" }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="#C8BFA8"><polygon points="5,3 19,12 5,21"/></svg>
-                    {pod.live && <div style={{ position:"absolute", top:-3, right:-3, width:7, height:7, borderRadius:"50%", background:"#E74C3C", border:"1.5px solid #fff" }}/>}
-                  </div>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:12, fontWeight:500, color:"#333", fontFamily:"'DM Sans', sans-serif", lineHeight:1.3, display:"-webkit-box", WebkitLineClamp:1, WebkitBoxOrient:"vertical", overflow:"hidden" }}>{pod.title}</div>
-                    <div style={{ display:"flex", gap:6, marginTop:2, alignItems:"center" }}>
-                      <span style={{ fontSize:9, color:"#C8A96E", fontFamily:"'DM Mono', monospace", textTransform:"uppercase", letterSpacing:"0.06em", fontWeight:600 }}>{pod.forum}</span>
-                      {pod.live
-                        ? <span style={{ fontSize:9, color:"#E74C3C", fontFamily:"'DM Mono', monospace" }}>· LIVE</span>
-                        : <span style={{ fontSize:9, color:"#CCC", fontFamily:"'DM Mono', monospace" }}>· {pod.duration}</span>
-                      }
-                    </div>
-                    <div style={{ fontSize:9, color:"#BBB", fontFamily:"'DM Mono', monospace", marginTop:1, fontStyle:"italic" }}>{pod.reason}</div>
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            <button style={{ width:"100%", background:"none", border:"none", padding:"12px 0 2px", fontSize:11, color:"#C8A96E", fontFamily:"'DM Sans', sans-serif", cursor:"pointer", textAlign:"center", fontWeight:500 }}>
+              ))}
+            <button onClick={() => navigate("/listen")} style={{ width:"100%", background:"none", border:"none", padding:"12px 0 2px", fontSize:11, color:"#C8A96E", fontFamily:"'DM Sans', sans-serif", cursor:"pointer", textAlign:"center", fontWeight:500 }}>
               Browse all podcasts →
             </button>
           </div>
@@ -1055,6 +1078,22 @@ function SideNav({ activeTab, onNavigate, onSignOut, session }) {
           </div>
         )}
       </div>
+
+      {/* Staff tools — only for @tryletters.tech accounts */}
+      {(session?.user?.email || "").toLowerCase().endsWith("@tryletters.tech") && (
+        <div style={{ padding:"10px 12px 0", borderTop:"1px solid #F0EDE8", flexShrink:0 }}>
+          <div style={{ fontSize:9, letterSpacing:"0.16em", textTransform:"uppercase", color:"#C8A96E", fontFamily:"'DM Mono', monospace", margin:"8px 0 6px" }}>Staff</div>
+          {[["Invitations", "/staff/invitations"], ["Reports", "/staff/reports"]].map(([label, path]) => (
+            <button key={path} onClick={() => navigate(path)}
+              style={{ width:"100%", background:"none", border:"none", padding:"6px 0", fontSize:12, fontFamily:"'DM Sans', sans-serif", color:"#666", cursor:"pointer", textAlign:"left", display:"flex", alignItems:"center", gap:7 }}
+              onMouseEnter={e => e.currentTarget.style.color="#111"}
+              onMouseLeave={e => e.currentTarget.style.color="#666"}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16v16H4z"/><path d="M4 9h16"/></svg>
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Sign out */}
       <div style={{ padding:"12px", borderTop:"1px solid #F0EDE8", flexShrink:0 }}>
@@ -1903,7 +1942,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
                                 <ContentMenu me={session?.user?.id} targetType="reply" targetId={reply.id} authorId={reply.userId} authorName={reply.author}/>
                               </div>
                             </div>
-                            <p style={{ margin:0, fontSize:14, lineHeight:1.65, color:"#555", fontFamily:"'EB Garamond', serif" }}>{reply.body}</p>
+                            <p style={{ margin:0, fontSize:14, lineHeight:1.65, color:"#555", fontFamily:"'EB Garamond', serif", whiteSpace:"pre-wrap" }}>{reply.body}</p>
                             {session?.user?.id && (
                               <button onClick={() => { setReplyingTo({ id: reply.id, author: reply.author }); setReplyFocused(true); }} style={{ background:"none", border:"none", padding:"4px 0 0", color:"#B0A488", fontFamily:"'DM Mono', monospace", fontSize:10.5, letterSpacing:"0.04em", cursor:"pointer" }}>Reply</button>
                             )}
@@ -1930,7 +1969,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
                             <ContentMenu me={session?.user?.id} targetType="reply" targetId={reply.id} authorId={reply.userId} authorName={reply.author}/>
                           </div>
                         </div>
-                        <p style={{ margin:0, fontSize:14, lineHeight:1.65, color:"#555", fontFamily:"'EB Garamond', serif" }}>{reply.body}</p>
+                        <p style={{ margin:0, fontSize:14, lineHeight:1.65, color:"#555", fontFamily:"'EB Garamond', serif", whiteSpace:"pre-wrap" }}>{reply.body}</p>
                       </div>
                     </div>
                   ))
@@ -5459,7 +5498,7 @@ function ForumPostPage({ session, onNavigate }) {
             <span style={{ fontSize:10, color:"#BBB", fontFamily:"'DM Mono', monospace" }}>{ago(r.created_at)}</span>
             <div style={{ marginLeft:"auto" }}><ContentMenu me={userId} targetType="reply" targetId={r.id} authorId={r.user_id} authorName={authorOf(r)}/></div>
           </div>
-          <p style={{ margin:0, fontSize:14.5, lineHeight:1.65, color:"#444", fontFamily:"'EB Garamond', Georgia, serif" }}>{r.body}</p>
+          <p style={{ margin:0, fontSize:14.5, lineHeight:1.65, color:"#444", fontFamily:"'EB Garamond', Georgia, serif", whiteSpace:"pre-wrap" }}>{r.body}</p>
           {userId && (
             <button onClick={() => setReplyingTo({ id: r.id, author: authorOf(r) })} style={{ background:"none", border:"none", padding:"4px 0 0", color:"#B0A488", fontFamily:"'DM Mono', monospace", fontSize:10.5, letterSpacing:"0.04em", cursor:"pointer" }}>Reply</button>
           )}
