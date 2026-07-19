@@ -8277,7 +8277,7 @@ function AnimatedDemoFeed() {
   const [statsProgress, setStatsProgress] = useState(0); // You-slide count-up, 0 → 1
   const scrollRef = useRef(null);
 
-  const demoArticle = { publication:"The Atlantic", section:"Economy", headline:"The Quiet Death of the American Middle Class" };
+  const demoArticle = { publication:"The Meridian", section:"Economy", headline:"The Quiet Death of the American Middle Class" };
   const demoLetterAuthor = mockFeed.find(i => i.type === "letter") || { author:"Margaret T.", username:"margaret_t", status:"founding", initial:"M", color:"#2D6A4F", preview:"The framing of this piece misses what's actually happening in rust-belt communities. Having lived in Youngstown for 30 years, I can tell you the numbers don't capture the social fabric that's unraveled..." };
   const commentText = "I was thinking the same thing! Great minds!";
 
@@ -8582,13 +8582,13 @@ function AnimatedDemoFeed() {
                       <div style={{ background:"#fff", border:"1px solid #E8E0D0", borderRadius:9, display:"flex", gap:12, padding:11, marginBottom:11 }}>
                         <div style={{ width:90, height:66, borderRadius:6, background:"#2C3E50", flexShrink:0 }}/>
                         <div style={{ minWidth:0 }}>
-                          <div style={{ fontSize:8.5, letterSpacing:"0.1em", textTransform:"uppercase", color:"#2C3E50", fontFamily:"'DM Mono', monospace", fontWeight:600, marginBottom:4 }}>The Atlantic · Economy</div>
+                          <div style={{ fontSize:8.5, letterSpacing:"0.1em", textTransform:"uppercase", color:"#2C3E50", fontFamily:"'DM Mono', monospace", fontWeight:600, marginBottom:4 }}>The Meridian · Economy</div>
                           <div style={{ fontFamily:"'Playfair Display', serif", fontSize:15, fontWeight:800, color:"#111", lineHeight:1.2 }}>The Quiet Death of the American Middle Class</div>
                         </div>
                       </div>
                       {/* Two secondary cards */}
                       <div style={{ display:"flex", gap:11 }}>
-                        {[{c:"#E67E22",p:"Reuters",t:"EU Reaches Historic Agreement on AI Liability"},{c:"#27AE60",p:"The Guardian",t:"Climate Scientists Warn of Tipping Points by 2030"}].map(a => (
+                        {[{c:"#E67E22",p:"The Standard",t:"EU Reaches Historic Agreement on AI Liability"},{c:"#27AE60",p:"The Beacon",t:"Climate Scientists Warn of Tipping Points by 2030"}].map(a => (
                           <div key={a.p} style={{ flex:1, background:"#fff", border:"1px solid #E8E0D0", borderRadius:9, overflow:"hidden", minWidth:0 }}>
                             <div style={{ height:48, background:a.c }}/>
                             <div style={{ padding:"8px 10px" }}>
