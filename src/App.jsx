@@ -971,7 +971,7 @@ function SideNav({ activeTab, onNavigate, onSignOut, session }) {
             {breaking.length === 0
               ? (loadedSide ? sideEmpty("No headlines yet \u2014 they'll appear as the news feed updates.") : null)
               : breaking.map((item, i) => (
-                <div key={item.id} onClick={() => navigate("/read")} style={{ padding:"10px 0", borderBottom:"1px solid #F0EDE8", cursor:"pointer" }}>
+                <div key={item.id} onClick={() => navigate(`/read/article/${item.id}`)} style={{ padding:"10px 0", borderBottom:"1px solid #F0EDE8", cursor:"pointer" }}>
                   <div style={{ display:"flex", alignItems:"flex-start", gap:7 }}>
                     {i === 0 && <div style={{ width:5, height:5, borderRadius:"50%", background:"#E74C3C", flexShrink:0, marginTop:5 }}/>}
                     <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:13, lineHeight:1.45, color:"#222", margin:0, fontWeight:500 }}>{item.title}</p>
@@ -2325,6 +2325,28 @@ function ReadPage({ onNavigate, session }) {
     fetchRealArticles();
   }, []);
 
+  // Deep-link fallback: a shared or sidebar link may point at an article that
+  // isn't in the recent-40 window we loaded above. Fetch that one by id so the
+  // reader lands on the real story instead of a blank article view.
+  const [deepArticle, setDeepArticle] = useState(null);
+  useEffect(() => {
+    if (!articleId || articleId.startsWith("mock-")) { setDeepArticle(null); return; }
+    if (realArticles.some(a => a.dbId === articleId)) { setDeepArticle(null); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.from("news_articles").select("*").eq("id", articleId).maybeSingle();
+      if (cancelled || !data) return;
+      setDeepArticle({
+        id: `real-${data.id}`, dbId: data.id, isReal: true,
+        title: cleanNewsText(data.title), publication: data.source, category: data.source_category,
+        timeAgo: timeAgoRead(data.published_at), color: colorForSource(data.source),
+        image_url: cleanImageUrl(data.image_url), description: cleanNewsText(data.description),
+        link: data.link, letters_count: data.letters_count || 0, reason: "From your sources",
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [articleId, realArticles]);
+
   // Pull recent long letters (kind: "letter") for the Letters section — most recent first.
   useEffect(() => {
     const fetchReadLetters = async () => {
@@ -2397,6 +2419,7 @@ function ReadPage({ onNavigate, session }) {
   const openArticle = articleId
     ? allArticles.find(a => a.dbId === articleId) ||
       allArticles.find(a => `mock-${a.id}` === articleId && !a.isReal) ||
+      deepArticle ||
       null
     : null;
 
