@@ -208,10 +208,18 @@ export default function Auth({ onAuthSuccess }) {
       });
 
       if (profileError) {
-        // Profile creation failing shouldn't block sign-in — surface it,
-        // but the account itself is valid and verified at this point.
         console.error("Profile creation failed after verification:", profileError);
+        const taken = /duplicate|unique|already exists|23505/i.test(profileError.message || "");
+        setError(taken
+          ? "That username is already taken — pick another and tap Verify & Continue again."
+          : "We couldn't finish setting up your profile. Please try again in a moment.");
+        setLoading(false);
+        return;   // verified account but no profile yet — let them retry rather than drop into a broken state
       }
+    } else {
+      setError("Verification didn't complete. Please try again.");
+      setLoading(false);
+      return;
     }
 
     setLoading(false);
@@ -268,14 +276,11 @@ export default function Auth({ onAuthSuccess }) {
           </div>
 
           {/* Tabs — hidden during reset/newPassword flows since those are single-purpose screens */}
-          {(mode === "signin" || mode === "signup") && (
-            <div style={{ display: "flex", borderBottom: "1px solid #C8BFA8", margin: "0 28px" }}>
-              {["signin", "signup"].map(m => (
-                <button key={m} onClick={() => { setMode(m); setError(null); setMessage(null); }}
-                  style={{ background: "none", border: "none", borderBottom: mode === m ? "2px solid #111" : "2px solid transparent", marginBottom: -1, padding: "8px 20px 10px", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "'DM Mono', monospace", fontWeight: mode === m ? 500 : 400, color: mode === m ? "#111" : "#AAA", cursor: "pointer", transition: "all 0.15s" }}>
-                  {m === "signin" ? "Sign In" : "Create Account"}
-                </button>
-              ))}
+          {mode === "signin" && (
+            <div style={{ padding: "0 28px", marginBottom: 4 }}>
+              <div style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "#C8A96E", fontFamily: "'DM Mono', monospace" }}>
+                Sign In
+              </div>
             </div>
           )}
 
@@ -448,9 +453,13 @@ export default function Auth({ onAuthSuccess }) {
                     <span style={{ fontSize: 12, color: "#AAA", fontFamily: "'EB Garamond', serif", fontStyle: "italic" }}>
                       {mode === "signin" ? "New to Letters? " : "Already have an account? "}
                     </span>
-                    <button onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setError(null); setMessage(null); }}
+                    <button onClick={() => {
+                        if (mode === "signup") { setMode("signin"); setError(null); setMessage(null); }
+                        else if (navigate) { navigate("invite"); }
+                        else { window.location.href = "/invite"; }
+                      }}
                       style={{ background: "none", border: "none", fontSize: 12, color: "#C8A96E", fontFamily: "'EB Garamond', serif", fontStyle: "italic", cursor: "pointer", padding: 0, textDecoration: "underline" }}>
-                      {mode === "signin" ? "Create an account" : "Sign in"}
+                      {mode === "signin" ? "Request an invitation" : "Sign in"}
                     </button>
                   </>
                 )}
