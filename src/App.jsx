@@ -666,6 +666,16 @@ function LetterCard({ item, onOpen, selected, onToggleLike, isLiked, onToggleRep
         </div>
       )}
 
+      {/* Publication nameplate — a letter published into a publication wears its
+          masthead, so newsletters read as newsletters in the feed. */}
+      {item.publicationTitle && (
+        <div style={{ borderTop:"1px solid #141414", borderBottom:"1px solid #141414", padding:"6px 0 5px", marginBottom:10, textAlign:"center" }}>
+          <div style={{ fontFamily:"'Playfair Display', serif", fontSize:15, fontWeight:900, letterSpacing:"-0.01em", color:"#141414", lineHeight:1.1 }}>
+            {item.publicationTitle}
+          </div>
+        </div>
+      )}
+
       {/* Letter label */}
       <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:10 }}>
         <div style={{ width:2, height:14, background:"#C8A96E", borderRadius:2 }}/>
@@ -1241,7 +1251,7 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
     // Fetch letters joined with their author's profile info
     const { data, error } = await supabase
       .from("letters")
-      .select("*, profiles:user_id (username, full_name, status, avatar_url), clip:clip_episode_id (id, title, audio_url, image_url, show:show_id (id, title, image_url))")
+      .select("*, profiles:user_id (username, full_name, status, avatar_url), publication:publication_id (title, slug), clip:clip_episode_id (id, title, audio_url, image_url, show:show_id (id, title, image_url))")
       .order("created_at", { ascending: false })
       .limit(50);
 
@@ -1289,6 +1299,8 @@ function FeedPage({ onSignOut, session, onNavigate, activeTab }) {
             media: letter.media,
             section: letter.source_publication ? "" : "General",
             publication: letter.source_publication || "",
+            publicationTitle: letter.publication?.title || null,
+            publicationSlug: letter.publication?.slug || null,
             headline: letter.source_title || "",
             title: letter.title,
             preview: plainBody.length > 280 ? plainBody.slice(0, 280) + "…" : plainBody,
@@ -3902,11 +3914,26 @@ function WritePage({ session, onNavigate }) {
   };
 
   // Shared Letter/Post segmented toggle, rendered at the top of both composers.
+  // Envelope = Letter (correspondence), speech bubble = Post (a quick remark).
+  const modeIcon = (k, active) => {
+    const stroke = active ? "#F0EAD8" : "#888";
+    if (k === "letter") return (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink:0 }}>
+        <rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>
+      </svg>
+    );
+    return (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink:0 }}>
+        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+      </svg>
+    );
+  };
   const modeToggle = (
     <div style={{ display:"flex", gap:4, background:"#F0EDE8", borderRadius:10, padding:4, width:"fit-content" }}>
       {[{ k:"letter", label:"Letter" }, { k:"post", label:"Post" }].map(m => (
         <button key={m.k} onClick={() => { setKind(m.k); setError(null); }}
-          style={{ background: kind===m.k ? "#111" : "none", color: kind===m.k ? "#F0EAD8" : "#888", border:"none", borderRadius:7, padding:"6px 20px", fontSize:12.5, fontFamily:"'DM Sans', sans-serif", fontWeight:600, cursor:"pointer", transition:"all 0.15s" }}>
+          style={{ display:"flex", alignItems:"center", gap:7, background: kind===m.k ? "#111" : "none", color: kind===m.k ? "#F0EAD8" : "#888", border:"none", borderRadius:7, padding:"6px 18px", fontSize:12.5, fontWeight:600, fontFamily:"'DM Sans', sans-serif", cursor:"pointer", transition:"background 0.15s" }}>
+          {modeIcon(m.k, kind===m.k)}
           {m.label}
         </button>
       ))}
@@ -5699,7 +5726,7 @@ function ForumDetailPage({ session, onNavigate }) {
         const { data: vf } = await supabase.from("forum_verified").select("forum_id").eq("forum_id", f.id).eq("user_id", userId).maybeSingle();
         verified = !!vf;
       }
-      const { data: pp } = await supabase.from("letters").select("id, title, body, created_at").eq("forum_id", f.id).order("created_at", { ascending:false }).limit(30);
+      const { data: pp } = await supabase.from("letters").select("id, title, body, created_at, clip_episode_id, clip_start, clip_end, clip:clip_episode_id (id, title, audio_url, image_url, show:show_id (id, title, image_url))").eq("forum_id", f.id).order("created_at", { ascending:false }).limit(30);
       if (!cancelled) { setForum(f); setJoined(isJoined); setIsEditor(editor); setIsVerified(verified); setPosts(pp || []); setLoading(false); }
     })();
     return () => { cancelled = true; };
@@ -5839,6 +5866,11 @@ function ForumDetailPage({ session, onNavigate }) {
               onMouseLeave={e => e.currentTarget.style.background="none"}>
               {post.title && <div style={{ fontFamily:"'Playfair Display', serif", fontSize:18, fontWeight:800, color:"#141414", lineHeight:1.25, marginBottom:6 }}>{post.title}</div>}
               <p style={{ fontFamily:"'EB Garamond', serif", fontSize:14.5, lineHeight:1.6, color:"#555", margin:0, display:"-webkit-box", WebkitLineClamp:3, WebkitBoxOrient:"vertical", overflow:"hidden" }}>{cleanNewsText(post.body)}</p>
+              {post.clip_episode_id && post.clip && (
+                <div onClick={e => e.stopPropagation()} style={{ marginTop:10 }}>
+                  <ClipCard clip={{ episode_id: post.clip_episode_id, start: post.clip_start, end: post.clip_end, episode: post.clip, show: post.clip?.show }} compact/>
+                </div>
+              )}
               <div style={{ fontSize:10, color:"#BBB", fontFamily:"'DM Mono', monospace", marginTop:8, display:"flex", alignItems:"center", gap:6 }}>{new Date(post.created_at).toLocaleDateString()} <span style={{ color:"#C8A96E" }}>· Open thread →</span></div>
             </article>
           ))
