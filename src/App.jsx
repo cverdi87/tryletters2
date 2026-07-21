@@ -7825,6 +7825,9 @@ function ListenPage({ session, onSignOut, onNavigate }) {
   const [showEpisodes, setShowEpisodes] = useState([]);
   const [showLoading, setShowLoading] = useState(false);
   const [q, setQ] = useState("");
+  const [extResults, setExtResults] = useState(null); // external iTunes results, or null before a search
+  const [extLoading, setExtLoading] = useState(false);
+  const [adding, setAdding] = useState({});           // feed_url -> true while ingesting
   const [clipping, setClipping] = useState(null);   // { episode, show, startAt }
 
   // Carry the clip into the composer via router state; WritePage picks it up.
@@ -7842,6 +7845,11 @@ function ListenPage({ session, onSignOut, onNavigate }) {
 
   useEffect(() => {
     let cancelled = false;
+    loadLibrary();
+    return () => { cancelled = true; };
+  }, [me]);
+
+  async function loadLibrary() {
     (async () => {
       setLoading(true);
       const [{ data: sh }, { data: ep }, { data: sb }, { data: pl }] = await Promise.all([
@@ -7850,7 +7858,6 @@ function ListenPage({ session, onSignOut, onNavigate }) {
         me ? supabase.from("podcast_subscriptions").select("show_id").eq("user_id", me) : Promise.resolve({ data: [] }),
         me ? supabase.from("podcast_plays").select("episode_id, position, completed").eq("user_id", me).order("updated_at", { ascending:false }) : Promise.resolve({ data: [] }),
       ]);
-      if (cancelled) return;
       setShows(sh || []);
       setEpisodes(ep || []);
       setSubs((sb || []).map(r => r.show_id));
@@ -7859,8 +7866,37 @@ function ListenPage({ session, onSignOut, onNavigate }) {
       setPlays(pmap);
       setLoading(false);
     })();
-    return () => { cancelled = true; };
-  }, [me]);
+  }
+
+  // Search the whole iTunes catalogue, not just our loaded shows.
+  const searchAll = async () => {
+    const term = q.trim();
+    if (term.length < 2) return;
+    setExtLoading(true);
+    try {
+      const { data } = await supabase.functions.invoke("podcast-search", { body: { term } });
+      // Hide shows already in the library (matched by feed_url) — no point re-adding.
+      const have = new Set(shows.map(sh => sh.feed_url));
+      setExtResults((data?.results || []).filter(r => !have.has(r.feed_url)));
+    } catch { setExtResults([]); }
+    setExtLoading(false);
+  };
+
+  const addShow = async (r) => {
+    setAdding(a => ({ ...a, [r.feed_url]: true }));
+    try {
+      const { data } = await supabase.functions.invoke("podcast-ingest", { body: r });
+      if (data?.show) {
+        await loadLibrary();                       // pull the new show into the grid
+        if (me) {                                  // and follow it, since "Add" implies intent
+          await supabase.from("podcast_subscriptions").insert({ user_id: me, show_id: data.show.id });
+          setSubs(prev => prev.includes(data.show.id) ? prev : [...prev, data.show.id]);
+        }
+        setExtResults(prev => (prev || []).filter(x => x.feed_url !== r.feed_url));
+      }
+    } catch { /* leave the row so they can retry */ }
+    setAdding(a => { const n = { ...a }; delete n[r.feed_url]; return n; });
+  };
 
   const toggleSub = async (showId) => {
     if (!me) return;
@@ -7953,7 +7989,9 @@ function ListenPage({ session, onSignOut, onNavigate }) {
           <div style={{ textAlign:"center", padding:"60px 0", fontSize:11, color:"#AAA", fontFamily:"'DM Mono', monospace", letterSpacing:"0.1em" }}>Loading...</div>
         ) : tab === "browse" ? (
           <>
-            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search shows…"
+            <input value={q} onChange={e => { setQ(e.target.value); setExtResults(null); }}
+              onKeyDown={e => { if (e.key === "Enter") searchAll(); }}
+              placeholder="Search shows…"
               style={{ width:"100%", boxSizing:"border-box", border:"1px solid #E2DAC9", borderRadius:22, padding:"10px 16px", fontSize:14, fontFamily:"'EB Garamond', Georgia, serif", color:"#2E2A22", background:"#fff", outline:"none", margin:"18px 0" }}/>
             {filteredShows.length === 0 ? (
               <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:15, color:"#888", textAlign:"center", padding:"40px 0" }}>No shows match "{q}".</p>
@@ -7972,6 +8010,43 @@ function ListenPage({ session, onSignOut, onNavigate }) {
                 ))}
               </div>
             )}
+
+            {/* Reach beyond the library into the whole iTunes catalogue. */}
+            <div style={{ marginTop:18, paddingTop:18, borderTop:"1px solid #EDE6D8" }}>
+              {extResults === null ? (
+                <button onClick={searchAll} disabled={q.trim().length < 2 || extLoading}
+                  style={{ width:"100%", background:"none", border:"1px dashed #D8CFBB", borderRadius:12, padding:"14px", cursor: q.trim().length < 2 ? "default" : "pointer", fontFamily:"'DM Mono', monospace", fontSize:11, letterSpacing:"0.1em", textTransform:"uppercase", color: q.trim().length < 2 ? "#CFC7B6" : "#B0A488" }}>
+                  {extLoading ? "Searching…" : q.trim().length < 2 ? "Type to search all podcasts" : `Search all podcasts for “${q.trim()}”`}
+                </button>
+              ) : (
+                <>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:10 }}>
+                    <div style={{ fontFamily:"'DM Mono', monospace", fontSize:10, letterSpacing:"0.14em", textTransform:"uppercase", color:"#C8A96E" }}>From all podcasts</div>
+                    <button onClick={() => setExtResults(null)} style={{ background:"none", border:"none", cursor:"pointer", fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:13, color:"#B0A488" }}>clear</button>
+                  </div>
+                  {extResults.length === 0 ? (
+                    <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:15, color:"#888", textAlign:"center", padding:"24px 0" }}>No new shows found for that search.</p>
+                  ) : (
+                    <div className="listen-show-grid">
+                      {extResults.map(r => (
+                        <div key={r.feed_url}
+                          style={{ display:"flex", gap:12, alignItems:"center", background:"#fff", border:"1px solid #EDE6D8", borderRadius:12, padding:"10px 12px" }}>
+                          <ShowArt src={r.image_url} title={r.title} size={54} radius={8}/>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ fontFamily:"'Playfair Display', serif", fontSize:15, fontWeight:700, color:"#111", lineHeight:1.25, marginBottom:3, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{r.title}</div>
+                            <div style={{ fontFamily:"'DM Mono', monospace", fontSize:10, color:"#B0A488", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{r.author}</div>
+                          </div>
+                          <button onClick={() => addShow(r)} disabled={!!adding[r.feed_url] || !me}
+                            style={{ flexShrink:0, background: adding[r.feed_url] ? "#F0EDE8" : "#111", color: adding[r.feed_url] ? "#888" : "#F0EAD8", border:"none", borderRadius:20, padding:"8px 16px", fontFamily:"'DM Sans', sans-serif", fontSize:12, fontWeight:600, cursor: adding[r.feed_url] ? "wait" : "pointer" }}>
+                            {adding[r.feed_url] ? "Adding…" : "Add"}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </>
         ) : tab === "subscribed" ? (
           subs.length === 0 ? (
