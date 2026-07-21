@@ -871,21 +871,6 @@ function NewsCard({ item }) {
 
 // ── Shared: Side Nav (desktop) + Hamburger (mobile) ──────────────────────────
 
-const mockPodcasts = [
-  { id:1, title:"The AI Accountability Debate", forum:"Technology", duration:"42m", live:false },
-  { id:2, title:"Breaking: Senate Budget Crisis", forum:"Politics", duration:"18m", live:true  },
-  { id:3, title:"Culture Wars & the Algorithm",  forum:"Culture",   duration:"61m", live:false },
-];
-
-const discoverPodcasts = [
-  { id:4, title:"The Weekly Letter",          forum:"World",      duration:"34m", live:false, reason:"Popular this week" },
-  { id:5, title:"Sports Desk Live",           forum:"Sports",     duration:"28m", live:true,  reason:"Trending in Sports" },
-  { id:6, title:"Inside the Economy",         forum:"Economy",    duration:"52m", live:false, reason:"Based on your reads" },
-  { id:7, title:"Climate Now",                forum:"Climate",    duration:"41m", live:false, reason:"Based on your reads" },
-  { id:8, title:"Press Freedom Roundtable",   forum:"World",      duration:"67m", live:false, reason:"Featured" },
-];
-
-
 function SideNav({ activeTab, onNavigate, onSignOut, session }) {
   const [sideTab, setSideTab] = useState("breaking");
   const navigate = useNavigate();
@@ -5885,21 +5870,6 @@ function ForumDetailPage({ session, onNavigate }) {
 
 // ── Page: You ─────────────────────────────────────────────────────────────────
 
-// Stock profile photos using picsum with consistent seeds
-const profilePhotos = {
-  default: "https://picsum.photos/seed/profile-default/200/200",
-};
-
-const demoFollowedPublications = [
-  { name:"The Atlantic",  color:"#2C3E50", category:"Culture"    },
-  { name:"Reuters",       color:"#E67E22", category:"World"      },
-  { name:"The Guardian",  color:"#27AE60", category:"World"      },
-  { name:"Wired",         color:"#1A1A1A", category:"Technology" },
-  { name:"Politico",      color:"#C0392B", category:"Politics"   },
-  { name:"BBC Sport",     color:"#F39C12", category:"Sports"     },
-];
-
-const demoStats = { letters: 12, replies: 47, likes: 203, following: 34, followers: 89 };
 
 function YouPage({ session, onSignOut }) {
   const navigate = useNavigate();
@@ -8378,7 +8348,7 @@ function AnimatedDemoFeed() {
   const demoForums = [
     { name:"Politics & Policy", note:"Open to all",   color:"#C0392B" },
     { name:"Technology",        note:"Open to all",   color:"#1A1A1A" },
-    { name:"Climate & Earth",   note:"Private forum", color:"#27AE60" },
+    { name:"Climate & Earth",   note:"Open to all", color:"#27AE60" },
   ];
 
   // You-slide stats (count up to these)
