@@ -22,19 +22,19 @@ const json = (b: unknown, s = 200) =>
 // --- tiny, dependency-free RSS helpers -------------------------------------
 // Podcast feeds are plain RSS 2.0; we pull just the fields our tables need.
 const tag = (block: string, name: string): string | null => {
-  const m = block.match(new RegExp(`<${name}[^>]*>([\\s\\S]*?)</${name}>`, "i"));
+  const m = block.match(new RegExp("<" + name + "[^>]*>([\\s\\S]*?)</" + name + ">", "i"));
   if (!m) return null;
-  return m[1].replace(/<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>/g, "$1").trim();
+  return m[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1").trim();
 };
 const attr = (block: string, name: string, a: string): string | null => {
-  const m = block.match(new RegExp(`<${name}[^>]*\\b${a}=["']([^"']+)["']`, "i"));
+  const m = block.match(new RegExp("<" + name + "[^>]*\\b" + a + "=[\"']([^\"']+)[\"']", "i"));
   return m ? m[1] : null;
 };
 // iTunes duration can be "3600", "1:02:03" or "02:03" — normalise to seconds.
 const toSeconds = (raw: string | null): number | null => {
   if (!raw) return null;
   if (/^\d+$/.test(raw)) return parseInt(raw, 10);
-  const parts = raw.split(":").map(n => parseInt(n, 10));
+  const parts = raw.split(":").map((n) => parseInt(n, 10));
   if (parts.some(isNaN)) return null;
   return parts.reduce((acc, n) => acc * 60 + n, 0);
 };
@@ -81,13 +81,13 @@ Deno.serve(async (req) => {
 
     // 2. Fetch + parse the RSS feed.
     const res = await fetch(feed_url, { headers: { "User-Agent": "Letters/1.0 (podcast ingest)" } });
-    if (!res.ok) return json({ show, episodesAdded: 0, warning: `feed ${res.status}` });
+    if (!res.ok) return json({ show, episodesAdded: 0, warning: "feed " + res.status });
     const xml = await res.text();
 
     const items = xml.split(/<item[\s>]/i).slice(1).slice(0, 50); // newest 50
     const feedImage = attr(xml, "itunes:image", "href") || tag(xml, "url");
 
-    const rows = items.map(raw => {
+    const rows = items.map((raw) => {
       const block = "<item " + raw;
       const enclosure = attr(block, "enclosure", "url");
       const guid = tag(block, "guid") || enclosure || tag(block, "link");

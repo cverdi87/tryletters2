@@ -2083,6 +2083,21 @@ const timeAgoRead = (dateStr) => {
   return `${days}d ago`;
 };
 
+// Module-level HTML stripper for podcast copy (episode/show descriptions arrive
+// as HTML in RSS feeds). Mirrors the component-scoped stripHtml. Module-level so
+// EpisodeRow and the show header — which aren't inside the feed component — can
+// reach it (same reason timeAgoRead is hoisted here).
+const stripHtmlText = (html) => {
+  if (!html) return "";
+  if (typeof document === "undefined") return html;
+  const withSpacing = String(html)
+    .replace(/<\/(p|div|li|blockquote|h[1-6])>/gi, " ")
+    .replace(/<br\s*\/?>/gi, " ");
+  const div = document.createElement("div");
+  div.innerHTML = withSpacing;
+  return (div.textContent || div.innerText || "").replace(/\s+/g, " ").trim();
+};
+
 const newsSources = [
   { name:"AP News", category:"World", color:"#C0392B" },
   { name:"Reuters", category:"World", color:"#E67E22" },
@@ -7775,7 +7790,7 @@ function EpisodeRow({ episode, show, progress, onOpenShow, onClip }) {
         )}
         <div style={{ fontFamily:"'Playfair Display', serif", fontSize:15.5, fontWeight:700, color:"#111", lineHeight:1.3, marginBottom:5 }}>{episode.title}</div>
         {episode.description && (
-          <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:14, lineHeight:1.55, color:"#666", margin:"0 0 9px", display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden" }}>{episode.description}</p>
+          <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:14, lineHeight:1.55, color:"#666", margin:"0 0 9px", display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden" }}>{stripHtmlText(episode.description)}</p>
         )}
         <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
           <button onClick={() => audio.play(episode, show)}
@@ -7950,7 +7965,7 @@ function ListenPage({ session, onSignOut, onNavigate }) {
           </div>
 
           {openShow.description && (
-            <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:15, lineHeight:1.6, color:"#555", margin:"0 0 24px" }}>{openShow.description}</p>
+            <p style={{ fontFamily:"'EB Garamond', Georgia, serif", fontSize:15, lineHeight:1.6, color:"#555", margin:"0 0 24px" }}>{stripHtmlText(openShow.description)}</p>
           )}
 
           <div style={{ fontSize:10, letterSpacing:"0.14em", textTransform:"uppercase", color:"#B0A488", fontFamily:"'DM Mono', monospace", marginBottom:4, borderTop:"1px solid #E8E0D0", paddingTop:18 }}>
