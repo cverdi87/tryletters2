@@ -282,7 +282,6 @@ function RightNav({ active, onNavigate, unread = 0 }) {
     { id:"feed",   label:"Feed",   icon: (isActive) => <svg width="20" height="20" viewBox="0 0 24 24" fill={isActive?"#111":"none"} stroke={isActive?"#111":"#999"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
     { id:"read",   label:"Read",   icon: (isActive) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={isActive?"#111":"#999"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg> },
     { id:"listen", label:"Listen", icon: (isActive) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={isActive?"#111":"#999"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg> },
-    { id:"briefing", label:"Briefing", icon: (isActive) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={isActive?"#111":"#999"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16v16H4z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg> },
     { id:"write",  label:"Write",  icon: (isActive) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={isActive?"#111":"#999"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> },
     { id:"forums", label:"Forums", icon: (isActive) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={isActive?"#111":"#999"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
     { id:"you",    label:"You",    icon: (isActive) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={isActive?"#111":"#999"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
@@ -2474,6 +2473,7 @@ function ReadPage({ onNavigate, session }) {
     <div className="letters-main" style={{ minHeight:"100vh", background:"#F9F6F0", paddingBottom:80 }}>
       <TopBar title={<span>Read<span style={{ color:"#C8A96E" }}>.</span></span>}/>
       <main className="read-main" style={{ maxWidth:680, margin:"0 auto", padding:"16px 20px 0" }}>
+        <BriefingStrip session={session}/>
 
         {/* Category filter */}
         <div style={{ display:"flex", gap:8, overflowX:"auto", paddingBottom:16 }}>
@@ -7836,24 +7836,38 @@ function EpisodeRow({ episode, show, progress, onOpenShow, onClip }) {
 // module-level helpers already in App.jsx: supabase, useNavigate, TopBar,
 // timeAgoRead, stripHtmlText, ShowArt.
 // ============================================================================
+// Daily Briefing — a compact strip pinned to the TOP of the Read tab. Shows the
+// day's picks from the user's saved sources (publications, podcasts, topics),
+// each dismissable (✕) with a "clear all" for the whole strip. Dismiss-state is
+// per-day and stored in localStorage (ephemeral, resets at date rollover, no DB
+// round-trip; per-device is fine for a daily glance). An "Edit" affordance flips
+// the strip into the source picker. Reused later on the You page.
+//
+// Assumes module-level helpers from App.jsx: supabase, useNavigate, timeAgoRead,
+// stripHtmlText, ShowArt.
+// ============================================================================
 
-function BriefingPage({ session, onSignOut, onNavigate }) {
+function BriefingStrip({ session }) {
   const navigate = useNavigate();
   const me = session?.user?.id;
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const dismissKey = me ? `letters_briefing_dismissed_${me}_${today}` : null;
 
   const [loading, setLoading] = useState(true);
-  const [mode, setMode] = useState("view");        // "view" | "setup"
-  const [prefs, setPrefs] = useState(null);        // briefing_preferences row (or null = not set up)
+  const [prefs, setPrefs] = useState(null);
+  const [mode, setMode] = useState("strip");       // "strip" | "setup"
+  const [packet, setPacket] = useState({ episodes: [], letters: [], articles: [] });
 
-  // catalogs for the picker
+  // dismiss state for today: { all:bool, items:[itemKey,...] }
+  const [dismissed, setDismissed] = useState({ all: false, items: [] });
+
+  // catalogs + selection for setup
   const [allPubs, setAllPubs] = useState([]);
   const [allShows, setAllShows] = useState([]);
   const [allTopics, setAllTopics] = useState([]);
-
-  // working selection while in setup
-  const [selPubs, setSelPubs] = useState([]);       // publication ids
-  const [selShows, setSelShows] = useState([]);     // podcast show ids
-  const [selTopics, setSelTopics] = useState([]);   // topic strings
+  const [selPubs, setSelPubs] = useState([]);
+  const [selShows, setSelShows] = useState([]);
+  const [selTopics, setSelTopics] = useState([]);
   const [deliveryTime, setDeliveryTime] = useState("07:00");
   const [isPublic, setIsPublic] = useState(false);
   const [pubSearch, setPubSearch] = useState("");
@@ -7861,23 +7875,33 @@ function BriefingPage({ session, onSignOut, onNavigate }) {
   const [topicSearch, setTopicSearch] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // the rendered packet
-  const [packet, setPacket] = useState({ episodes: [], letters: [], articles: [] });
+  // read today's dismiss-state from localStorage on mount
+  useEffect(() => {
+    if (!dismissKey) return;
+    try {
+      const raw = window.localStorage.getItem(dismissKey);
+      if (raw) setDismissed(JSON.parse(raw));
+    } catch { /* ignore */ }
+  }, [dismissKey]);
 
+  const persistDismissed = (next) => {
+    setDismissed(next);
+    try { if (dismissKey) window.localStorage.setItem(dismissKey, JSON.stringify(next)); } catch { /* ignore */ }
+  };
+
+  // load prefs + catalogs
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
       const [{ data: pref }, { data: pubs }, { data: shows }, { data: topics }] = await Promise.all([
         me ? supabase.from("briefing_preferences").select("*").eq("user_id", me).maybeSingle() : Promise.resolve({ data: null }),
-        supabase.from("publications").select("id, title, slug, standfirst, description").eq("archived", false).order("title"),
+        supabase.from("publications").select("id, title, slug").eq("archived", false).order("title"),
         supabase.from("podcast_shows").select("id, title, author, image_url").order("title"),
         supabase.from("topics").select("tag").order("tag"),
       ]);
       if (cancelled) return;
-      setAllPubs(pubs || []);
-      setAllShows(shows || []);
-      setAllTopics((topics || []).map(t => t.tag));
+      setAllPubs(pubs || []); setAllShows(shows || []); setAllTopics((topics || []).map(t => t.tag));
       if (pref) {
         setPrefs(pref);
         setSelPubs(pref.publication_ids || []);
@@ -7885,50 +7909,34 @@ function BriefingPage({ session, onSignOut, onNavigate }) {
         setSelTopics(pref.topics || []);
         setDeliveryTime((pref.delivery_time || "07:00").slice(0, 5));
         setIsPublic(!!pref.is_public);
-        setMode("view");
-      } else {
-        setMode("setup");   // never set up → straight into setup
       }
       setLoading(false);
     })();
     return () => { cancelled = true; };
   }, [me]);
 
-  // Build the packet whenever prefs are present and we're viewing.
+  // build the packet when prefs present
   useEffect(() => {
-    if (!prefs || mode !== "view") return;
+    if (!prefs) return;
     let cancelled = false;
     (async () => {
       const pubIds = prefs.publication_ids || [];
       const showIds = prefs.podcast_show_ids || [];
       const topics = prefs.topics || [];
-
-      const jobs = [];
-      // newest episode from each briefing podcast
-      jobs.push(showIds.length
-        ? supabase.from("podcast_episodes")
-            .select("id, title, description, published_at, image_url, show_id, show:show_id (id, title, image_url)")
-            .in("show_id", showIds).order("published_at", { ascending: false }).limit(12)
-        : Promise.resolve({ data: [] }));
-      // latest letters from each briefing publication
-      jobs.push(pubIds.length
-        ? supabase.from("letters")
-            .select("id, title, body, created_at, publication_id, profiles:user_id (username, full_name)")
-            .in("publication_id", pubIds).order("created_at", { ascending: false }).limit(12)
-        : Promise.resolve({ data: [] }));
-      // recent news for the chosen topics (topic == article category here)
-      jobs.push(topics.length
-        ? supabase.from("news_articles")
-            .select("id, title, description, source, published_at, image_url, category")
-            .in("category", topics).order("published_at", { ascending: false }).limit(12)
-        : Promise.resolve({ data: [] }));
-
-      const [ep, lt, ar] = await Promise.all(jobs);
+      const [ep, lt, ar] = await Promise.all([
+        showIds.length ? supabase.from("podcast_episodes").select("id, title, published_at, image_url, show_id, show:show_id (id, title, image_url)").in("show_id", showIds).order("published_at", { ascending: false }).limit(6) : Promise.resolve({ data: [] }),
+        pubIds.length ? supabase.from("letters").select("id, title, body, created_at, publication_id, profiles:user_id (username, full_name)").in("publication_id", pubIds).order("created_at", { ascending: false }).limit(6) : Promise.resolve({ data: [] }),
+        topics.length ? supabase.from("news_articles").select("id, title, source, published_at, category").in("category", topics).order("published_at", { ascending: false }).limit(6) : Promise.resolve({ data: [] }),
+      ]);
       if (cancelled) return;
       setPacket({ episodes: ep.data || [], letters: lt.data || [], articles: ar.data || [] });
     })();
     return () => { cancelled = true; };
-  }, [prefs, mode]);
+  }, [prefs]);
+
+  const isDismissed = (key) => dismissed.items.includes(key);
+  const dismissItem = (key) => persistDismissed({ ...dismissed, items: [...dismissed.items, key] });
+  const clearAll = () => persistDismissed({ all: true, items: dismissed.items });
 
   const togglePub = (id) => setSelPubs(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
   const toggleShow = (id) => setSelShows(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
@@ -7937,178 +7945,126 @@ function BriefingPage({ session, onSignOut, onNavigate }) {
   const save = async () => {
     if (!me) return;
     setSaving(true);
-    const row = {
-      user_id: me,
-      publication_ids: selPubs,
-      podcast_show_ids: selShows,
-      topics: selTopics,
-      delivery_time: deliveryTime.length === 5 ? deliveryTime + ":00" : deliveryTime,
-      is_public: isPublic,
-      enabled: true,
-    };
-    const { data, error } = await supabase.from("briefing_preferences")
-      .upsert(row, { onConflict: "user_id" }).select().single();
+    const { data, error } = await supabase.from("briefing_preferences").upsert({
+      user_id: me, publication_ids: selPubs, podcast_show_ids: selShows, topics: selTopics,
+      delivery_time: deliveryTime.length === 5 ? deliveryTime + ":00" : deliveryTime, is_public: isPublic, enabled: true,
+    }, { onConflict: "user_id" }).select().single();
     setSaving(false);
-    if (!error && data) { setPrefs(data); setMode("view"); }
+    if (!error && data) { setPrefs(data); setMode("strip"); }
   };
 
+  // ---- assemble visible (non-dismissed) items across all three types ----
+  const items = [];
+  packet.episodes.forEach(ep => items.push({ key: "ep_" + ep.id, kind: "Podcast", title: ep.title, sub: (ep.show?.title || "") + (ep.published_at ? " · " + timeAgoRead(ep.published_at) : ""), img: ep.image_url || ep.show?.image_url, go: () => navigate("/listen") }));
+  packet.letters.forEach(l => items.push({ key: "lt_" + l.id, kind: "Newsletter", title: l.title || stripHtmlText(l.body).slice(0, 60), sub: (l.profiles?.full_name || l.profiles?.username || "") + (l.created_at ? " · " + timeAgoRead(l.created_at) : ""), go: () => navigate("/feed/letter/" + l.id) }));
+  packet.articles.forEach(a => items.push({ key: "ar_" + a.id, kind: "Topic · " + (a.category || ""), title: a.title, sub: (a.source || "") + (a.published_at ? " · " + timeAgoRead(a.published_at) : ""), go: () => navigate("/read/article/" + a.id) }));
+  const visible = items.filter(it => !isDismissed(it.key));
+
   const hasSources = (prefs?.publication_ids?.length || 0) + (prefs?.podcast_show_ids?.length || 0) + (prefs?.topics?.length || 0) > 0;
-  const today = new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
 
-  // ---- filtered catalogs for the picker ----
-  const pubMatches = allPubs.filter(p => !pubSearch || (p.title || "").toLowerCase().includes(pubSearch.toLowerCase()));
-  const showMatches = allShows.filter(s => !showSearch || (s.title || "").toLowerCase().includes(showSearch.toLowerCase()) || (s.author || "").toLowerCase().includes(showSearch.toLowerCase()));
-  const topicMatches = allTopics.filter(t => !topicSearch || t.toLowerCase().includes(topicSearch.toLowerCase()));
+  // styles
+  const wrap = { background: "#fff", border: "1px solid #E8E0D0", borderRadius: 12, padding: "15px 18px", marginBottom: 18 };
+  const kicker = { fontFamily: "'DM Mono', monospace", fontSize: 10.5, letterSpacing: "0.12em", textTransform: "uppercase", color: "#C8A96E" };
+  const label = { fontFamily: "'DM Mono', monospace", fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#C8A96E", marginBottom: 8 };
+  const chip = (on) => ({ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 18, border: on ? "1px solid #141414" : "1px solid #E2DAC9", background: on ? "#141414" : "#fff", color: on ? "#F0EAD8" : "#555", fontFamily: "'DM Sans', sans-serif", fontSize: 12.5, cursor: "pointer", marginRight: 7, marginBottom: 7 });
+  const searchBox = { width: "100%", boxSizing: "border-box", border: "1px solid #E2DAC9", borderRadius: 9, padding: "7px 11px", fontSize: 13, fontFamily: "'DM Sans', sans-serif", marginBottom: 9 };
 
-  const label = { fontFamily: "'DM Mono', monospace", fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#C8A96E", marginBottom: 10 };
-  const chip = (on) => ({ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 13px", borderRadius: 20, border: on ? "1px solid #141414" : "1px solid #E2DAC9", background: on ? "#141414" : "#fff", color: on ? "#F0EAD8" : "#555", fontFamily: "'DM Sans', sans-serif", fontSize: 13, cursor: "pointer", marginBottom: 8 });
-  const searchBox = { width: "100%", boxSizing: "border-box", border: "1px solid #E2DAC9", borderRadius: 10, padding: "8px 12px", fontSize: 13.5, fontFamily: "'DM Sans', sans-serif", marginBottom: 10 };
+  // ---------- render ----------
+  if (loading) return null;                 // don't flash an empty box while loading
+  if (!me) return null;
 
+  // Not set up yet → a slim invitation, unless already cleared for today.
+  if (!prefs || !hasSources) {
+    if (mode !== "setup") {
+      return (
+        <div style={{ ...wrap, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+          <div>
+            <div style={kicker}>Daily Briefing</div>
+            <div style={{ fontFamily: "'EB Garamond', serif", fontSize: 15, color: "#444", marginTop: 3 }}>Gather your newsletters, podcasts, and topics into one daily read.</div>
+          </div>
+          <button onClick={() => setMode("setup")} style={{ flexShrink: 0, background: "#141414", color: "#F0EAD8", border: "none", borderRadius: 20, padding: "9px 18px", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Set it up</button>
+        </div>
+      );
+    }
+  }
+
+  // Setup mode (shared by first-run and Edit)
+  if (mode === "setup") {
+    const pubMatches = allPubs.filter(p => !pubSearch || (p.title || "").toLowerCase().includes(pubSearch.toLowerCase()));
+    const showMatches = allShows.filter(s => !showSearch || (s.title || "").toLowerCase().includes(showSearch.toLowerCase()) || (s.author || "").toLowerCase().includes(showSearch.toLowerCase()));
+    const topicMatches = allTopics.filter(t => !topicSearch || t.toLowerCase().includes(topicSearch.toLowerCase()));
+    return (
+      <div style={wrap}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 19, fontWeight: 800 }}>Your Daily Briefing<span style={{ color: "#C8A96E" }}>.</span></div>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <div style={label}>Newsletters &amp; publications</div>
+          <input value={pubSearch} onChange={e => setPubSearch(e.target.value)} placeholder="Search publications…" style={searchBox}/>
+          {pubMatches.length === 0 ? <p style={{ fontFamily: "'EB Garamond', serif", fontStyle: "italic", fontSize: 13.5, color: "#999" }}>None yet — as writers start publications on Letters, they'll appear here.</p>
+            : pubMatches.slice(0, 24).map(p => <button key={p.id} onClick={() => togglePub(p.id)} style={chip(selPubs.includes(p.id))}>{selPubs.includes(p.id) ? "✓ " : ""}{p.title}</button>)}
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <div style={label}>Podcasts</div>
+          <input value={showSearch} onChange={e => setShowSearch(e.target.value)} placeholder="Search podcasts…" style={searchBox}/>
+          {showMatches.length === 0 ? <p style={{ fontFamily: "'EB Garamond', serif", fontStyle: "italic", fontSize: 13.5, color: "#999" }}>None yet — add podcasts from the Listen tab.</p>
+            : showMatches.slice(0, 24).map(sh => <button key={sh.id} onClick={() => toggleShow(sh.id)} style={chip(selShows.includes(sh.id))}>{selShows.includes(sh.id) ? "✓ " : ""}{sh.title}</button>)}
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <div style={label}>Topics</div>
+          <input value={topicSearch} onChange={e => setTopicSearch(e.target.value)} placeholder="Search topics…" style={searchBox}/>
+          {topicMatches.length === 0 ? <p style={{ fontFamily: "'EB Garamond', serif", fontStyle: "italic", fontSize: 13.5, color: "#999" }}>None yet.</p>
+            : topicMatches.slice(0, 30).map(t => <button key={t} onClick={() => toggleTopic(t)} style={chip(selTopics.includes(t))}>{selTopics.includes(t) ? "✓ " : ""}#{t}</button>)}
+        </div>
+
+        <div style={{ borderTop: "1px solid #EDE6D8", paddingTop: 14, marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 11, flexWrap: "wrap" }}>
+            <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13.5, color: "#333" }}>Email it each day at</span>
+            <input type="time" value={deliveryTime} onChange={e => setDeliveryTime(e.target.value)} style={{ border: "1px solid #E2DAC9", borderRadius: 8, padding: "5px 9px", fontFamily: "'DM Mono', monospace", fontSize: 12.5 }}/>
+          </div>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <input type="checkbox" checked={isPublic} onChange={e => setIsPublic(e.target.checked)} style={{ width: 15, height: 15 }}/>
+            <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13.5, color: "#333" }}>Show “What I'm Reading” on my profile</span>
+          </label>
+        </div>
+
+        <div style={{ display: "flex", gap: 9 }}>
+          <button onClick={save} disabled={saving} style={{ background: "#141414", color: "#F0EAD8", border: "none", borderRadius: 20, padding: "9px 22px", fontFamily: "'DM Sans', sans-serif", fontSize: 13.5, fontWeight: 600, cursor: saving ? "wait" : "pointer" }}>{saving ? "Saving…" : "Save"}</button>
+          {prefs && <button onClick={() => setMode("strip")} style={{ background: "none", color: "#888", border: "1px solid #E2DAC9", borderRadius: 20, padding: "9px 16px", fontFamily: "'DM Sans', sans-serif", fontSize: 13.5, cursor: "pointer" }}>Cancel</button>}
+        </div>
+      </div>
+    );
+  }
+
+  // Strip cleared for the day, or every item individually cleared → show nothing.
+  if (dismissed.all || visible.length === 0) return null;
+
+  // The strip.
   return (
-    <div className="letters-main" style={{ minHeight: "100vh", background: "#F9F6F0", paddingBottom: 120 }}>
-      <TopBar title={<span>Briefing<span style={{ color: "#C8A96E" }}>.</span></span>} maxWidth={720} onLogoClick={() => navigate("/feed")}/>
-      <main style={{ maxWidth: 720, margin: "0 auto", padding: "0 20px" }}>
+    <div style={wrap}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 17, fontWeight: 800 }}>Your Daily Briefing<span style={{ color: "#C8A96E" }}>.</span></div>
+        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <button onClick={() => setMode("setup")} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12.5, color: "#888" }}>Edit</button>
+          <button onClick={clearAll} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "'EB Garamond', serif", fontStyle: "italic", fontSize: 13, color: "#B0A488" }}>clear all</button>
+        </div>
+      </div>
 
-        {loading ? (
-          <p style={{ fontFamily: "'EB Garamond', serif", fontStyle: "italic", color: "#888", textAlign: "center", padding: "60px 0" }}>Loading your briefing…</p>
-        ) : mode === "setup" ? (
-          <>
-            <div style={{ borderBottom: "2px solid #141414", paddingBottom: 14, marginBottom: 22 }}>
-              <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 30, fontWeight: 900, color: "#141414", lineHeight: 1.1 }}>Your Daily Briefing</div>
-              <p style={{ fontFamily: "'EB Garamond', serif", fontSize: 16, color: "#555", margin: "8px 0 0", lineHeight: 1.5 }}>Choose the newsletters, podcasts, and topics you want gathered each day. Your news, delivered how you want it.</p>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "9px 18px" }} className="briefing-mini">
+        {visible.map(it => (
+          <div key={it.key} style={{ display: "flex", gap: 9, alignItems: "flex-start", borderLeft: "2px solid #C8A96E", paddingLeft: 9 }}>
+            <div onClick={it.go} style={{ flex: 1, minWidth: 0, cursor: "pointer" }}>
+              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 8.5, letterSpacing: "0.1em", textTransform: "uppercase", color: "#C8A96E" }}>{it.kind}</div>
+              <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 13.5, fontWeight: 700, lineHeight: 1.2, color: "#141414", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{it.title}</div>
+              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#B0A488", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.sub}</div>
             </div>
-
-            {/* Publications */}
-            <div style={{ marginBottom: 26 }}>
-              <div style={label}>Newsletters &amp; publications</div>
-              <input value={pubSearch} onChange={e => setPubSearch(e.target.value)} placeholder="Search publications…" style={searchBox}/>
-              <div>
-                {pubMatches.length === 0 ? (
-                  <p style={{ fontFamily: "'EB Garamond', serif", fontStyle: "italic", fontSize: 14, color: "#999" }}>No publications yet — as writers start publications on Letters, they'll appear here.</p>
-                ) : pubMatches.slice(0, 30).map(p => (
-                  <button key={p.id} onClick={() => togglePub(p.id)} style={{ ...chip(selPubs.includes(p.id)), marginRight: 8 }}>
-                    {selPubs.includes(p.id) ? "✓ " : ""}{p.title}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Podcasts */}
-            <div style={{ marginBottom: 26 }}>
-              <div style={label}>Podcasts</div>
-              <input value={showSearch} onChange={e => setShowSearch(e.target.value)} placeholder="Search podcasts in your library…" style={searchBox}/>
-              <div>
-                {showMatches.length === 0 ? (
-                  <p style={{ fontFamily: "'EB Garamond', serif", fontStyle: "italic", fontSize: 14, color: "#999" }}>No shows yet — add podcasts from the Listen tab and they'll show up here.</p>
-                ) : showMatches.slice(0, 30).map(s => (
-                  <button key={s.id} onClick={() => toggleShow(s.id)} style={{ ...chip(selShows.includes(s.id)), marginRight: 8 }}>
-                    {selShows.includes(s.id) ? "✓ " : ""}{s.title}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Topics */}
-            <div style={{ marginBottom: 26 }}>
-              <div style={label}>Topics</div>
-              <input value={topicSearch} onChange={e => setTopicSearch(e.target.value)} placeholder="Search topics…" style={searchBox}/>
-              <div>
-                {topicMatches.length === 0 ? (
-                  <p style={{ fontFamily: "'EB Garamond', serif", fontStyle: "italic", fontSize: 14, color: "#999" }}>No topics yet.</p>
-                ) : topicMatches.slice(0, 40).map(t => (
-                  <button key={t} onClick={() => toggleTopic(t)} style={{ ...chip(selTopics.includes(t)), marginRight: 8 }}>
-                    {selTopics.includes(t) ? "✓ " : ""}#{t}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Delivery + privacy */}
-            <div style={{ borderTop: "1px solid #EDE6D8", paddingTop: 18, marginBottom: 22 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
-                <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: "#333" }}>Deliver each day at</span>
-                <input type="time" value={deliveryTime} onChange={e => setDeliveryTime(e.target.value)} style={{ border: "1px solid #E2DAC9", borderRadius: 8, padding: "6px 10px", fontFamily: "'DM Mono', monospace", fontSize: 13 }}/>
-              </div>
-              <label style={{ display: "flex", alignItems: "center", gap: 9, cursor: "pointer" }}>
-                <input type="checkbox" checked={isPublic} onChange={e => setIsPublic(e.target.checked)} style={{ width: 16, height: 16 }}/>
-                <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: "#333" }}>Show “What I'm Reading” on my profile</span>
-              </label>
-            </div>
-
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={save} disabled={saving} style={{ background: "#141414", color: "#F0EAD8", border: "none", borderRadius: 22, padding: "11px 26px", fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 600, cursor: saving ? "wait" : "pointer" }}>
-                {saving ? "Saving…" : "Save briefing"}
-              </button>
-              {prefs && (
-                <button onClick={() => setMode("view")} style={{ background: "none", color: "#888", border: "1px solid #E2DAC9", borderRadius: 22, padding: "11px 20px", fontFamily: "'DM Sans', sans-serif", fontSize: 14, cursor: "pointer" }}>Cancel</button>
-              )}
-            </div>
-          </>
-        ) : (
-          // ---------- VIEW MODE: the packet ----------
-          <>
-            <div style={{ borderBottom: "2px solid #141414", paddingBottom: 12, marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-              <div>
-                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#C8A96E" }}>{today}</div>
-                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 30, fontWeight: 900, color: "#141414", lineHeight: 1.1 }}>Your Daily Briefing</div>
-              </div>
-              <button onClick={() => setMode("setup")} style={{ background: "none", border: "1px solid #E2DAC9", borderRadius: 20, padding: "7px 15px", fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#555", cursor: "pointer" }}>Edit</button>
-            </div>
-
-            {!hasSources ? (
-              <div style={{ textAlign: "center", padding: "50px 0" }}>
-                <p style={{ fontFamily: "'EB Garamond', serif", fontSize: 17, color: "#555", marginBottom: 18 }}>Your briefing is empty. Add a few newsletters, podcasts, or topics to build your daily packet.</p>
-                <button onClick={() => setMode("setup")} style={{ background: "#141414", color: "#F0EAD8", border: "none", borderRadius: 22, padding: "11px 26px", fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Set up your briefing</button>
-              </div>
-            ) : (
-              <div style={{ marginTop: 22 }}>
-                {/* Podcasts */}
-                {packet.episodes.length > 0 && (
-                  <section style={{ marginBottom: 30 }}>
-                    <div style={label}>Latest from your podcasts</div>
-                    {packet.episodes.map(ep => (
-                      <div key={ep.id} onClick={() => navigate("/listen")} style={{ display: "flex", gap: 12, alignItems: "center", padding: "10px 0", borderBottom: "1px solid #EDE6D8", cursor: "pointer" }}>
-                        <ShowArt src={ep.image_url || ep.show?.image_url} title={ep.show?.title || ep.title} size={46} radius={7}/>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 15, fontWeight: 700, color: "#141414", lineHeight: 1.25, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ep.title}</div>
-                          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "#B0A488" }}>{ep.show?.title}{ep.published_at ? " · " + timeAgoRead(ep.published_at) : ""}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </section>
-                )}
-
-                {/* Publications */}
-                {packet.letters.length > 0 && (
-                  <section style={{ marginBottom: 30 }}>
-                    <div style={label}>From your newsletters</div>
-                    {packet.letters.map(l => (
-                      <div key={l.id} onClick={() => navigate("/feed/letter/" + l.id)} style={{ padding: "12px 0", borderBottom: "1px solid #EDE6D8", cursor: "pointer" }}>
-                        {l.title && <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 17, fontWeight: 800, color: "#141414", lineHeight: 1.25, marginBottom: 4 }}>{l.title}</div>}
-                        <p style={{ fontFamily: "'EB Garamond', serif", fontSize: 14.5, lineHeight: 1.55, color: "#555", margin: 0, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{stripHtmlText(l.body)}</p>
-                        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "#B0A488", marginTop: 5 }}>{l.profiles?.full_name || l.profiles?.username}{l.created_at ? " · " + timeAgoRead(l.created_at) : ""}</div>
-                      </div>
-                    ))}
-                  </section>
-                )}
-
-                {/* Topics / news */}
-                {packet.articles.length > 0 && (
-                  <section style={{ marginBottom: 30 }}>
-                    <div style={label}>In your topics</div>
-                    {packet.articles.map(a => (
-                      <div key={a.id} onClick={() => navigate("/read/article/" + a.id)} style={{ padding: "12px 0", borderBottom: "1px solid #EDE6D8", cursor: "pointer" }}>
-                        <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 16, fontWeight: 700, color: "#141414", lineHeight: 1.25, marginBottom: 3 }}>{a.title}</div>
-                        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "#B0A488" }}>{a.source}{a.category ? " · " + a.category : ""}{a.published_at ? " · " + timeAgoRead(a.published_at) : ""}</div>
-                      </div>
-                    ))}
-                  </section>
-                )}
-              </div>
-            )}
-          </>
-        )}
-      </main>
+            <button onClick={() => dismissItem(it.key)} title="Mark as read" style={{ flexShrink: 0, background: "none", border: "none", cursor: "pointer", color: "#C9BFA9", fontSize: 15, lineHeight: 1, padding: "0 2px" }}>✕</button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -10580,7 +10536,6 @@ function AuthenticatedApp({ session, handleSignOut }) {
         <Route path="/read/article/:articleId" element={<ReadPage onNavigate={goToTab} session={session}/>}/>
         <Route path="/read/publication/:publicationName" element={<ReadPage onNavigate={goToTab} session={session}/>}/>
         <Route path="/listen" element={<ListenPage session={session} onSignOut={handleSignOut} onNavigate={goToTab}/>}/>
-        <Route path="/briefing" element={<BriefingPage session={session} onSignOut={handleSignOut} onNavigate={goToTab}/>}/>
         <Route path="/write" element={<WriteDeskPage session={session} onNavigate={goToTab}/>}/>
         <Route path="/write/compose" element={<WritePage session={session} onNavigate={goToTab}/>}/>
         <Route path="/forums" element={<ForumsPage session={session} onSignOut={handleSignOut} onNavigate={goToTab}/>}/>
