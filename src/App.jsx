@@ -8027,7 +8027,7 @@ function ListenPage({ session, onSignOut, onNavigate }) {
                   {extResults.length === 0 ? (
                     <p style={{ fontFamily:"'EB Garamond', serif", fontStyle:"italic", fontSize:15, color:"#888", textAlign:"center", padding:"24px 0" }}>No new shows found for that search.</p>
                   ) : (
-                    <div className="listen-show-grid">
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr", gap:10 }}>
                       {extResults.map(r => (
                         <div key={r.feed_url}
                           style={{ display:"flex", gap:12, alignItems:"center", background:"#fff", border:"1px solid #EDE6D8", borderRadius:12, padding:"10px 12px" }}>
